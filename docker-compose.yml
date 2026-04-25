@@ -1,3 +1,11 @@
+# Single docker-compose file for both local development and a
+# production-style demo. Default behavior is dev mode:
+#
+#   docker compose up --build       # hot reload, source bind-mounted
+#
+# Switch the api/web targets to "runner" and drop the bind mounts to
+# run the production build instead — see comments inline.
+
 services:
   db:
     image: postgres:16-alpine
@@ -10,7 +18,8 @@ services:
     volumes:
       - pg-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-app} -d ${POSTGRES_DB:-app}"]
+      test:
+        ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-app} -d ${POSTGRES_DB:-app}"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -19,12 +28,15 @@ services:
     build:
       context: .
       dockerfile: apps/api/Dockerfile
-    image: app-control-pediatrico/api:latest
+      # `dev` keeps nest in watch mode; switch to `runner` for a
+      # production image (then remove the volumes section below).
+      target: ${API_BUILD_TARGET:-dev}
+    image: app-control-pediatrico/api:${IMAGE_TAG:-dev}
     ports:
       - "${API_PORT:-3001}:3001"
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgres://app:app@db:5432/app}
-      LMS_DATA_DIR: /app/data/lms
+      LMS_DATA_DIR: /repo/data/lms
       JWT_SECRET: ${JWT_SECRET:-change-me-access-secret}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-change-me-refresh-secret}
       JWT_EXPIRY: ${JWT_EXPIRY:-15m}
@@ -46,23 +58,66 @@ services:
       API_CORS_ORIGIN: ${API_CORS_ORIGIN:-http://localhost:3000}
       SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-admin@example.com}
       SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-changeme1234}
+    # Dev-mode bind mounts: source on the host stays in sync with the
+    # container, so saving a .ts file restarts the nest watcher.
+    # In production you'd remove this whole `volumes` block.
+    volumes:
+      - ./apps/api/src:/repo/apps/api/src
+      - ./packages/shared/src:/repo/packages/shared/src
+      - ./packages/database/src:/repo/packages/database/src
+      - ./data:/repo/data
+      # Keep node_modules from the image — never let the host overlay
+      # them (would break native modules built for linux).
+      - /repo/node_modules
+      - /repo/apps/api/node_modules
+      - /repo/packages/shared/node_modules
+      - /repo/packages/database/node_modules
     depends_on:
       db:
         condition: service_healthy
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "wget -qO- http://localhost:3001/api/v1/health >/dev/null || exit 1"
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 60s
 
   web:
     build:
       context: .
       dockerfile: apps/web/Dockerfile
+      target: ${WEB_BUILD_TARGET:-dev}
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3001}
-    image: app-control-pediatrico/web:latest
+    image: app-control-pediatrico/web:${IMAGE_TAG:-dev}
     ports:
       - "${WEB_PORT:-3000}:3000"
     environment:
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3001}
+      # Server-to-server health check uses the in-cluster URL.
+      INTERNAL_API_URL: http://api:3001
+    volumes:
+      - ./apps/web/app:/repo/apps/web/app
+      - ./apps/web/components:/repo/apps/web/components
+      - ./apps/web/lib:/repo/apps/web/lib
+      - ./packages/shared/src:/repo/packages/shared/src
+      - /repo/node_modules
+      - /repo/apps/web/node_modules
+      - /repo/apps/web/.next
+      - /repo/packages/shared/node_modules
     depends_on:
-      - api
+      api:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "wget -qO- http://localhost:3000/api/health >/dev/null || exit 1"
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 60s
 
 volumes:
   pg-data:

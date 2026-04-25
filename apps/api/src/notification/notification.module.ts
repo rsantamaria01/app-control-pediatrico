@@ -1,11 +1,11 @@
 import { Global, Module } from '@nestjs/common';
-import { NotificationChannel } from '@app/shared';
 import { NotificationService } from './notification.service';
 import { EmailProvider } from './providers/email.provider';
 import { SmsProvider } from './providers/sms.provider';
 import { WhatsAppProvider } from './providers/whatsapp.provider';
 import { TelegramProvider } from './providers/telegram.provider';
 import { NOTIFICATION_PROVIDER } from './notification-provider.interface';
+import { isChannelConfigured } from './active-channels';
 
 const ALL_PROVIDERS = [EmailProvider, SmsProvider, WhatsAppProvider, TelegramProvider];
 
@@ -15,21 +15,6 @@ const ALL_PROVIDERS = [EmailProvider, SmsProvider, WhatsAppProvider, TelegramPro
  * admin asserts contact ownership when registering the patient and the
  * parent signs in by password.
  */
-function isChannelConfigured(channel: NotificationChannel, env = process.env): boolean {
-  switch (channel) {
-    case NotificationChannel.EMAIL:
-      return Boolean(env.SMTP_HOST);
-    case NotificationChannel.SMS:
-      return Boolean(env.TWILIO_ACCOUNT_SID && env.TWILIO_AUTH_TOKEN && env.TWILIO_FROM);
-    case NotificationChannel.WHATSAPP:
-      return Boolean(env.WHATSAPP_API_KEY);
-    case NotificationChannel.TELEGRAM:
-      return Boolean(env.TELEGRAM_BOT_TOKEN);
-    default:
-      return false;
-  }
-}
-
 @Global()
 @Module({
   providers: [

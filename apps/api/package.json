@@ -7,6 +7,8 @@
     "dev": "nest start --watch",
     "start": "node dist/main.js",
     "test": "jest",
+    "test:watch": "jest --watch",
+    "test:cov": "jest --coverage",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "lint": "eslint \"src/**/*.ts\" --fix || true",
     "typecheck": "tsc -p tsconfig.json --noEmit",

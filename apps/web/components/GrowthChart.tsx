@@ -57,6 +57,10 @@ export function GrowthChart({
         return 'Weight (kg)';
       case WhoIndicator.BMI_FOR_AGE:
         return 'BMI (kg/m²)';
+      case WhoIndicator.HEAD_CIRCUMFERENCE_FOR_AGE:
+        return 'Head circumference (cm)';
+      default:
+        return '';
     }
   }, [indicator]);
 
@@ -86,6 +90,12 @@ export function GrowthChart({
               return m.weightKg;
             case WhoIndicator.BMI_FOR_AGE:
               return m.bmi;
+            case WhoIndicator.HEAD_CIRCUMFERENCE_FOR_AGE:
+              // Head circumference is not (yet) recorded on a Measurement,
+              // so this indicator's chart shows reference bands only.
+              return Number.NaN;
+            default:
+              return Number.NaN;
           }
         })();
         const zKey =
@@ -95,15 +105,17 @@ export function GrowthChart({
               ? 'waz'
               : indicator === WhoIndicator.WEIGHT_FOR_HEIGHT
                 ? 'whz'
-                : 'baz';
+                : indicator === WhoIndicator.BMI_FOR_AGE
+                  ? 'baz'
+                  : null;
         return {
           x: xVal,
           y: yVal,
-          z: m.zScores[zKey],
+          z: zKey ? m.zScores[zKey] : null,
           recordedAt: m.recordedAt,
         };
       })
-      .filter((p) => p.x >= range.min && p.x <= range.max);
+      .filter((p) => Number.isFinite(p.y) && p.x >= range.min && p.x <= range.max);
 
     return {
       tooltip: {

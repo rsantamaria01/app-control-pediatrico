@@ -4,31 +4,19 @@ export class Init1714000000000 implements MigrationInterface {
   name = 'Init1714000000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
-    const isPg = queryRunner.connection.options.type === 'postgres';
-    const uuid = isPg ? 'uuid' : 'varchar';
-    const ts = isPg ? 'timestamp with time zone' : 'datetime';
-    const date = isPg ? 'date' : 'date';
-    const num = (precision: number, scale: number) =>
-      isPg ? `numeric(${precision},${scale})` : `numeric`;
+    const uuid = 'uuid';
+    const ts = 'timestamp with time zone';
+    const date = 'date';
+    const num = (precision: number, scale: number) => `numeric(${precision},${scale})`;
+    const uuidDefault = 'gen_random_uuid()';
 
-    if (isPg) {
-      await queryRunner.query('CREATE EXTENSION IF NOT EXISTS pgcrypto');
-    }
-
-    const uuidDefault = isPg ? "gen_random_uuid()" : undefined;
+    await queryRunner.query('CREATE EXTENSION IF NOT EXISTS pgcrypto');
 
     await queryRunner.createTable(
       new Table({
         name: 'users',
         columns: [
-          {
-            name: 'id',
-            type: uuid,
-            isPrimary: true,
-            generationStrategy: 'uuid',
-            default: uuidDefault,
-            isGenerated: !isPg,
-          },
+          { name: 'id', type: uuid, isPrimary: true, default: uuidDefault },
           { name: 'email', type: 'varchar', length: '320', isNullable: true },
           { name: 'phone', type: 'varchar', length: '32', isNullable: true },
           { name: 'passwordHash', type: 'varchar', length: '255', isNullable: true },
@@ -53,14 +41,7 @@ export class Init1714000000000 implements MigrationInterface {
       new Table({
         name: 'otp_codes',
         columns: [
-          {
-            name: 'id',
-            type: uuid,
-            isPrimary: true,
-            generationStrategy: 'uuid',
-            default: uuidDefault,
-            isGenerated: !isPg,
-          },
+          { name: 'id', type: uuid, isPrimary: true, default: uuidDefault },
           { name: 'userId', type: uuid, isNullable: true },
           { name: 'parentContactId', type: uuid, isNullable: true },
           { name: 'codeHash', type: 'varchar', length: '255' },
@@ -90,14 +71,7 @@ export class Init1714000000000 implements MigrationInterface {
       new Table({
         name: 'refresh_tokens',
         columns: [
-          {
-            name: 'id',
-            type: uuid,
-            isPrimary: true,
-            generationStrategy: 'uuid',
-            default: uuidDefault,
-            isGenerated: !isPg,
-          },
+          { name: 'id', type: uuid, isPrimary: true, default: uuidDefault },
           { name: 'userId', type: uuid },
           { name: 'tokenHash', type: 'varchar', length: '255' },
           { name: 'expiresAt', type: ts },
@@ -129,14 +103,7 @@ export class Init1714000000000 implements MigrationInterface {
       new Table({
         name: 'patients',
         columns: [
-          {
-            name: 'id',
-            type: uuid,
-            isPrimary: true,
-            generationStrategy: 'uuid',
-            default: uuidDefault,
-            isGenerated: !isPg,
-          },
+          { name: 'id', type: uuid, isPrimary: true, default: uuidDefault },
           { name: 'firstName1', type: 'varchar', length: '64' },
           { name: 'firstName2', type: 'varchar', length: '64', isNullable: true },
           { name: 'lastName1', type: 'varchar', length: '64' },
@@ -168,14 +135,7 @@ export class Init1714000000000 implements MigrationInterface {
       new Table({
         name: 'parents',
         columns: [
-          {
-            name: 'id',
-            type: uuid,
-            isPrimary: true,
-            generationStrategy: 'uuid',
-            default: uuidDefault,
-            isGenerated: !isPg,
-          },
+          { name: 'id', type: uuid, isPrimary: true, default: uuidDefault },
           { name: 'firstName1', type: 'varchar', length: '64' },
           { name: 'firstName2', type: 'varchar', length: '64', isNullable: true },
           { name: 'lastName1', type: 'varchar', length: '64' },
@@ -230,14 +190,7 @@ export class Init1714000000000 implements MigrationInterface {
       new Table({
         name: 'parent_contacts',
         columns: [
-          {
-            name: 'id',
-            type: uuid,
-            isPrimary: true,
-            generationStrategy: 'uuid',
-            default: uuidDefault,
-            isGenerated: !isPg,
-          },
+          { name: 'id', type: uuid, isPrimary: true, default: uuidDefault },
           { name: 'parentId', type: uuid },
           { name: 'type', type: 'varchar', length: '8' },
           { name: 'value', type: 'varchar', length: '320' },
@@ -265,14 +218,7 @@ export class Init1714000000000 implements MigrationInterface {
       new Table({
         name: 'measurements',
         columns: [
-          {
-            name: 'id',
-            type: uuid,
-            isPrimary: true,
-            generationStrategy: 'uuid',
-            default: uuidDefault,
-            isGenerated: !isPg,
-          },
+          { name: 'id', type: uuid, isPrimary: true, default: uuidDefault },
           { name: 'patientId', type: uuid },
           { name: 'recordedById', type: uuid },
           { name: 'recordedAt', type: date },

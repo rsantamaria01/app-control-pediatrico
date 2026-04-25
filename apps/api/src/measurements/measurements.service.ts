@@ -61,18 +61,14 @@ export class MeasurementsService {
       where: { patientId },
       order: { recordedAt: 'ASC' },
     });
-    const results: MeasurementDto[] = [];
-    for (const m of all) {
-      results.push(await this.toDto(m, patient.gender as Gender));
-    }
-    return results;
+    return all.map((m) => this.toDto(m, patient.gender as Gender));
   }
 
-  private async toDto(m: Measurement, gender: Gender): Promise<MeasurementDto> {
+  private toDto(m: Measurement, gender: Gender): MeasurementDto {
     const ageMonths = Number(m.ageMonths);
     const weightKg = Number(m.weightKg);
     const heightCm = Number(m.heightCm);
-    const lmsRows = await this.who.getAllForGender(gender);
+    const lmsRows = this.who.getAllForGender(gender);
     const z = computeAllZScores({ weightKg, heightCm, ageMonths, gender, lmsRows });
     return {
       id: m.id,

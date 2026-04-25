@@ -68,6 +68,12 @@ export class ContactVerifyConfirmDto {
   code!: string;
 }
 
+export interface AuthConfigDto {
+  /** Notification channels currently configured on the server. Empty
+   * array means OTP login is unavailable and only password login works. */
+  channels: NotificationChannel[];
+}
+
 export class ChangePasswordDto {
   @IsOptional()
   @IsString()

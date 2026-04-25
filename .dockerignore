@@ -7,6 +7,5 @@ dist
 .env
 .env.*
 *.log
-data/data.db
-data/data.db-journal
+data/who.db
 scripts/.venv

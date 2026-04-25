@@ -1,77 +1,86 @@
 # app-control-pediatrico
 
-Clinical web application for tracking infant growth measurements (weight,
-height, age) and visualising them against the WHO Child Growth Standards
-LMS curves with computed Z-scores.
+Clinical web application for tracking infant and child growth
+measurements (weight, height, age) and visualising them against the
+CDC growth-chart LMS curves with computed Z-scores.
 
 - Doctors record measurements; the API computes HAZ / WAZ / WHZ / BAZ
   using the LMS formula with the WHO disjoint regression cap.
 - Parents (PATIENT role) get a read-only view of their child's chart.
-- WHO LMS reference data ships as a pre-seeded read-only SQLite
-  database (`data/who.db`). The application's own data lives in a
-  second TypeORM DataSource that switches between SQLite and Postgres
-  via env vars.
+- Patients are **never self-registered** — a doctor or admin creates
+  them and links a parent.
+- Reference LMS data lives as static **CSV files** under `data/lms/`
+  (one file per indicator+age range; no database needed for the
+  reference data). The application's own data lives in **Postgres**.
 
 ## Repository layout
 
 ```
 apps/
-  api/          NestJS (port 3001), TypeORM dual DataSource
+  api/          NestJS (port 3001)
   web/          Next.js App Router (port 3000), Tailwind, ECharts
 packages/
   shared/       DTOs, enums, Z-score utility (LMS + disjoint cap)
-  database/     TypeORM entities, App + WHO DataSources, migrations
+  database/     TypeORM entities, App DataSource (Postgres), migrations
 data/
-  who.db        Pre-seeded WHO LMS standards (read-only, committed)
-  data.db       Runtime app DB (sqlite demo; gitignored)
+  lms/          CDC growth-chart CSV files (committed, read-only)
 scripts/
-  who-db.sh     Bash entrypoint to (re)build data/who.db
-  who-db.py     Downloads + parses 8 WHO Excel tables -> sqlite
-  who-db-synthetic.py  Deterministic placeholder generator
-docker-compose.yml          Production-style stack
-docker-compose.override.yml Dev overrides (hot reload)
+  lms-csv-mock.py  Generates mock CDC LMS CSVs for the demo
+docker-compose.yml  Single-file production-style stack (api + web + db)
 ```
 
 ## Toolchain
 
 - Node 20 LTS (a `.nvmrc` is included; Node 22 also works)
 - pnpm 9.x via `corepack` (the root `package.json` pins `packageManager`)
-- Python 3.9+ only when regenerating WHO data from cdn.who.int
+- Docker + docker-compose
+- Python 3.9+ only when regenerating the mock CSVs
 
-## Local dev (no Docker)
+## Quick start (Docker)
 
 ```bash
-corepack enable
-pnpm install
 cp .env.example .env
-
-# Initialise the runtime app DB (sqlite by default)
-pnpm --filter @app/database migration:run
-
-# Run API + web with Turborepo
-pnpm dev
+docker compose up --build
 ```
 
-- API on http://localhost:3001/api/v1 (Swagger: /api/docs)
+That brings up Postgres, the API (which auto-runs migrations on boot)
+and the web UI:
+
 - Web on http://localhost:3000
+- API on http://localhost:3001/api/v1 (Swagger: /api/docs)
+- Postgres on localhost:5432 (`app` / `app`)
 
 A bootstrap ADMIN user is seeded on first boot using
 `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` (defaults
 `admin@example.com` / `changeme1234`). Sign in via
 `/login/password` to get started, then create DOCTOR users.
 
+## Local dev (no Docker)
+
+You still need a Postgres instance. The simplest path is to run only
+the `db` service from compose and run the rest natively:
+
+```bash
+docker compose up -d db
+corepack enable
+pnpm install
+cp .env.example .env  # DATABASE_URL defaults work for the db container
+pnpm dev              # turbo runs api + web + shared/db builds
+```
+
 ## End-to-end demo flow
 
 1. Sign in as ADMIN at http://localhost:3000/login/password.
 2. Create a DOCTOR user under **Users**.
-3. Sign out, sign back in as the DOCTOR (OTP via email or password).
-4. Create a parent under **Parents**, add an email contact, click
-   **Send code**, enter the OTP from the API logs to verify.
+3. Sign out, sign back in as the DOCTOR.
+4. Create a parent under **Parents**, add an email or phone contact.
+   (If no notification channel is configured the contact is marked
+   verified automatically; otherwise click **Send code**.)
 5. Create a patient under **Patients**, link the parent.
 6. Open the patient → **Record measurement** (date, kg, cm). The API
    responds with HAZ / WAZ / WHZ / BAZ inline.
 7. Toggle **Chart** ↔ **Table**. Switch indicators with the chart's
-   buttons; the WHO band lines come from the LMS data filtered by
+   buttons; the LMS band lines come from the CSV files filtered by
    the patient's gender.
 8. The table view colours each Z-score by band:
    green ≤ |1| · yellow ≤ |2| · orange ≤ |3| · red > |3|.
@@ -87,95 +96,71 @@ if L == 0:  Z = ln(Y / M) / S
 
 Values beyond ±3 SD are remapped via the WHO disjoint regression rule
 using `SD23 = SD3 − SD2` (and analogously below). `valueAtZ()` is the
-inverse used to render the WHO reference lines on the chart.
+inverse used to render the reference percentile lines on the chart.
 
-## Switching SQLite ↔ Postgres
+## CDC LMS reference data (CSV files)
 
-The same code runs on both engines. Edit `.env`:
+The application reads every `*.csv` in `LMS_DATA_DIR` (default
+`./data/lms`) once at startup and indexes the rows by indicator and
+gender. Files follow a strict naming convention:
 
 ```
-DATABASE_TYPE=postgres
-DATABASE_URL=postgres://app:app@db:5432/app
+<xAxis>_<yAxis>_<initialMonth>_<lastMonth>.csv
 ```
 
-Then start with the postgres compose profile:
+Letters: `a`=age (months), `w`=weight (kg), `h`=height/stature (cm),
+`l`=length (cm), `b`=BMI, `hc`=head circumference (cm).
+
+Examples shipped under `data/lms/`:
+
+| File | Indicator | Range |
+|------|-----------|-------|
+| `h_a_0_240.csv`  | height-for-age (length 0–24 mo, stature 24–240 mo) | 0–240 months |
+| `w_a_0_240.csv`  | weight-for-age | 0–240 months |
+| `b_a_24_240.csv` | BMI-for-age   | 24–240 months |
+| `hc_a_0_36.csv`  | head-circumference-for-age | 0–36 months |
+| `w_h_45_121.csv` | weight-for-stature (x-axis is cm, not months) | 45–121 cm |
+
+CSV column layout matches the CDC published tables:
+
+```
+Sex,X,L,M,S,P3,P5,P10,P25,P50,P75,P85,P90,P95,P97
+```
+
+`Sex` is `1` for male, `2` for female. The API uses only `L`, `M`,
+`S`; the percentile columns are included so the file is
+self-describing.
+
+To regenerate the demo mock files:
 
 ```bash
-docker compose --profile postgres up --build
+python3 scripts/lms-csv-mock.py
 ```
 
-Run migrations once: `pnpm --filter @app/database migration:run`.
+To use real reference data, download the CDC tables from
+<https://www.cdc.gov/growthcharts/cdc-data-files.htm>, convert each
+table to the layout above, name the files using the convention, and
+drop them in `data/lms/` (overwriting the mocks).
 
-## Regenerating `data/who.db`
+## Notification channels (all optional)
 
-The WHO LMS reference table changes only when WHO publishes an update.
-To regenerate:
+Each channel auto-enables when its credentials env vars are present:
 
-```bash
-bash scripts/who-db.sh --force
-```
+| Channel  | Enabled when… |
+|----------|---------------|
+| EMAIL    | `SMTP_HOST` is set |
+| SMS      | `TWILIO_ACCOUNT_SID` + `TWILIO_AUTH_TOKEN` + `TWILIO_FROM` are set |
+| WHATSAPP | `WHATSAPP_API_KEY` is set |
+| TELEGRAM | `TELEGRAM_BOT_TOKEN` is set |
 
-This:
-- Verifies `python3` is available
-- Creates `scripts/.venv` and installs `requests` + `openpyxl`
-- Downloads 8 WHO `.xlsx` tables from `cdn.who.int`
-- Parses L/M/S columns by header name (case-insensitive)
-- Writes `data/who.db` atomically (temp file + rename)
+Effects when no channels are configured (the default `.env.example`):
 
-> **Note:** the committed `data/who.db` was generated from
-> `scripts/who-db-synthetic.py` because the build sandbox could not
-> reach `cdn.who.int`. The schema and ranges match the real WHO data;
-> values are deterministic plausible curves. Replace with real WHO data
-> by running the script above on a machine with outbound HTTPS.
+- The doctor or admin enters parent contact data; contacts are marked
+  verified automatically since there is no way to send a code.
+- OTP login is unavailable. Users sign in via password.
 
-## Docker
-
-Build and run the production stack:
-
-```bash
-docker compose up --build
-```
-
-- The API image bakes `data/who.db` into the layer at build time
-  (read-only at runtime).
-- The runtime app DB lives on the `app-data` named volume (sqlite by
-  default, or use the `postgres` profile).
-- A `docker-compose.override.yml` is layered automatically when running
-  `docker compose up` locally; it volume-mounts source for hot reload.
-
-## Notification channels
-
-`NotificationModule` resolves active providers from
-`NOTIFICATION_CHANNELS` (comma-separated): `EMAIL`, `SMS`, `WHATSAPP`,
-`TELEGRAM`. Only `EmailProvider` is fully wired (Nodemailer / SMTP);
-the rest are `console.log` stubs with TODOs for Twilio / WhatsApp
-Business / Telegram Bot integrations.
-
-When `SMTP_HOST` is empty the EmailProvider also logs to console — useful
-for local dev without an SMTP server.
-
-## Running tests
-
-```bash
-pnpm test          # vitest in @app/shared (z-score)
-```
-
-End-to-end smoke (after `pnpm dev` is up):
-
-```bash
-curl -s http://localhost:3001/api/v1/auth/password \
-  -H 'content-type: application/json' \
-  -d '{"email":"admin@example.com","password":"changeme1234"}'
-```
-
-## Authentication
-
-- Primary: 6-digit OTP, argon2-hashed in `otp_codes`, 10-minute TTL.
-- Fallback: email + password (argon2 on `users.password_hash`).
-- JWT access (15 min) + refresh (7 d) pair; refresh tokens are
-  rotated on every use, the previous hash is revoked.
-- Role enforcement via `@Roles(...)` + global `RolesGuard`. `@Public()`
-  opts out of auth (used on OTP request/verify, password, refresh).
+The web UI calls `GET /auth/config` to discover the active channels
+and adapt accordingly.
 
 ## Roles
 
@@ -183,3 +168,28 @@ curl -s http://localhost:3001/api/v1/auth/password \
 - **DOCTOR**: creates/reads/updates patients, parents and measurements.
 - **PATIENT** (the parent's user account): read-only access to their
   linked children's data.
+
+## Authentication
+
+- Primary: 6-digit OTP, argon2-hashed in `otp_codes`, 10-minute TTL —
+  available only when at least one notification channel is enabled.
+- Always available: email + password (argon2 on `users.password_hash`).
+- JWT access (15 min) + refresh (7 d) pair; refresh tokens are
+  rotated on every use, the previous hash is revoked.
+- Role enforcement via `@Roles(...)` + global `RolesGuard`. `@Public()`
+  opts out of auth (used on OTP request/verify, password, refresh,
+  `/auth/config`).
+
+## Running tests
+
+```bash
+pnpm test          # vitest in @app/shared (z-score)
+```
+
+End-to-end smoke (after `docker compose up` is healthy):
+
+```bash
+curl -s http://localhost:3001/api/v1/auth/password \
+  -H 'content-type: application/json' \
+  -d '{"email":"admin@example.com","password":"changeme1234"}'
+```

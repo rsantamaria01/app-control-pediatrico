@@ -5,4 +5,3 @@ export * from './patient.entity';
 export * from './parent.entity';
 export * from './parent-contact.entity';
 export * from './measurement.entity';
-export * from './who-lms-standard.entity';

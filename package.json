@@ -1,0 +1,25 @@
+{
+  "name": "app-control-pediatrico",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Clinical web app for tracking infant growth metrics against WHO Child Growth Standards.",
+  "packageManager": "pnpm@9.15.0",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev --parallel",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "typecheck": "turbo run typecheck",
+    "clean": "turbo run clean && rm -rf node_modules .turbo",
+    "format": "prettier --write \"**/*.{ts,tsx,js,json,md}\"",
+    "who-db:generate": "bash scripts/who-db.sh"
+  },
+  "devDependencies": {
+    "prettier": "^3.3.3",
+    "turbo": "^2.3.3",
+    "typescript": "^5.5.4"
+  }
+}

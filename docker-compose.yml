@@ -1,38 +1,54 @@
 services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-app}
+      POSTGRES_USER: ${POSTGRES_USER:-app}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-app}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-app} -d ${POSTGRES_DB:-app}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   api:
     build:
       context: .
       dockerfile: apps/api/Dockerfile
     image: app-control-pediatrico/api:latest
     ports:
-      - "3001:3001"
+      - "${API_PORT:-3001}:3001"
     environment:
-      DATABASE_TYPE: ${DATABASE_TYPE:-sqlite}
-      DATABASE_URL: ${DATABASE_URL:-/app/data/data.db}
-      WHO_DATABASE_PATH: /app/data/who.db
+      DATABASE_URL: ${DATABASE_URL:-postgres://app:app@db:5432/app}
+      LMS_DATA_DIR: /app/data/lms
       JWT_SECRET: ${JWT_SECRET:-change-me-access-secret}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-change-me-refresh-secret}
       JWT_EXPIRY: ${JWT_EXPIRY:-15m}
       JWT_REFRESH_EXPIRY: ${JWT_REFRESH_EXPIRY:-7d}
       OTP_LENGTH: ${OTP_LENGTH:-6}
       OTP_TTL_MINUTES: ${OTP_TTL_MINUTES:-10}
-      NOTIFICATION_CHANNELS: ${NOTIFICATION_CHANNELS:-EMAIL}
+      # Email channel: enabled iff SMTP_HOST is set.
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASS: ${SMTP_PASS:-}
       SMTP_FROM: ${SMTP_FROM:-Pediatric Growth <no-reply@example.com>}
+      # SMS channel: enabled iff all three TWILIO_* vars are set.
+      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}
+      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
+      TWILIO_FROM: ${TWILIO_FROM:-}
+      WHATSAPP_API_KEY: ${WHATSAPP_API_KEY:-}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       API_CORS_ORIGIN: ${API_CORS_ORIGIN:-http://localhost:3000}
       SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-admin@example.com}
       SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-changeme1234}
-    volumes:
-      # Persist the runtime sqlite app DB across container restarts; who.db
-      # is baked into the image and read-only at runtime.
-      - app-data:/app/data
     depends_on:
       db:
         condition: service_healthy
-        required: false
 
   web:
     build:
@@ -42,30 +58,11 @@ services:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3001}
     image: app-control-pediatrico/web:latest
     ports:
-      - "3000:3000"
+      - "${WEB_PORT:-3000}:3000"
     environment:
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3001}
     depends_on:
       - api
 
-  # Postgres service used only when DATABASE_TYPE=postgres. Default sqlite
-  # demo can ignore it. Activate by setting DATABASE_TYPE=postgres and
-  # DATABASE_URL=postgres://app:app@db:5432/app in your .env file.
-  db:
-    image: postgres:16-alpine
-    profiles: ["postgres"]
-    environment:
-      POSTGRES_DB: app
-      POSTGRES_USER: app
-      POSTGRES_PASSWORD: app
-    volumes:
-      - pg-data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U app -d app"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-
 volumes:
-  app-data:
   pg-data:

@@ -14,13 +14,6 @@ build/
 .env.local
 .env.*.local
 
-# Runtime data (sqlite app DB only; data/who.db is committed)
-data/data.db
-data/data.db-journal
-data/*.db-journal
-data/*.db-wal
-data/*.db-shm
-
 # Logs
 *.log
 npm-debug.log*
@@ -33,7 +26,7 @@ pnpm-debug.log*
 .DS_Store
 Thumbs.db
 
-# Python (scripts/who-db.sh creates a venv here)
+# Python (scripts/lms-csv-mock.py creates a venv here when used)
 scripts/.venv/
 scripts/__pycache__/
 **/__pycache__/

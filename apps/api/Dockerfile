@@ -45,11 +45,11 @@ COPY --from=builder /repo/apps/api/dist ./apps/api/dist
 COPY --from=builder /repo/packages/shared/dist ./packages/shared/dist
 COPY --from=builder /repo/packages/database/dist ./packages/database/dist
 
-# Bake the read-only WHO database into the image so the container can run
-# without an external mount (data.db is mounted at runtime via compose).
-COPY data/who.db ./data/who.db
+# Bake the static CDC LMS CSV files into the image so the container can
+# run without any external mount; the data is read once at startup.
+COPY data/lms ./data/lms
 
-ENV WHO_DATABASE_PATH=/app/data/who.db
+ENV LMS_DATA_DIR=/app/data/lms
 ENV API_PORT=3001
 EXPOSE 3001
 

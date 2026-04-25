@@ -1,12 +1,14 @@
 import {
   Body,
   Controller,
+  Get,
   HttpCode,
   HttpStatus,
   Post,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import {
+  AuthConfigDto,
   AuthTokensDto,
   ContactVerifyConfirmDto,
   ContactVerifyRequestDto,
@@ -16,12 +18,22 @@ import {
   RefreshTokenDto,
 } from '@app/shared';
 import { AuthService } from './auth.service';
+import { NotificationService } from '../notification/notification.service';
 import { Public } from '../common/decorators/public.decorator';
 
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly auth: AuthService) {}
+  constructor(
+    private readonly auth: AuthService,
+    private readonly notifications: NotificationService,
+  ) {}
+
+  @Public()
+  @Get('config')
+  config(): AuthConfigDto {
+    return { channels: this.notifications.channels() };
+  }
 
   @Public()
   @Post('otp/request')

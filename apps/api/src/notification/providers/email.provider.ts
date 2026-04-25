@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
 import { NotificationChannel } from '@app/shared';
 import { NotificationProvider } from '../notification-provider.interface';
@@ -6,19 +6,21 @@ import { NotificationProvider } from '../notification-provider.interface';
 @Injectable()
 export class EmailProvider implements NotificationProvider {
   readonly channel = NotificationChannel.EMAIL;
-  private readonly logger = new Logger(EmailProvider.name);
-  private readonly transporter: nodemailer.Transporter | null;
+  private transporter: nodemailer.Transporter | null = null;
   private readonly from: string;
 
   constructor() {
-    const host = process.env.SMTP_HOST;
     this.from = process.env.SMTP_FROM ?? 'Pediatric Growth <no-reply@example.com>';
+  }
+
+  private ensureTransporter(): nodemailer.Transporter {
+    if (this.transporter) return this.transporter;
+    const host = process.env.SMTP_HOST;
     if (!host) {
-      this.logger.warn(
-        'SMTP_HOST is not set. EmailProvider will log messages instead of sending.',
-      );
-      this.transporter = null;
-      return;
+      // NotificationModule should not have included this provider; guard
+      // anyway so a misconfiguration surfaces as a clear runtime error
+      // rather than a silent drop.
+      throw new Error('EmailProvider invoked without SMTP_HOST configured');
     }
     this.transporter = nodemailer.createTransport({
       host,
@@ -28,14 +30,11 @@ export class EmailProvider implements NotificationProvider {
         ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
         : undefined,
     });
+    return this.transporter;
   }
 
   async send(to: string, message: string, subject = 'Pediatric Growth code'): Promise<void> {
-    if (!this.transporter) {
-      this.logger.log(`[email/dev] to=${to} subject="${subject}" body=${message}`);
-      return;
-    }
-    await this.transporter.sendMail({
+    await this.ensureTransporter().sendMail({
       from: this.from,
       to,
       subject,

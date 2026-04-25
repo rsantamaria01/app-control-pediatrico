@@ -12,7 +12,7 @@ export class WhoStandardsController {
   curve(
     @Query('indicator') indicator: WhoIndicator,
     @Query('gender') gender: Gender,
-  ): Promise<WhoStandardsResponseDto> {
+  ): WhoStandardsResponseDto {
     return this.service.getCurve(indicator, gender);
   }
 }

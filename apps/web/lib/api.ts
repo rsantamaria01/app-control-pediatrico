@@ -1,5 +1,6 @@
 import type {
   ApiResponse,
+  AuthConfigDto,
   AuthTokensDto,
   CreateMeasurementDto,
   CreateParentContactDto,
@@ -41,6 +42,7 @@ async function request<T>(path: string, opts: FetchOpts = {}): Promise<T> {
 
 export const api = {
   auth: {
+    config: () => request<AuthConfigDto>('/auth/config'),
     requestOtp: (identifier: string, channel: NotificationChannel) =>
       request<void>('/auth/otp/request', {
         method: 'POST',

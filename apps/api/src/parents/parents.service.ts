@@ -10,10 +10,12 @@ import {
   ContactType,
   CreateParentContactDto,
   CreateParentDto,
+  NotificationChannel,
   ParentContactDto,
   ParentDto,
   UpdateParentDto,
 } from '@app/shared';
+import { NotificationService } from '../notification/notification.service';
 
 @Injectable()
 export class ParentsService {
@@ -21,6 +23,7 @@ export class ParentsService {
     @InjectRepository(Parent) private readonly parentRepo: Repository<Parent>,
     @InjectRepository(ParentContact)
     private readonly contactRepo: Repository<ParentContact>,
+    private readonly notifications: NotificationService,
   ) {}
 
   async create(dto: CreateParentDto): Promise<ParentDto> {
@@ -67,12 +70,19 @@ export class ParentsService {
     if (dto.isPrimary) {
       await this.contactRepo.update({ parentId }, { isPrimary: false });
     }
+    // When the matching notification channel is not configured (no
+    // SMTP / SMS provider) the doctor or admin is asserting contact
+    // ownership at registration time — there is no way to send a code,
+    // so mark the contact verified up front.
+    const channel =
+      dto.type === ContactType.EMAIL ? NotificationChannel.EMAIL : NotificationChannel.SMS;
+    const isVerified = !this.notifications.hasChannel(channel);
     const contact = this.contactRepo.create({
       parentId,
       type: dto.type,
       value: dto.value,
       isPrimary: dto.isPrimary ?? false,
-      isVerified: false,
+      isVerified,
     });
     await this.contactRepo.save(contact);
     return this.toContactDto(contact);

@@ -13,6 +13,7 @@ import { ParentsModule } from './parents/parents.module';
 import { MeasurementsModule } from './measurements/measurements.module';
 import { WhoStandardsModule } from './who-standards/who-standards.module';
 import { NotificationModule } from './notification/notification.module';
+import { HealthModule } from './health/health.module';
 import { SeedModule } from './seed/seed.module';
 
 @Module({
@@ -32,6 +33,7 @@ import { SeedModule } from './seed/seed.module';
     ParentsModule,
     MeasurementsModule,
     WhoStandardsModule,
+    HealthModule,
     SeedModule,
   ],
   providers: [

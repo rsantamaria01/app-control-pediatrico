@@ -36,18 +36,24 @@ docker-compose.yml  Single-file production-style stack (api + web + db)
 - Docker + docker-compose
 - Python 3.9+ only when regenerating the mock CSVs
 
-## Quick start (Docker)
+## Quick start (single docker-compose for everything)
 
 ```bash
 cp .env.example .env
 docker compose up --build
 ```
 
-That brings up Postgres, the API (which auto-runs migrations on boot)
-and the web UI:
+The single `docker-compose.yml` spins up Postgres + the API + the web
+UI. By default the api/web services use the Dockerfile `dev` target,
+which runs Nest and Next.js in **watch mode** with the host source
+directories bind-mounted into the container — saving a `.ts` file
+restarts the service inside the container, so this is the only
+workflow you need for local development.
 
 - Web on http://localhost:3000
 - API on http://localhost:3001/api/v1 (Swagger: /api/docs)
+- API health on http://localhost:3001/api/v1/health
+- Web health on http://localhost:3000/api/health
 - Postgres on localhost:5432 (`app` / `app`)
 
 A bootstrap ADMIN user is seeded on first boot using
@@ -55,18 +61,26 @@ A bootstrap ADMIN user is seeded on first boot using
 `admin@example.com` / `changeme1234`). Sign in via
 `/login/password` to get started, then create DOCTOR users.
 
-## Local dev (no Docker)
-
-You still need a Postgres instance. The simplest path is to run only
-the `db` service from compose and run the rest natively:
+To run the production-style images instead (multi-stage `runner`
+target with no source mount), set the build targets:
 
 ```bash
-docker compose up -d db
-corepack enable
-pnpm install
-cp .env.example .env  # DATABASE_URL defaults work for the db container
-pnpm dev              # turbo runs api + web + shared/db builds
+API_BUILD_TARGET=runner WEB_BUILD_TARGET=runner docker compose up --build
 ```
+
+## Healthchecks
+
+Both services expose a JSON liveness endpoint suitable for Uptime
+Kuma, load balancers, and the docker-compose `healthcheck:` directive
+that ships in the file:
+
+| Service | URL | 200 means |
+|---------|-----|-----------|
+| API     | `GET /api/v1/health` | Postgres is reachable AND the LMS CSV files loaded with rows. |
+| Web     | `GET /api/health`    | The Next.js process is up AND it can reach the API health endpoint. |
+
+A failing check returns 503 with a JSON body describing which
+sub-check failed (database connectivity, LMS rows, upstream API).
 
 ## End-to-end demo flow
 
@@ -117,8 +131,8 @@ Examples shipped under `data/lms/`:
 |------|-----------|-------|
 | `h_a_0_240.csv`  | height-for-age (length 0–24 mo, stature 24–240 mo) | 0–240 months |
 | `w_a_0_240.csv`  | weight-for-age | 0–240 months |
-| `b_a_24_240.csv` | BMI-for-age   | 24–240 months |
-| `hc_a_0_36.csv`  | head-circumference-for-age | 0–36 months |
+| `b_a_0_240.csv`  | BMI-for-age   | 0–240 months |
+| `hc_a_0_240.csv` | head-circumference-for-age | 0–240 months |
 | `w_h_45_121.csv` | weight-for-stature (x-axis is cm, not months) | 45–121 cm |
 
 CSV column layout matches the CDC published tables:
@@ -182,13 +196,37 @@ and adapt accordingly.
 
 ## Running tests
 
+The repo has three test suites:
+
+| Suite | Where | Runner | Needs Postgres? |
+|-------|-------|--------|-----------------|
+| Z-score unit tests       | `packages/shared/src/zscore.test.ts`  | vitest | no |
+| API unit tests (`*.spec.ts`) | `apps/api/src/**/*.spec.ts`       | jest   | no |
+| API e2e tests (`*.e2e-spec.ts`) | `apps/api/test/*.e2e-spec.ts`  | jest   | yes (uses `app_test`) |
+
+Run from the host:
+
 ```bash
-pnpm test          # vitest in @app/shared (z-score)
+pnpm --filter @app/shared test          # z-score unit tests
+pnpm --filter @app/api test             # API unit tests
+pnpm --filter @app/api test:cov         # API unit tests + coverage
+pnpm --filter @app/api test:e2e         # API e2e tests (boots the Nest app, hits supertest)
 ```
 
-End-to-end smoke (after `docker compose up` is healthy):
+The e2e suite drops + recreates a `app_test` database on the
+configured Postgres (override with `TEST_DATABASE_URL`). The whole
+suite normally runs from inside the api container so the Postgres host
+resolves to `db`:
 
 ```bash
+docker compose exec api pnpm --filter @app/api test:e2e
+```
+
+E2E quick-check from a running stack:
+
+```bash
+curl -s http://localhost:3001/api/v1/health
+curl -s http://localhost:3000/api/health
 curl -s http://localhost:3001/api/v1/auth/password \
   -H 'content-type: application/json' \
   -d '{"email":"admin@example.com","password":"changeme1234"}'

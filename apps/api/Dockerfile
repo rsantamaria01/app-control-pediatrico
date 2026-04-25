@@ -20,12 +20,25 @@ RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
 COPY packages/shared packages/shared
 COPY packages/database packages/database
 COPY apps/api apps/api
+COPY data data
 
 RUN pnpm --filter @app/shared build \
  && pnpm --filter @app/database build \
  && pnpm --filter @app/api build
 
-# ---- runner ----
+# ---- dev (used by docker-compose for hot reload) ----
+# Same image as builder but stays in the foreground running nest in
+# watch mode. Compose mounts the source dirs over /repo so saving a
+# .ts file triggers a rebuild + restart inside the container.
+FROM builder AS dev
+WORKDIR /repo
+ENV NODE_ENV=development
+ENV LMS_DATA_DIR=/repo/data/lms
+ENV API_PORT=3001
+EXPOSE 3001
+CMD ["pnpm", "--filter", "@app/api", "dev"]
+
+# ---- runner (production) ----
 FROM node:20-bookworm-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
@@ -48,6 +61,10 @@ COPY --from=builder /repo/packages/database/dist ./packages/database/dist
 # Bake the static CDC LMS CSV files into the image so the container can
 # run without any external mount; the data is read once at startup.
 COPY data/lms ./data/lms
+
+# wget is used by the docker-compose healthcheck.
+RUN apt-get update && apt-get install -y --no-install-recommends wget \
+ && rm -rf /var/lib/apt/lists/*
 
 ENV LMS_DATA_DIR=/app/data/lms
 ENV API_PORT=3001

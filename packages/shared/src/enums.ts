@@ -41,8 +41,8 @@ export const INDICATOR_AGE_RANGE: Record<
   [WhoIndicator.HEIGHT_FOR_AGE]: { min: 0, max: 240, unit: 'months' },
   [WhoIndicator.WEIGHT_FOR_AGE]: { min: 0, max: 240, unit: 'months' },
   [WhoIndicator.WEIGHT_FOR_HEIGHT]: { min: 45, max: 121, unit: 'cm' },
-  [WhoIndicator.BMI_FOR_AGE]: { min: 24, max: 240, unit: 'months' },
-  [WhoIndicator.HEAD_CIRCUMFERENCE_FOR_AGE]: { min: 0, max: 36, unit: 'months' },
+  [WhoIndicator.BMI_FOR_AGE]: { min: 0, max: 240, unit: 'months' },
+  [WhoIndicator.HEAD_CIRCUMFERENCE_FOR_AGE]: { min: 0, max: 240, unit: 'months' },
 };
 
 export const INDICATOR_LABEL: Record<WhoIndicator, string> = {

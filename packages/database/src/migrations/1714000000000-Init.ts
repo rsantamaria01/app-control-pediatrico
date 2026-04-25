@@ -8,9 +8,9 @@ export class Init1714000000000 implements MigrationInterface {
     const ts = 'timestamp with time zone';
     const date = 'date';
     const num = (precision: number, scale: number) => `numeric(${precision},${scale})`;
+    // Postgres 13+ ships gen_random_uuid() in core (the SQL standard
+    // function), so no pgcrypto extension is required.
     const uuidDefault = 'gen_random_uuid()';
-
-    await queryRunner.query('CREATE EXTENSION IF NOT EXISTS pgcrypto');
 
     await queryRunner.createTable(
       new Table({

@@ -20,10 +20,25 @@ ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
 RUN pnpm --filter @app/shared build \
  && pnpm --filter @app/web build
 
-# ---- runner (Next standalone) ----
+# ---- dev (used by docker-compose for hot reload) ----
+# Builder image kept around with `next dev` in the foreground; source
+# dirs are bind-mounted at runtime so saving a file refreshes the
+# browser.
+FROM builder AS dev
+WORKDIR /repo
+ENV NODE_ENV=development
+ENV PORT=3000
+EXPOSE 3000
+CMD ["pnpm", "--filter", "@app/web", "dev"]
+
+# ---- runner (production, Next standalone) ----
 FROM node:20-bookworm-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
+
+# wget is used by the docker-compose healthcheck.
+RUN apt-get update && apt-get install -y --no-install-recommends wget \
+ && rm -rf /var/lib/apt/lists/*
 
 # Standalone copy includes its own node_modules, so we don't need pnpm here.
 COPY --from=builder /repo/apps/web/.next/standalone ./

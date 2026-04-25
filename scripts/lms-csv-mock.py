@@ -141,25 +141,33 @@ WFH_GIRL = piecewise_linear([
 ])
 
 BFA_BOY = piecewise_linear([
-    Anchor(24, 16.0), Anchor(36, 15.7), Anchor(60, 15.3),
-    Anchor(96, 15.7), Anchor(120, 16.6), Anchor(144, 17.9),
-    Anchor(168, 19.7), Anchor(192, 21.4), Anchor(228, 22.4),
-    Anchor(240, 22.5),
+    Anchor(0, 13.4), Anchor(3, 16.9), Anchor(6, 17.3),
+    Anchor(12, 16.8), Anchor(24, 16.0), Anchor(36, 15.7),
+    Anchor(60, 15.3), Anchor(96, 15.7), Anchor(120, 16.6),
+    Anchor(144, 17.9), Anchor(168, 19.7), Anchor(192, 21.4),
+    Anchor(228, 22.4), Anchor(240, 22.5),
 ])
 BFA_GIRL = piecewise_linear([
-    Anchor(24, 15.7), Anchor(36, 15.5), Anchor(60, 15.2),
-    Anchor(96, 15.7), Anchor(120, 16.7), Anchor(144, 18.4),
-    Anchor(168, 20.2), Anchor(192, 21.4), Anchor(228, 21.5),
-    Anchor(240, 21.5),
+    Anchor(0, 13.3), Anchor(3, 16.4), Anchor(6, 16.8),
+    Anchor(12, 16.4), Anchor(24, 15.7), Anchor(36, 15.5),
+    Anchor(60, 15.2), Anchor(96, 15.7), Anchor(120, 16.7),
+    Anchor(144, 18.4), Anchor(168, 20.2), Anchor(192, 21.4),
+    Anchor(228, 21.5), Anchor(240, 21.5),
 ])
 
 HC_BOY = piecewise_linear([
     Anchor(0, 34.5), Anchor(3, 40.5), Anchor(6, 43.3),
     Anchor(12, 46.0), Anchor(24, 48.3), Anchor(36, 49.5),
+    Anchor(60, 50.6), Anchor(96, 52.0), Anchor(120, 52.9),
+    Anchor(144, 53.8), Anchor(168, 54.8), Anchor(192, 55.5),
+    Anchor(228, 56.0), Anchor(240, 56.1),
 ])
 HC_GIRL = piecewise_linear([
     Anchor(0, 33.9), Anchor(3, 39.5), Anchor(6, 42.2),
     Anchor(12, 44.9), Anchor(24, 47.2), Anchor(36, 48.4),
+    Anchor(60, 49.6), Anchor(96, 51.0), Anchor(120, 52.0),
+    Anchor(144, 53.0), Anchor(168, 54.0), Anchor(192, 54.7),
+    Anchor(228, 55.0), Anchor(240, 55.0),
 ])
 
 
@@ -176,21 +184,22 @@ class Plan:
 
 
 PLANS: tuple[Plan, ...] = (
-    # height-for-age (combined infant length + child stature), 0-240 months
-    Plan("h_a_0_240.csv", 1, 0, 240, 1.0, HFA_BOY,  1.0,  0.040),
-    Plan("h_a_0_240.csv", 2, 0, 240, 1.0, HFA_GIRL, 1.0,  0.040),
-    # weight-for-age, 0-240 months
-    Plan("w_a_0_240.csv", 1, 0, 240, 1.0, WFA_BOY,  0.20, 0.130),
-    Plan("w_a_0_240.csv", 2, 0, 240, 1.0, WFA_GIRL, 0.20, 0.135),
-    # weight-for-stature; trailing numbers are stature in cm.
+    # All age-indexed indicators span the full pediatric range
+    # 0-240 months so charts share one x-axis. Real CDC tables only
+    # publish e.g. BMI from 24 months; the mock extrapolates plausible
+    # infant medians for demo purposes.
+    Plan("h_a_0_240.csv",  1, 0, 240, 1.0, HFA_BOY,  1.0,  0.040),
+    Plan("h_a_0_240.csv",  2, 0, 240, 1.0, HFA_GIRL, 1.0,  0.040),
+    Plan("w_a_0_240.csv",  1, 0, 240, 1.0, WFA_BOY,  0.20, 0.130),
+    Plan("w_a_0_240.csv",  2, 0, 240, 1.0, WFA_GIRL, 0.20, 0.135),
+    Plan("b_a_0_240.csv",  1, 0, 240, 1.0, BFA_BOY,  -0.30, 0.085),
+    Plan("b_a_0_240.csv",  2, 0, 240, 1.0, BFA_GIRL, -0.30, 0.090),
+    Plan("hc_a_0_240.csv", 1, 0, 240, 1.0, HC_BOY,   1.0,  0.035),
+    Plan("hc_a_0_240.csv", 2, 0, 240, 1.0, HC_GIRL,  1.0,  0.035),
+    # Weight-for-stature is the CDC's only chart not indexed by age;
+    # the trailing numbers in the filename are stature in cm.
     Plan("w_h_45_121.csv", 1, 45, 121, 0.5, WFH_BOY,  -0.35, 0.080),
     Plan("w_h_45_121.csv", 2, 45, 121, 0.5, WFH_GIRL, -0.40, 0.085),
-    # bmi-for-age, 24-240 months (CDC chart starts at 24 months)
-    Plan("b_a_24_240.csv", 1, 24, 240, 1.0, BFA_BOY,  -0.30, 0.085),
-    Plan("b_a_24_240.csv", 2, 24, 240, 1.0, BFA_GIRL, -0.30, 0.090),
-    # head-circumference-for-age, 0-36 months
-    Plan("hc_a_0_36.csv", 1, 0, 36, 0.5, HC_BOY,  1.0, 0.035),
-    Plan("hc_a_0_36.csv", 2, 0, 36, 0.5, HC_GIRL, 1.0, 0.035),
 )
 
 

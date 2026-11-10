@@ -1,0 +1,65 @@
+# Deployment unit: app (Nuxt), db (PostgreSQL 18), cache (Valkey), storage (RustFS).
+# Development: the devcontainer starts db/cache/storage and runs Nuxt with `pnpm dev`.
+# Prod-like run: docker compose --profile full up -d --build
+services:
+  app:
+    build: .
+    profiles: ["full"]
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgres://pediatrico:${DB_PASSWORD:-pediatrico}@db:5432/pediatrico
+      REDIS_URL: redis://cache:6379
+      S3_ENDPOINT: http://storage:9000
+      S3_BUCKET: pediatrico
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-pediatrico}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-pediatrico-dev-secret}
+    ports:
+      - "3000:3000"
+    depends_on:
+      db: { condition: service_healthy }
+      cache: { condition: service_healthy }
+      storage: { condition: service_started }
+
+  db:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: pediatrico
+      POSTGRES_USER: pediatrico
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-pediatrico}
+    volumes:
+      - db-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pediatrico -d pediatrico"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  cache:
+    image: valkey/valkey:8-alpine
+    restart: unless-stopped
+    command: ["valkey-server", "--save", "60", "1", "--appendonly", "no"]
+    volumes:
+      - cache-data:/data
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  storage:
+    image: rustfs/rustfs:latest   # pin a version before production
+    restart: unless-stopped
+    environment:
+      RUSTFS_ACCESS_KEY: ${S3_ACCESS_KEY:-pediatrico}
+      RUSTFS_SECRET_KEY: ${S3_SECRET_KEY:-pediatrico-dev-secret}
+    volumes:
+      - storage-data:/data
+
+volumes:
+  db-data: {}
+  cache-data: {}
+  storage-data: {}

@@ -1,0 +1,40 @@
+{
+  "name": "app-control-pediatrico",
+  "dockerComposeFile": [
+    "../compose.yaml",
+    "compose.dev.yaml"
+  ],
+  "service": "workspace",
+  "runServices": [
+    "workspace",
+    "db",
+    "cache",
+    "storage"
+  ],
+  "workspaceFolder": "/workspaces/app-control-pediatrico",
+  "shutdownAction": "stopCompose",
+  "remoteUser": "root",
+  "forwardPorts": [
+    3000
+  ],
+  "portsAttributes": {
+    "3000": {
+      "label": "Nuxt",
+      "onAutoForward": "notify"
+    }
+  },
+  "postCreateCommand": "pnpm install && pnpm exec playwright install --with-deps chromium",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "Vue.volar",
+        "dbaeumer.vscode-eslint",
+        "bradlc.vscode-tailwindcss",
+        "vitest.explorer",
+        "ms-playwright.playwright"
+      ]
+    }
+  },
+  "containerUser": "root",
+  "updateRemoteUserUID": false
+}

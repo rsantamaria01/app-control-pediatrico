@@ -1,0 +1,37 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "omniroute": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "OmniRoute",
+      "options": {
+        "baseURL": "https://omniroute.internal.rsantamaria.xyz/v1",
+        "apiKey": "{env:OMNIROUTE_API_KEY}"
+      },
+      "models": {
+        "models-max": { "name": "models-max" },
+        "models-high": { "name": "models-high" },
+        "models-balanced": { "name": "models-balanced" },
+        "models-fast": { "name": "models-fast" }
+      }
+    }
+  },
+  "model": "omniroute/models-high",
+  "small_model": "omniroute/models-fast",
+  "mcp": {
+    "hindsight": {
+      "type": "remote",
+      "url": "https://memory.internal.rsantamaria.xyz/mcp/app-monitoreo-pediatrico/",
+      "headers": { "Authorization": "Bearer {env:HINDSIGHT_API_KEY}" },
+      "enabled": true
+    },
+    "nuxt": { "type": "remote", "url": "https://nuxt.com/mcp", "enabled": true },
+    "nuxt-ui": { "type": "remote", "url": "https://ui.nuxt.com/mcp", "enabled": true },
+    "context7": { "type": "remote", "url": "https://mcp.context7.com/mcp", "enabled": true },
+    "playwright": {
+      "type": "local",
+      "command": ["npx", "-y", "@playwright/mcp@latest", "--headless"],
+      "enabled": true
+    }
+  }
+}

@@ -5,10 +5,6 @@ description: Use when building or reviewing any screen, component, chart, PDF or
 
 # Control Pediátrico — UI rules
 
-Status: **draft from the design phase (branch `design/handoff-v1`). OpenCode must verify this
-skill against the repo, the Nuxt UI v4 docs and `docs/decisions/` before relying on it**, then
-remove this line.
-
 ## Where the design lives
 
 - Index and screenshots: `docs/design/README.md`, `docs/design/screens/*.png`.
@@ -21,8 +17,9 @@ Before building a screen: open its screenshot, then its `.dc.html`, then the com
 
 ## Non-negotiable rules
 
-1. **Z without traffic lights.** Never write "Normal", "Vigilar", "Riesgo" or similar. Show the Z
-   value. Name a result only with the WHO name from `references/clinical-labels.md`.
+1. **Z without traffic lights.** Never use "Normal", "Vigilar" or generic "Riesgo" as a status.
+   Show the raw Z value; use only indicator-specific WHO names from `references/clinical-labels.md`
+   (including the provisional "Riesgo de sobrepeso"), subject to pediatrician demo review.
 2. **Three chip tones only:** neutral (no name, inside ±2), watch (named, inside ±2: yellow + eye
    icon), flag (outside ±2: orange + triangle icon + WHO name). Color is never the only signal.
    The old `zScoreBand` green/yellow/orange/red helper does not drive the UI.
@@ -34,6 +31,7 @@ Before building a screen: open its screenshot, then its `.dc.html`, then the com
 5. **Brand:** only `primary` and the logo change per clinic. Neutral, Z colors, curve colors and the
    patient color are fixed. See `references/tokens.md`.
 6. **Numbers:** `es-EC`, decimal comma, real minus sign (`Z −1,39`), tabular numerals.
+   Show provisional percentiles beside Z from the same verified reference.
 7. **Roles:** `ASSISTANT` never sees clinical data (no "Abrir ficha", no measurements, no Z).
 8. **PDF report** never contains private clinical notes.
 9. **Offline:** never show cached clinical data; route to `/sin-conexion`.
@@ -51,7 +49,8 @@ Before building a screen: open its screenshot, then its `.dc.html`, then the com
 
 ## Red flags — stop and re-check the references
 
-- A label like "Normal", "Riesgo", "Alerta" next to a Z value.
+- A generic "Normal", "Riesgo" or "Alerta" status next to a Z value;
+  "Riesgo de sobrepeso" is a provisional indicator-specific name.
 - A green/yellow/red badge with no text or icon.
 - Chart colors tied to `primary`.
 - Generated or hand-typed LMS / SD values.

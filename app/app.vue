@@ -1,7 +1,11 @@
 <script setup lang="ts">
 import { es } from '@nuxt/ui/locale'
+import { clinicBrand } from './utils/clinic-brand'
 
 const locale = extendLocale(es, { code: 'es-EC' })
+const config = useRuntimeConfig()
+const brand = clinicBrand(config.public.clinicPrimary, config.public.clinicLogo)
+updateAppConfig({ ui: { colors: { primary: brand.primary } } })
 const online = ref(true)
 
 const updateConnection = () => {
@@ -49,7 +53,7 @@ useSeoMeta({
       <template #title>
         <span class="inline-flex items-center gap-2">
           <img
-            src="/favicon.svg"
+            :src="brand.logo"
             alt="Logo de la clínica"
             class="size-8"
           >

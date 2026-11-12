@@ -48,9 +48,13 @@ use the actual stylesheet for both light and dark fixed palettes.
 
 ## White-label rule
 
-Each clinic sets one primary color. Generate a 50–950 scale from it. Light theme uses step 700
-with white text; if 700 does not reach 4.5:1 against white, darken until it does. Dark theme
-uses step 400 with text `#042f2e`-like dark. Only primary and the logo change.
+For the alpha, each independent deployment selects an existing Tailwind palette using
+`NUXT_PUBLIC_CLINIC_PRIMARY` (allowlisted: `brand`, `teal`, `indigo`, `violet`, `rose`, `emerald`)
+and an optional local public asset `NUXT_PUBLIC_CLINIC_LOGO` under `/branding/<name>.svg|png|webp`.
+Unsupported names and paths fall back to `brand` and `/favicon.svg`. The deployment operator
+supplies the actual logo file; client input is never used to choose the palette. Use shade 700
+in light and 400 in dark. Arbitrary custom-color 50–950 scale generation and persisted clinic
+settings belong to Task 16, after contrast review. Clinical tokens never change.
 
 ## Semantic colors
 

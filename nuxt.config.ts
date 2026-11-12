@@ -13,7 +13,9 @@ export default defineNuxtConfig({
 
   runtimeConfig: {
     public: {
-      siteUrl: ''
+      siteUrl: '',
+      clinicLogo: '',
+      clinicPrimary: 'brand'
     }
   },
 

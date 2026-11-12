@@ -45,10 +45,13 @@ component catalog; check detailed props/slots against the installed version befo
 
 ## Navigation
 
-Once Task 2 provides server-verified sessions, doctor and assistant: UDashboardSidebar at ≥ 1024 px
+`server/utils/shell-navigation.ts` is the role-filtering contract. It accepts only a server-resolved
+actor and a server-owned list of completed route paths; guests see no feature links. No request
+parameters, client-provided roles or deployment variables grant access. When Task 2 provides a
+verified session and routes are implemented, doctor and assistant: UDashboardSidebar at ≥ 1024 px
 (collapsible to icons at 1024), bottom tabs on phones. Parents: bottom tabs on phones, UHeader on
-desktop. Admin: sidebar. Until authentication and each route's end-to-end flow exist, keep its
-navigation hidden; a hidden link is not authorization.
+desktop. Admin: sidebar. Until each route's end-to-end flow exists, keep its navigation hidden;
+a hidden link is not authorization and server endpoints must enforce capability independently.
 An ADMIN who also treats patients sees "Administración" at the end of the doctor sidebar.
 
 | Role | Item | Route | Sub-routes |

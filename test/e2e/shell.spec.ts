@@ -19,6 +19,27 @@ for (const width of [375, 1440]) {
   })
 }
 
+test('deployment brand changes header logo and primary in both color modes without recoloring clinical tokens', async ({ page }) => {
+  await page.goto('/')
+  await expect(page.locator('header img[alt="Logo de la clínica"]')).toHaveAttribute('src', '/favicon.svg')
+  await page.waitForLoadState('networkidle')
+  const defaultPrimary = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--ui-primary').trim())
+  for (const theme of ['light', 'dark'] as const) {
+    await page.emulateMedia({ colorScheme: theme })
+    await expect(page.locator('html')).toHaveClass(new RegExp(theme))
+    const tokens = await page.evaluate(() => {
+      const css = getComputedStyle(document.documentElement)
+      return {
+        primary: css.getPropertyValue('--ui-primary').trim(),
+        patient: css.getPropertyValue('--color-patient').trim()
+      }
+    })
+    expect(tokens.primary).toBeTruthy()
+    if (theme === 'light') expect(tokens.primary).toBe(defaultPrimary)
+    expect(tokens.patient).toBe(theme === 'light' ? '#1d4ed8' : '#60a5fa')
+  }
+})
+
 test('production worker has no document precache or offline document fallback', async () => {
   execFileSync('pnpm', ['build'], { cwd: new URL('../..', import.meta.url), stdio: 'pipe' })
   const worker = readFileSync(new URL('../../.output/public/sw.js', import.meta.url), 'utf8')

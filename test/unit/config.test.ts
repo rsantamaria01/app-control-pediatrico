@@ -67,7 +67,25 @@ describe('clinical shell configuration', () => {
     expect(workspace).not.toMatch(/GH_TOKEN:\s*\S{20,}/)
   })
 
-  it('has a deployment-configurable public origin rather than a fixed hostname', () => {
-    expect(nuxtConfig.runtimeConfig.public.siteUrl).toBe('')
+  it('uses only a deployment-approved primary palette and local static logo', async () => {
+    const { clinicBrand } = await import('../../app/utils/clinic-brand')
+    expect(clinicBrand('brand', '')).toEqual({ primary: 'brand', logo: '/favicon.svg' })
+    expect(clinicBrand('brand', '/branding/clinic.svg')).toEqual({ primary: 'brand', logo: '/branding/clinic.svg' })
+    expect(clinicBrand('indigo', '/branding/clinic-logo.svg')).toEqual({ primary: 'indigo', logo: '/branding/clinic-logo.svg' })
+    expect(clinicBrand('teal', '/branding/clinic.webp')).toEqual({ primary: 'teal', logo: '/branding/clinic.webp' })
+    expect(clinicBrand('indigo', '/clinic-logo.svg')).toEqual({ primary: 'indigo', logo: '/favicon.svg' })
+    expect(clinicBrand('indigo', '/branding/../../api/clinical.svg')).toEqual({ primary: 'indigo', logo: '/favicon.svg' })
+    expect(clinicBrand('teal', '/api/private.svg')).toEqual({ primary: 'teal', logo: '/favicon.svg' })
+    expect(clinicBrand('slate', 'https://other.example/logo.svg')).toEqual({ primary: 'brand', logo: '/favicon.svg' })
+    expect(clinicBrand('brand', '/api/pacientes/1')).toEqual({ primary: 'brand', logo: '/favicon.svg' })
+    expect(clinicBrand('red; background:url(https://evil.example)', '//evil.example/logo.svg')).toEqual({ primary: 'brand', logo: '/favicon.svg' })
+    expect(clinicBrand('violet', '/clinic-logo.svg?cache=123')).toEqual({ primary: 'violet', logo: '/favicon.svg' })
+  })
+
+  it('has deployment-configurable site, logo and primary without configuring clinical colors', () => {
+    expect(nuxtConfig.runtimeConfig.public).toMatchObject({
+      siteUrl: '', clinicLogo: '', clinicPrimary: 'brand'
+    })
+    expect(appConfig.ui.colors.neutral).toBe('slate')
   })
 })

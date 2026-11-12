@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { es } from '@nuxt/ui/locale'
+
+const locale = extendLocale(es, { code: 'es-EC' })
 const online = ref(true)
 
 const updateConnection = () => {
@@ -25,7 +28,7 @@ useHead({
     { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' }
   ],
   htmlAttrs: {
-    lang: 'es'
+    lang: 'es-EC'
   }
 })
 
@@ -36,13 +39,23 @@ useSeoMeta({
 </script>
 
 <template>
-  <UApp>
+  <UApp :locale="locale">
     <NuxtPwaManifest />
 
     <UHeader
       title="Control Pediátrico"
       :toggle="false"
     >
+      <template #title>
+        <span class="inline-flex items-center gap-2">
+          <img
+            src="/favicon.svg"
+            alt="Logo de la clínica"
+            class="size-8"
+          >
+          Control Pediátrico
+        </span>
+      </template>
       <template #right>
         <UColorModeButton aria-label="Cambiar tema" />
       </template>

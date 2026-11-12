@@ -4,6 +4,7 @@ import os
 import sys
 import tempfile
 import unittest
+from contextlib import nullcontext
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
 from unittest.mock import Mock, call, patch
@@ -300,6 +301,54 @@ class MuapiGenerationTests(unittest.TestCase):
             )
 
         json_request.assert_called_once()
+
+    @patch.object(logo_generate.time, "sleep")
+    @patch.object(logo_generate, "_json_request")
+    def test_muapi_rejects_external_poll_url_before_sending_key(self, json_request, sleep):
+        json_request.return_value = {
+            "request_id": "req-123",
+            "status": "created",
+            "output": {
+                "urls": {"get": "https://attacker.example/api/v1/results/req-123"}
+            },
+        }
+
+        with self.assertRaisesRegex(RuntimeError, "valid HTTPS result URL"):
+            logo_generate._generate_with_muapi(
+                "logo prompt", "logo.png", "1:1", "muapi-key", "nano-banana"
+            )
+
+        json_request.assert_called_once()
+        sleep.assert_not_called()
+
+    def test_muapi_rejects_subdomain_userinfo_and_non_api_paths(self):
+        for target in (
+            "https://api.muapi.ai.attacker.example/api/v1/results/req-123",
+            "https://api.muapi.ai@attacker.example/api/v1/results/req-123",
+            "https://api.muapi.ai/api/v10/results/req-123",
+            "https://api.muapi.ai:444/api/v1/results/req-123",
+        ):
+            with self.subTest(target=target), self.assertRaisesRegex(
+                RuntimeError, "valid HTTPS result URL"
+            ):
+                logo_generate._muapi_result_url({"urls": {"get": target}})
+
+    @patch.object(logo_generate, "build_opener")
+    def test_authenticated_request_rejects_redirect_with_key(self, build_opener):
+        def redirected(request, timeout):
+            build_opener.call_args.args[0].redirect_request(
+                request, None, 302, "Found", {}, "https://attacker.example/collect"
+            )
+            return nullcontext(SimpleNamespace(read=lambda: b"{}"))
+
+        build_opener.return_value.open.side_effect = redirected
+        with self.assertRaisesRegex(ValueError, "redirect"):
+            logo_generate._json_request(
+                "https://api.muapi.ai/api/v1/results/req-123",
+                "muapi-key",
+                api_key_header="x-api-key",
+            )
+        build_opener.return_value.open.assert_called_once()
 
     @patch.object(logo_generate, "_json_request")
     def test_muapi_rejects_invalid_creation_result_url(self, json_request):

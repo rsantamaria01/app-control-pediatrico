@@ -58,6 +58,10 @@ export default defineNuxtConfig({
       globPatterns: ['**/*.{js,css,png,svg,ico,woff2}'],
       runtimeCaching: [
         {
+          urlPattern: ({ request }) => request.mode === 'navigate',
+          handler: 'NetworkOnly'
+        },
+        {
           urlPattern: ({ url }) => url.pathname.startsWith('/api/'),
           handler: 'NetworkOnly'
         }

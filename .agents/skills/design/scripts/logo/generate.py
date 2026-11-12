@@ -175,6 +175,8 @@ class _SafeRedirectHandler(HTTPRedirectHandler):
 
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         _validate_public_https_url(newurl)
+        if req.has_header("Authorization") or req.has_header("X-api-key"):
+            raise ValueError("Authenticated provider request cannot follow a redirect")
         return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 
@@ -367,6 +369,12 @@ def _muapi_result_url(response):
             )
         try:
             _validate_public_https_url(result_url)
+            result = urlparse(result_url)
+            base = urlparse(MUAPI_API_BASE)
+            if (result.scheme, result.hostname, result.port) != (
+                base.scheme, base.hostname, base.port
+            ) or not result.path.startswith(base.path.rstrip("/") + "/"):
+                raise ValueError("MuAPI result URL is outside the provider API")
         except ValueError as exc:
             raise RuntimeError(
                 "MuAPI creation response did not include a valid HTTPS result URL"

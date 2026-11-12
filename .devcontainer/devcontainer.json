@@ -24,6 +24,9 @@
     }
   },
   "postCreateCommand": "pnpm install && pnpm exec playwright install --with-deps chromium",
+  "remoteEnv": {
+    "GH_TOKEN": "${containerEnv:GH_TOKEN}"
+  },
   "customizations": {
     "vscode": {
       "extensions": [

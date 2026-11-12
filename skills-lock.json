@@ -11,7 +11,8 @@
       "source": "nextlevelbuilder/ui-ux-pro-max-skill",
       "sourceType": "github",
       "revision": "6ae86f61f520d6ca229d2f40e070410638c908c5",
-      "skillPath": "cli/assets/skills/design/SKILL.md"
+      "skillPath": "cli/assets/skills/design/SKILL.md",
+      "localPatch": "scripts/logo/generate.py: restrict credential-bearing MuAPI polling to provider API origin/path and reject authenticated redirects; regression tests in scripts/logo/tests/test_generate.py"
     },
     "design-system": {
       "source": "nextlevelbuilder/ui-ux-pro-max-skill",

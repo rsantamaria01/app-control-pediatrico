@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Agenda</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:inherit}
+.cp{--bg:#fff;--bg2:#f8fafc;--bg3:#f1f5f9;--bd:#e2e8f0;--bd2:#cbd5e1;--tx:#0f172a;--tx2:#475569;--tx3:#64748b;--pr:#0f766e;--prt:#0f766e;--pro:#fff;--prs:#f0fdfa;--prst:#115e59;--wab:#fef9c3;--wat:#713f12;--oub:#fee2e2;--out:#991b1b;--nab:#f1f5f9;--nat:#475569;font-family:Inter,system-ui,sans-serif;color:var(--tx);background:var(--bg2);font-size:14px;line-height:1.45;font-variant-numeric:tabular-nums}
+.cp.dark{--bg:#0f172a;--bg2:#020617;--bg3:#1e293b;--bd:#1e293b;--bd2:#334155;--tx:#f1f5f9;--tx2:#cbd5e1;--tx3:#94a3b8;--pr:#2dd4bf;--prt:#5eead4;--pro:#042f2e;--prs:rgba(45,212,191,.12);--prst:#99f6e4;--wab:rgba(234,179,8,.18);--wat:#fde047;--oub:rgba(239,68,68,.2);--out:#fca5a5;--nab:#1e293b;--nat:#cbd5e1}
+.cp *{box-sizing:border-box}.cp h1,.cp h2,.cp h3,.cp p{margin:0}
+.t2{color:var(--tx2)}.t3{color:var(--tx3)}.sm{font-size:13px}.xs{font-size:12px}
+.card{background:var(--bg);border:1px solid var(--bd);border-radius:12px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:0 16px;border-radius:8px;font:600 14px/1 Inter,sans-serif;border:1px solid transparent;cursor:pointer;text-decoration:none;white-space:nowrap}
+.bp{background:var(--pr);color:var(--pro)}.bo{background:var(--bg);color:var(--tx);border-color:var(--bd2)}.bg{background:transparent;color:var(--tx2)}.bs{min-height:36px;padding:0 12px;font-size:13px}
+.bd{display:inline-flex;align-items:center;gap:4px;height:22px;padding:0 8px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap}
+.zwa{background:var(--wab);color:var(--wat)}.zna{background:var(--nab);color:var(--nat)}.zpr{background:var(--prs);color:var(--prst)}
+.ic{width:20px;height:20px;flex:none;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}.ic4{width:16px;height:16px}
+.nav{display:flex;align-items:center;gap:10px;min-height:40px;padding:0 12px;border-radius:8px;color:var(--tx2);font-weight:500;text-decoration:none}.nav.on{background:var(--prs);color:var(--prst)}
+.seg{display:inline-flex;padding:3px;border-radius:8px;background:var(--bg3);gap:2px}.seg a{display:inline-flex;align-items:center;min-height:36px;padding:0 14px;border-radius:6px;font-size:13px;font-weight:500;color:var(--tx2);text-decoration:none}.seg a.on{background:var(--bg);color:var(--tx);font-weight:600;box-shadow:0 1px 2px rgba(15,23,42,.08)}
+.cnt{min-width:20px;height:20px;padding:0 6px;border-radius:99px;background:var(--pr);color:var(--pro);font-size:11px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;margin-left:auto}
+.daycol{position:relative;height:504px;border-left:1px solid var(--bd);background-image:repeating-linear-gradient(to bottom,var(--bd) 0,var(--bd) 1px,transparent 1px,transparent 56px)}
+.ev{position:absolute;left:4px;right:4px;border-radius:8px;padding:6px 8px;font-size:12px;line-height:1.3;overflow:hidden;text-decoration:none;display:block}
+.cp :focus-visible{outline:2px solid var(--pr);outline-offset:2px}
+</style>
+</helmet>
+<div class="{{theme}}" style="width: 100%; min-height: 1000px; display: flex; flex-wrap: wrap;">
+<aside style="flex: 1 1 240px; max-width: 256px; background: var(--bg); border-right: 1px solid var(--bd); padding: 16px 12px; display: flex; flex-direction: column; gap: 4px;">
+<div style="display: flex; align-items: center; gap: 10px; padding: 4px 8px 16px;">
+<svg viewBox="0 0 64 64" width="32" height="32" aria-hidden="true"><rect width="64" height="64" rx="14" fill="var(--pr)"></rect><path d="M14 46C24 44 30 36 36 28S46 18 50 17" fill="none" stroke="var(--pro)" stroke-width="5" stroke-linecap="round"></path><circle cx="50" cy="17" r="5" fill="var(--pro)"></circle></svg>
+<div><p style="font-weight: 600;">Pediatría Demo</p><p class="xs t3">Control Pediátrico</p></div>
+</div>
+<nav aria-label="Principal" style="display: flex; flex-direction: column; gap: 2px;">
+<sc-for list="{{nav}}" as="n" hint-placeholder-count="5"><a href="#" class="{{n.cls}}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{n.d}}"></path></svg>{{n.l}}<sc-if value="{{n.c}}" hint-placeholder-val="{{ false }}"><span class="cnt">{{n.c}}</span></sc-if></a></sc-for>
+</nav>
+</aside>
+
+<main style="flex: 999 1 640px; min-width: 0; display: flex; flex-direction: column;">
+<div style="min-height: 64px; border-bottom: 1px solid var(--bd); background: var(--bg); display: flex; align-items: center; gap: 12px; padding: 10px 24px; flex-wrap: wrap;">
+<h1 style="font-size: 17px; font-weight: 600;">Agenda</h1>
+<div class="seg" aria-label="Vista"><a href="#">Día</a><a href="#" class="on">Semana</a></div>
+<div style="display: flex; align-items: center; gap: 4px;"><button class="btn bg bs" aria-label="Semana anterior" style="width: 36px; padding: 0;"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg></button><span style="font-weight: 600; min-width: 150px; text-align: center;">9 – 14 nov 2026</span><button class="btn bg bs" aria-label="Semana siguiente" style="width: 36px; padding: 0;"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg></button><a href="#" class="btn bo bs">Hoy</a></div>
+<div style="margin-left: auto; display: flex; gap: 8px;"><a href="#" class="btn bo"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"></path></svg>Disponibilidad</a><a href="#" class="btn bp"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Nueva cita</a></div>
+</div>
+
+<div style="padding: 20px 24px; display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 20px; align-items: start;">
+<section class="card" aria-label="Semana" style="overflow-x: auto;">
+<div style="min-width: 720px;">
+<div style="display: grid; grid-template-columns: 56px repeat(6, minmax(0, 1fr)); border-bottom: 1px solid var(--bd);">
+<div></div>
+<sc-for list="{{days}}" as="d" hint-placeholder-count="6"><div style="padding: 10px 8px; text-align: center; border-left: 1px solid var(--bd); background: {{d.hbg}};"><p class="xs t3" style="font-weight: 600; text-transform: uppercase;">{{d.w}}</p><p style="font-size: 20px; font-weight: 700; color: {{d.hc}};">{{d.n}}</p></div></sc-for>
+</div>
+<div style="display: grid; grid-template-columns: 56px repeat(6, minmax(0, 1fr));">
+<div style="position: relative; height: 504px;"><sc-for list="{{hours}}" as="h" hint-placeholder-count="9"><span class="xs t3" style="position: absolute; right: 8px; top: {{h.top}};">{{h.l}}</span></sc-for></div>
+<sc-for list="{{days}}" as="d" hint-placeholder-count="6"><div class="daycol" style="background-color: {{d.cbg}};">
+<sc-for list="{{d.ev}}" as="e" hint-placeholder-count="3"><a href="#" class="ev" style="top: {{e.top}}; height: {{e.h}}; background: {{e.bg}}; color: {{e.c}}; border: {{e.b}};"><b>{{e.t}}</b> {{e.p}}<br><span style="opacity: .85;">{{e.m}}</span></a></sc-for>
+</div></sc-for>
+</div>
+<div style="display: flex; gap: 16px; flex-wrap: wrap; padding: 10px 16px; border-top: 1px solid var(--bd);" class="xs t2">
+<span style="display: inline-flex; gap: 6px; align-items: center;"><span style="width: 12px; height: 12px; border-radius: 3px; background: var(--prs); border: 1px solid var(--pr);"></span>Control</span>
+<span style="display: inline-flex; gap: 6px; align-items: center;"><span style="width: 12px; height: 12px; border-radius: 3px; background: var(--bg3); border: 1px solid var(--bd2);"></span>Primera consulta / otros</span>
+<span style="display: inline-flex; gap: 6px; align-items: center;"><span style="width: 12px; height: 12px; border-radius: 3px; border: 1.5px dashed var(--wat); background: var(--wab);"></span>Solicitud pendiente</span>
+<span style="display: inline-flex; gap: 6px; align-items: center;"><span style="width: 12px; height: 12px; border-radius: 3px; background: repeating-linear-gradient(45deg, var(--bd2) 0 2px, transparent 2px 5px);"></span>Bloqueado</span>
+</div>
+</div>
+</section>
+
+<div style="display: flex; flex-direction: column; gap: 16px;">
+<section class="card" aria-labelledby="sol">
+<div style="padding: 14px 16px; display: flex; align-items: center; justify-content: space-between;"><h2 id="sol" style="font-size: 16px; font-weight: 600;">Solicitudes pendientes</h2><span class="bd zwa">3</span></div>
+<sc-for list="{{reqs}}" as="r" hint-placeholder-count="3"><div style="padding: 14px 16px; border-top: 1px solid var(--bd); display: flex; flex-direction: column; gap: 8px;">
+<div style="display: flex; justify-content: space-between; gap: 8px;"><p style="font-weight: 600;">{{r.p}}</p><span class="xs t3">{{r.ago}}</span></div>
+<p class="sm t2">{{r.d}}</p>
+<p class="sm"><span class="t3">Pide:</span> <b>{{r.s}}</b></p>
+<div style="display: flex; gap: 8px;"><button class="btn bp bs" style="flex: 1;">Aceptar</button><button class="btn bo bs" style="flex: 1;">Rechazar</button></div>
+</div></sc-for>
+<p class="xs t3" style="padding: 10px 16px 14px; border-top: 1px solid var(--bd);">Aceptar crea la ficha del paciente y envía la invitación al representante.</p>
+</section>
+<section class="card" style="padding: 16px; display: flex; flex-direction: column; gap: 10px;">
+<div style="display: flex; justify-content: space-between; align-items: center;"><h2 style="font-size: 16px; font-weight: 600;">Disponibilidad</h2><a href="#" class="btn bg bs">Editar</a></div>
+<p class="sm"><span class="t3">Lun–Vie</span> 08:00–13:00 · 14:00–17:00</p>
+<p class="sm"><span class="t3">Sábado</span> 08:00–12:00</p>
+<p class="sm"><span class="t3">Duración</span> 30 min · primera consulta 45 min</p>
+<p class="sm"><span class="t3">Bloqueados</span> 24–25 dic · 31 dic</p>
+</section>
+</div>
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"dark":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+renderVals() {
+const nav = [
+{l:'Inicio',d:'M3 10l9-7 9 7v10a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z'},
+{l:'Pacientes',d:'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8'},
+{l:'Agenda',d:'M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z',c:'3',on:true},
+{l:'Avisos',d:'M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0',c:'2'},
+{l:'Perfil',d:'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0'}
+].map(n => ({...n, cls: n.on ? 'nav on' : 'nav'}));
+const H = 56;
+const ST = {
+c:{bg:'var(--prs)',c:'var(--prst)',b:'1px solid var(--pr)'},
+o:{bg:'var(--bg3)',c:'var(--tx)',b:'1px solid var(--bd2)'},
+p:{bg:'var(--wab)',c:'var(--wat)',b:'1.5px dashed var(--wat)'},
+x:{bg:'repeating-linear-gradient(45deg, var(--bd) 0 3px, transparent 3px 8px)',c:'var(--tx3)',b:'1px solid var(--bd)'}
+};
+const E = (s,dur,t,p,m,k) => ({top:((s-8)*H+2)+'px',h:(dur*H-4)+'px',t,p,m,...ST[k]});
+const lunch = E(13,1,'','Almuerzo','','x');
+const days = [
+{w:'Lun',n:'9',ev:[E(8.5,0.5,'08:30','Sofía C.','Control','c'),E(9.5,0.75,'09:30','Ana Torres','Primera consulta','o'),E(11,0.5,'11:00','Lucas G.','Seguimiento','c'),lunch,E(15,0.5,'15:00','Tomás V.','Vacunas','o')]},
+{w:'Mar',n:'10',today:true,ev:[E(8.5,0.5,'08:30','Camila O.','Control 2 m','c'),E(9.25,0.5,'09:15','Valentina R.','Control 16 m','c'),E(10,0.75,'10:00','Daniel Pino','Primera · web','o'),E(11.5,0.5,'11:30','Joaquín M.','Seguimiento','c'),lunch,E(15,0.5,'15:00','Martina L.','Control anual','c')]},
+{w:'Mié',n:'11',ev:[E(9,0.75,'09:00','Solicitud','Renata Vélez','p'),E(10.5,0.5,'10:30','Mateo A.','Longitud','c'),lunch,E(16,0.5,'16:00','Isabella P.','Control 4 m','c')]},
+{w:'Jue',n:'12',ev:[E(8,0.5,'08:00','Emilia Z.','PC control','c'),E(11,0.75,'11:00','Solicitud','Hnos. Mera','p'),lunch]},
+{w:'Vie',n:'13',ev:[E(9,0.5,'09:00','Sebastián M.','Control 18 m','c'),lunch,E(14,3,'','Bloqueado','Congreso SEP','x')]},
+{w:'Sáb',n:'14',ev:[E(9,0.75,'09:00','Solicitud','Gael Suárez','p'),E(12,5,'','Fuera de horario','','x')]}
+].map(d => ({...d, hbg: d.today ? 'var(--prs)' : 'transparent', hc: d.today ? 'var(--prt)' : 'var(--tx)', cbg: d.today ? 'var(--prs)' : 'transparent'}));
+const hours = [8,9,10,11,12,13,14,15,16].map((h,i) => ({l: String(h).padStart(2,'0')+':00', top: (i*H-8+ (i===0 ? 10 : 0))+'px'}));
+const reqs = [
+{p:'Renata Vélez · 3 m',ago:'hace 2 días',d:'Representante: Paula Mora (madre) · email verificado',s:'Mié 11 nov, 09:00'},
+{p:'Hnos. Mera (2 niños)',ago:'hace 1 día',d:'Representante: Luis Mera (padre) · email verificado',s:'Jue 12 nov, 11:00'},
+{p:'Gael Suárez · 4 a',ago:'hace 3 h',d:'Representante: Diana Suárez (madre) · email verificado',s:'Sáb 14 nov, 09:00'}
+];
+return { theme: this.props.dark ? 'cp dark' : 'cp', nav, days, hours, reqs };
+}
+}
+</script>
+</body>
+</html>

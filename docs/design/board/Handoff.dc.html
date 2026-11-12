@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Mapeo Nuxt UI y preguntas</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+.cp{--bg:#fff;--bg2:#f8fafc;--bg3:#f1f5f9;--bd:#e2e8f0;--bd2:#cbd5e1;--tx:#0f172a;--tx2:#475569;--tx3:#64748b;--pr:#0f766e;--prs:#f0fdfa;--prst:#115e59;--wab:#fef9c3;--wat:#713f12;--oub:#fee2e2;--out:#991b1b;font-family:Inter,system-ui,sans-serif;color:var(--tx);background:var(--bg2);font-size:14px;line-height:1.45}
+.cp.dark{--bg:#0f172a;--bg2:#020617;--bg3:#1e293b;--bd:#1e293b;--bd2:#334155;--tx:#f1f5f9;--tx2:#cbd5e1;--tx3:#94a3b8;--pr:#2dd4bf;--prs:rgba(45,212,191,.12);--prst:#99f6e4;--wab:rgba(234,179,8,.18);--wat:#fde047;--oub:rgba(239,68,68,.2);--out:#fca5a5}
+.cp *{box-sizing:border-box}.cp h1,.cp h2,.cp p{margin:0}
+.card{background:var(--bg);border:1px solid var(--bd);border-radius:12px}
+.cap{font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--tx3)}
+.tb{width:100%;border-collapse:collapse}.tb th{text-align:left;font-size:12px;font-weight:500;color:var(--tx3);padding:8px 12px;border-bottom:1px solid var(--bd)}.tb td{padding:9px 12px;border-bottom:1px solid var(--bd);font-size:13px;vertical-align:top}
+.mono{font:12px/1.5 ui-monospace,Menlo,monospace;color:var(--tx2)}
+.chip{display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:99px;font-size:12px;font-weight:600;background:var(--prs);color:var(--prst);white-space:nowrap}
+.chip.p{background:var(--bg3);color:var(--tx2)}
+</style>
+</helmet>
+<div class="{{theme}}" style="width: 100%; min-height: 1700px; padding: 48px 40px;">
+<div style="max-width: 1360px; margin: 0 auto; display: flex; flex-direction: column; gap: 24px;">
+<div>
+<p class="cap">Entrega al agente de código</p>
+<h1 style="font-size: 30px; font-weight: 700; margin-top: 6px;">Mapeo de componentes Nuxt UI v4 por pantalla</h1>
+<p style="color: var(--tx2); margin-top: 6px; max-width: 900px;">«Artboard» indica dónde está dibujada. Las marcadas «patrón» reutilizan el layout de otra pantalla dibujada; el agente las arma con los mismos componentes.</p>
+</div>
+<div class="card" style="overflow-x: auto;">
+<table class="tb" style="min-width: 1100px;">
+<thead><tr><th style="width: 40px;">#</th><th style="width: 230px;">Pantalla</th><th>Componentes</th><th style="width: 260px;">Artboard</th></tr></thead>
+<tbody>
+<sc-for list="{{rows}}" as="r" hint-placeholder-count="24"><tr><td style="color: var(--tx3);">{{r.n}}</td><td style="font-weight: 600;">{{r.s}}</td><td class="mono">{{r.c}}</td><td><span class="{{r.cls}}">{{r.a}}</span></td></tr></sc-for>
+</tbody>
+</table>
+</div>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px;">
+<div class="card" style="padding: 20px; display: flex; flex-direction: column; gap: 8px;">
+<h2 style="font-size: 16px; font-weight: 600;">Vacío</h2>
+<p style="font-size: 13px; color: var(--tx2);"><span class="mono">UEmpty</span> con ícono lucide, título corto y una acción. Ej.: «Aún no hay mediciones» + «Registrar primera visita». Nunca ilustraciones de niños.</p>
+</div>
+<div class="card" style="padding: 20px; display: flex; flex-direction: column; gap: 8px;">
+<h2 style="font-size: 16px; font-weight: 600;">Cargando</h2>
+<p style="font-size: 13px; color: var(--tx2);"><span class="mono">USkeleton</span> con la forma final (filas, tarjetas, rectángulo del gráfico). Sin spinners de página completa salvo el splash.</p>
+</div>
+<div class="card" style="padding: 20px; display: flex; flex-direction: column; gap: 8px;">
+<h2 style="font-size: 16px; font-weight: 600;">Error</h2>
+<p style="font-size: 13px; color: var(--tx2);"><span class="mono">UAlert color="error" variant="soft"</span> dentro del bloque que falló + «Reintentar». Sin red → /sin-conexion, nunca datos guardados.</p>
+</div>
+</div>
+<div class="card" style="padding: 24px;">
+<div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap;"><h2 style="font-size: 20px; font-weight: 600;">Decisiones (10 nov 2026) y pendientes</h2><span class="chip" style="background: var(--wab); color: var(--wat);">Fuente: pediatra y Raul</span></div>
+<ol style="margin: 12px 0 0; padding-left: 22px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 40px; font-size: 14px; color: var(--tx2);">
+<sc-for list="{{qs}}" as="q" hint-placeholder-count="12"><li><b style="color: var(--tx);">{{q.t}}</b> {{q.d}}</li></sc-for>
+</ol>
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"dark":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":1700}}'>
+class Component extends DCLogic {
+renderVals() {
+const R = (n, s, c, a) => ({ n, s, c, a, cls: a.startsWith('patrón') ? 'chip p' : 'chip' });
+const rows = [
+R(1,'Acceso (OTP por email)','UCard · UForm · UFormField · UInput type=email · UPinInput length=6 otp · UButton · UAlert','AuthMobile · Login1440'),
+R(2,'Aceptar invitación','UCard · UAvatar (logo) · UCheckbox (consentimiento) · UPinInput · UButton','AuthMobile'),
+R(3,'Reserva pública','UStepper · UCalendar · UButton (franjas) · UForm · UInput · URadioGroup · USelect · UCheckbox · UPinInput','BookingMobile'),
+R(4,'Privacidad y Mis datos','UPageHeader · UCard · UButton · UModal (confirmar eliminación)','PwaSystemMobile'),
+R(5,'Perfil y ajustes','UForm · UInput · UColorModeSelect · UCheckbox (canales) · USwitch','patrón: PwaSystemMobile (Mis datos)'),
+R(6,'Centro de avisos','UTabs (Todos / Sin leer) · lista UCard · UBadge · UButton variant=link','PwaSystemMobile'),
+R(7,'PWA: instalar, iOS, sin conexión, splash','UBanner · UModal (hint iOS) · UEmpty','PwaSystemMobile · Icons'),
+R(8,'404 · 403 · sesión expirada','UError · UButton','PwaSystemMobile'),
+R(9,'Inicio médico','UDashboardGroup · UDashboardSidebar · UDashboardPanel · UDashboardNavbar · UDashboardSearch · UCard · UTable · UBadge','Dashboard1440 · DoctorMobile'),
+R(10,'Pacientes','UInput (búsqueda) · UTable (filas clicables) · UAvatar · UPagination · UButton','DoctorMobile'),
+R(11,'Detalle del paciente','UDashboardPanel · UCard · UBadge · UTabs · VChart · USwitch (Gráfico/Tabla) · UTable · UDropdownMenu','PatientDetail1440 · Tablet1024 · DoctorMobile'),
+R(12,'Nueva visita','USlideover (≥1024) / página (<1024) · UForm · UInputDate · UInputNumber · URadioGroup · UTextarea · UAlert','Tablet1024 · DoctorMobile'),
+R(13,'Nuevo / editar paciente','UForm · UInput · URadioGroup · UInputDate · UInputNumber · UTextarea · USwitch (Invitar al portal) · UCheckbox (extender corrección) · UButton','NewPatient1440 · DoctorMobile'),
+R(14,'Pestaña Vacunas','UTable agrupada por edad · UBadge · UModal (registrar dosis) · UInputDate · UInput (lote)','VaccinesMilestones1440'),
+R(15,'Pestaña Hitos','UCard · barra de ventana de edad (div) · UBadge · UInputDate','VaccinesMilestones1440'),
+R(16,'Agenda (día, semana, mes)','UTabs (Día/Semana/Mes) · grilla propia · UCalendar (mes) · USlideover (detalle, reprogramar, cancelar) · UModal (nueva cita)','Agenda1440 · AgendaViews1440 · AgendaMobile'),
+R(16.1,'Horarios de atención','USwitch por día · USelect (horas) · URadioGroup (duración) · lista de días bloqueados · UInputDate','Availability1440 · AgendaMobile'),
+R(16.2,'Asistente (rol ASSISTANT)','Mismas pantallas de agenda y horarios, sin «Abrir ficha» ni datos clínicos','AgendaMobile (nota)'),
+R(17,'Informe de crecimiento','Vista previa en página · @media print A4 · 3 hojas · UButton (Descargar, Compartir)','ReportA4 · ReportA4p2 · ReportA4p3'),
+R(18,'Padres: inicio','UCard por hijo · UBadge · UButton · barra inferior propia (UNavigationMenu horizontal)','ParentMobile · ParentDesktop1440'),
+R(19,'Padres: hijo','UTabs · VChart (variante padres) · UCollapsible («Ver detalles») · UCard','ParentMobile · ParentDesktop1440'),
+R(20,'Padres: agendar cita','USelect (hijo) · UCalendar · UButton (franjas) · UAlert (canales)','ParentMobile'),
+R(21,'Asistente inicial','UStepper · UForm · UFileUpload (logo) · UColorPicker · UInput · UCheckbox','AdminWizard1440'),
+R(22,'Usuarios','UTabs · UTable · UDropdownMenu · UModal (invitar) · UBadge','AdminAudit1440'),
+R(23,'Ajustes de la clínica','Igual que el asistente + reglas de recordatorio (USwitch, USelect), proveedor WhatsApp y vista previa de mensajes','ClinicSettings1440'),
+R(24,'Auditoría','UTable · USelectMenu (filtros) · UInputDate range · UBadge · UTabs (Solicitudes de datos)','AdminAudit1440')
+];
+const Q = (t, d) => ({ t, d });
+const qs = [
+Q('Z sin semáforo.','Se muestra el valor Z; solo se nombra lo que tiene nombre OMS. Lo clave: fuera de ±2 DE y la tendencia.'),
+Q('Nombres OMS.','Talla baja (severa), bajo peso (severo), emaciación / delgadez (≥ 5 a), riesgo de sobrepeso, sobrepeso, obesidad, microcefalia y macrocefalia desde ±2.'),
+Q('Edad corregida.','Hasta 24 meses; en prematuros extremos se puede extender a 36 por paciente.'),
+Q('Controles (AAP).','3–5 días, 1, 2, 4, 6, 9, 12, 15, 18, 24 y 30 meses, 3 años y luego anual; se pueden agregar.'),
+Q('Vacunas.','Esquema MSP vigente y editable, vacunas privadas y esquemas de recuperación.'),
+Q('Desarrollo.','Hitos de motor grueso y fino, lenguaje, social y cognitivo; recordatorios de tamizaje del desarrollo y autismo.'),
+Q('Reservas públicas.','Aprobación manual por la doctora o la asistente (nuevo rol ASSISTANT, sin datos clínicos).'),
+Q('PDF.','Curvas, resultados, recomendaciones e indicaciones médicas; nunca notas privadas.'),
+Q('Resto.','Todos los médicos ven a todos los pacientes · decimal con coma (es-EC) · ícono A · OTP 10 min · invitación 7 días · sesión 12 h médicos / 30 días padres · WhatsApp vía Meta o Twilio.'),
+Q('Pendiente.','Criterio de «tendencia» (cambio de carril) · lista final de hitos y edades de tamizaje · textos LOPDP (abogado) · esquema MSP verificado.')
+];
+return { theme: this.props.dark ? 'cp dark' : 'cp', rows, qs };
+}
+}
+</script>
+</body>
+</html>

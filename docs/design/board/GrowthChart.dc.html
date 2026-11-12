@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Gráfico de crecimiento</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap">
+<style>body{margin:0}</style>
+</helmet>
+<div style="width: 100%; font-family: Inter, system-ui, sans-serif; color: {{c.tx}}; background: {{c.bg}}; font-variant-numeric: tabular-nums;">
+<svg viewBox="0 0 640 312" role="img" aria-label="{{aria}}" style="display: block; width: 100%; height: auto;">
+<path d="{{d.band}}" fill="{{c.bandOk}}" fill-opacity="{{c.o1}}"></path>
+<g stroke="{{c.grid}}" stroke-width="1">
+<sc-for list="{{d.ticks}}" as="t" hint-placeholder-count="6"><path d="M48,{{t.y}} H588"></path></sc-for>
+<path d="M116,12 V272 M183,12 V272 M250,12 V272 M318,12 V272 M386,12 V272 M453,12 V272 M520,12 V272" stroke-dasharray="2 4"></path>
+</g>
+<path d="M48,12 V272 H588" fill="none" stroke="{{c.axis}}" stroke-width="1"></path>
+<sc-if value="{{doctor}}" hint-placeholder-val="{{ true }}">
+<g fill="none" stroke-linejoin="round">
+<path d="{{d.l3}}" stroke="{{c.sd3}}" stroke-width="1.5"></path>
+<path d="{{d.lm3}}" stroke="{{c.sd3}}" stroke-width="1.5"></path>
+<path d="{{d.l1}}" stroke="{{c.sd1}}" stroke-width="1" stroke-dasharray="4 3"></path>
+<path d="{{d.lm1}}" stroke="{{c.sd1}}" stroke-width="1" stroke-dasharray="4 3"></path>
+</g>
+</sc-if>
+<g fill="none" stroke-linejoin="round">
+<path d="{{d.l2}}" stroke="{{c.sd2}}" stroke-width="{{c.w2}}"></path>
+<path d="{{d.lm2}}" stroke="{{c.sd2}}" stroke-width="{{c.w2}}"></path>
+</g>
+<g font-size="10" font-weight="600">
+<sc-for list="{{labels}}" as="lb" hint-placeholder-count="7"><text x="594" y="{{lb.y}}" fill="{{lb.c}}">{{lb.t}}</text></sc-for>
+</g>
+<path d="{{d.l0}}" fill="none" stroke="{{c.median}}" stroke-width="{{c.mw}}" stroke-dasharray="{{c.md}}"></path>
+<g font-size="10" fill="{{c.tick}}">
+<sc-for list="{{d.ticks}}" as="t" hint-placeholder-count="6"><text x="40" y="{{t.ly}}" text-anchor="end">{{t.v}}</text></sc-for>
+<text x="48" y="287" text-anchor="middle">0</text><text x="116" y="287" text-anchor="middle">3</text><text x="183" y="287" text-anchor="middle">6</text><text x="250" y="287" text-anchor="middle">9</text><text x="318" y="287" text-anchor="middle">12</text><text x="386" y="287" text-anchor="middle">15</text><text x="453" y="287" text-anchor="middle">18</text><text x="520" y="287" text-anchor="middle">21</text><text x="588" y="287" text-anchor="middle">24</text>
+<text x="318" y="306" text-anchor="middle" font-weight="500">{{xlabel}}</text>
+<text x="10" y="142" text-anchor="middle" font-weight="500" transform="rotate(-90 10 142)">{{d.ylab}}</text>
+</g>
+<path d="{{d.pl}}" fill="none" stroke="{{c.line}}" stroke-width="2.5" stroke-linejoin="round"></path>
+<g fill="{{c.bg}}" stroke="{{c.line}}" stroke-width="2">
+<sc-for list="{{d.pts}}" as="p" hint-placeholder-count="8"><circle cx="{{p.x}}" cy="{{p.y}}" r="3.5"></circle></sc-for>
+</g>
+<circle cx="{{d.lx}}" cy="{{d.ly}}" r="9" fill="{{c.line}}" fill-opacity="0.18"></circle>
+<circle cx="{{d.lx}}" cy="{{d.ly}}" r="5" fill="{{c.line}}" stroke="{{c.bg}}" stroke-width="2"></circle>
+<sc-if value="{{tip}}" hint-placeholder-val="{{ true }}">
+<path d="M{{d.lx}},{{d.tly}} V272" stroke="{{c.line}}" stroke-width="1" stroke-dasharray="3 3"></path>
+<rect x="420" y="{{d.ty}}" width="164" height="{{tipH}}" rx="8" fill="{{c.tipBg}}" stroke="{{c.tipBd}}"></rect>
+<text x="432" y="{{d.ty1}}" font-size="10.5" font-weight="600" fill="{{c.tx}}">10 nov 2026 · 1 a 4 m</text>
+<text x="432" y="{{d.ty2}}" font-size="13" font-weight="700" fill="{{c.tx}}">{{d.val}}</text>
+<text x="522" y="{{d.ty2}}" font-size="11" font-weight="700" fill="{{c.tx}}">Z {{d.z}}</text>
+<sc-if value="{{parent}}" hint-placeholder-val="{{ false }}">
+<text x="432" y="{{d.ty3}}" font-size="10" fill="{{c.tx2}}">Dentro del rango esperado</text>
+</sc-if>
+</sc-if>
+</svg>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"dark":{"editor":"boolean","default":false},"variant":{"editor":"enum","options":["medico","padres"],"default":"medico"},"ind":{"editor":"enum","options":["peso","talla","pc"],"default":"peso"},"tooltip":{"editor":"boolean","default":true},"corrected":{"editor":"boolean","default":false},"$preview":{"width":640,"height":360}}'>
+class Component extends DCLogic {
+renderVals() {
+const D = {"peso":{"l":{"-3":"M48,263 L70,253 L93,242 L116,235 L138,228 L160,223 L183,218 L206,214 L228,211 L250,207 L273,204 L296,201 L318,198 L340,196 L363,194 L386,191 L408,189 L430,187 L453,185 L476,182 L498,179 L520,177 L543,175 L566,173 L588,170","-2":"M48,257 L70,245 L93,234 L116,225 L138,217 L160,211 L183,206 L206,202 L228,198 L250,194 L273,190 L296,187 L318,184 L340,181 L363,179 L386,176 L408,173 L430,171 L453,168 L476,165 L498,162 L520,160 L543,157 L566,155 L588,152","-1":"M48,251 L70,237 L93,224 L116,214 L138,205 L160,199 L183,193 L206,188 L228,183 L250,179 L273,175 L296,171 L318,168 L340,165 L363,162 L386,159 L408,156 L430,153 L453,150 L476,147 L498,144 L520,140 L543,138 L566,135 L588,132","0":"M48,244 L70,228 L93,213 L116,201 L138,192 L160,184 L183,178 L206,172 L228,167 L250,163 L273,158 L296,154 L318,151 L340,147 L363,144 L386,140 L408,137 L430,134 L453,131 L476,127 L498,123 L520,119 L543,116 L566,113 L588,110","1":"M48,236 L70,218 L93,201 L116,188 L138,177 L160,168 L183,161 L206,155 L228,150 L250,145 L273,140 L296,136 L318,132 L340,128 L363,124 L386,120 L408,116 L430,113 L453,109 L476,105 L498,100 L520,96 L543,92 L566,89 L588,85","2":"M48,228 L70,207 L93,188 L116,173 L138,161 L160,151 L183,143 L206,136 L228,130 L250,125 L273,120 L296,115 L318,111 L340,107 L363,102 L386,98 L408,93 L430,89 L453,85 L476,80 L498,75 L520,71 L543,66 L566,62 L588,58","3":"M48,218 L70,195 L93,173 L116,156 L138,143 L160,132 L183,123 L206,116 L228,109 L250,103 L273,97 L296,92 L318,88 L340,83 L363,78 L386,73 L408,68 L430,64 L453,59 L476,54 L498,48 L520,43 L543,38 L566,34 L588,29"},"band":"M48,257 L70,245 L93,234 L116,225 L138,217 L160,211 L183,206 L206,202 L228,198 L250,194 L273,190 L296,187 L318,184 L340,181 L363,179 L386,176 L408,173 L430,171 L453,168 L476,165 L498,162 L520,160 L543,157 L566,155 L588,152 L588,58 L566,62 L543,66 L520,71 L498,75 L476,80 L453,85 L430,89 L408,93 L386,98 L363,102 L340,107 L318,111 L296,115 L273,120 L250,125 L228,130 L206,136 L183,143 L160,151 L138,161 L116,173 L93,188 L70,207 L48,228Z","pl":"M48,246 L70,231 L93,218 L138,200 L183,189 L250,179 L318,171 L386,165 L410,163","pts":[[48,246],[70,231],[93,218],[138,200],[183,189],[250,179],[318,171],[386,165],[410,163]],"ticks":[[2,264],[4,231],[6,199],[8,166],[10,134],[12,101],[14,69],[16,36]],"end":{"-3":170,"-2":152,"-1":132,"0":110,"1":85,"2":58,"3":29},"ylab":"Peso (kg)","val":"8,20 kg","z":"−1,39","name":"Peso para la edad"},"talla":{"l":{"-3":"M48,263 L70,243 L93,228 L116,217 L138,207 L160,199 L183,191 L206,185 L228,178 L250,172 L273,167 L296,161 L318,155 L340,150 L363,145 L386,140 L408,136 L430,131 L453,126 L476,122 L498,118 L520,114 L543,110 L566,106 L588,102","-2":"M48,254 L70,234 L93,219 L116,206 L138,196 L160,188 L183,180 L206,173 L228,167 L250,160 L273,155 L296,149 L318,143 L340,138 L363,132 L386,127 L408,122 L430,118 L453,113 L476,108 L498,104 L520,99 L543,95 L566,91 L588,87","-1":"M48,246 L70,225 L93,209 L116,196 L138,186 L160,177 L183,169 L206,162 L228,155 L250,149 L273,142 L296,136 L318,130 L340,125 L363,120 L386,114 L408,109 L430,104 L453,99 L476,95 L498,90 L520,85 L543,81 L566,77 L588,73","0":"M48,238 L70,216 L93,199 L116,186 L138,175 L160,167 L183,158 L206,151 L228,144 L250,137 L273,130 L296,124 L318,118 L340,112 L363,107 L386,101 L408,96 L430,91 L453,86 L476,81 L498,76 L520,71 L543,67 L566,63 L588,58","1":"M48,230 L70,207 L93,190 L116,176 L138,165 L160,156 L183,147 L206,140 L228,132 L250,125 L273,118 L296,112 L318,105 L340,100 L363,94 L386,88 L408,83 L430,77 L453,72 L476,67 L498,62 L520,57 L543,53 L566,48 L588,44","2":"M48,221 L70,198 L93,180 L116,166 L138,154 L160,145 L183,136 L206,128 L228,121 L250,113 L273,106 L296,100 L318,93 L340,87 L363,81 L386,75 L408,69 L430,64 L453,58 L476,53 L498,48 L520,43 L543,38 L566,34 L588,29","3":"M48,213 L70,189 L93,170 L116,156 L138,144 L160,134 L183,125 L206,117 L228,109 L250,101 L273,94 L296,87 L318,81 L340,74 L363,68 L386,62 L408,56 L430,51 L453,45 L476,40 L498,34 L520,29 L543,24 L566,19 L588,15"},"band":"M48,254 L70,234 L93,219 L116,206 L138,196 L160,188 L183,180 L206,173 L228,167 L250,160 L273,155 L296,149 L318,143 L340,138 L363,132 L386,127 L408,122 L430,118 L453,113 L476,108 L498,104 L520,99 L543,95 L566,91 L588,87 L588,29 L566,34 L543,38 L520,43 L498,48 L476,53 L453,58 L430,64 L408,69 L386,75 L363,81 L340,87 L318,93 L296,100 L273,106 L250,113 L228,121 L206,128 L183,136 L160,145 L138,154 L116,166 L93,180 L70,198 L48,221Z","pl":"M48,238 L70,217 L93,201 L138,178 L183,162 L250,142 L318,125 L386,111 L410,106","pts":[[48,238],[70,217],[93,201],[138,178],[183,162],[250,142],[318,125],[386,111],[410,106]],"ticks":[[45,258],[55,209],[65,161],[75,113],[85,65],[95,17]],"end":{"-3":102,"-2":87,"-1":73,"0":58,"1":44,"2":29,"3":15},"ylab":"Longitud (cm)","val":"76,4 cm","z":"−0,80","name":"Longitud para la edad"},"pc":{"l":{"-3":"M48,259 L70,230 L93,209 L116,196 L138,183 L160,174 L183,165 L206,159 L228,153 L250,147 L273,143 L296,139 L318,135 L340,132 L363,129 L386,126 L408,124 L430,122 L453,120 L476,118 L498,116 L520,114 L543,112 L566,111 L588,109","-2":"M48,245 L70,215 L93,195 L116,182 L138,169 L160,160 L183,151 L206,145 L228,139 L250,133 L273,129 L296,125 L318,121 L340,118 L363,114 L386,111 L408,110 L430,108 L453,106 L476,104 L498,102 L520,100 L543,98 L566,96 L588,95","-1":"M48,231 L70,201 L93,181 L116,167 L138,155 L160,146 L183,137 L206,131 L228,125 L250,119 L273,115 L296,111 L318,106 L340,103 L363,100 L386,97 L408,95 L430,94 L453,92 L476,90 L498,88 L520,86 L543,84 L566,82 L588,80","0":"M48,217 L70,187 L93,167 L116,153 L138,141 L160,132 L183,123 L206,117 L228,111 L250,105 L273,101 L296,96 L318,92 L340,89 L363,86 L386,83 L408,81 L430,79 L453,78 L476,76 L498,74 L520,72 L543,70 L566,68 L588,66","1":"M48,202 L70,173 L93,153 L116,139 L138,127 L160,118 L183,109 L206,103 L228,97 L250,91 L273,86 L296,82 L318,78 L340,75 L363,72 L386,69 L408,67 L430,65 L453,63 L476,62 L498,60 L520,58 L543,56 L566,54 L588,52","2":"M48,188 L70,159 L93,139 L116,125 L138,113 L160,104 L183,95 L206,88 L228,82 L250,76 L273,72 L296,68 L318,64 L340,61 L363,58 L386,55 L408,53 L430,51 L453,49 L476,47 L498,46 L520,44 L543,42 L566,40 L588,38","3":"M48,174 L70,145 L93,124 L116,111 L138,98 L160,89 L183,80 L206,74 L228,68 L250,62 L273,58 L296,54 L318,50 L340,47 L363,44 L386,41 L408,39 L430,37 L453,35 L476,33 L498,31 L520,30 L543,28 L566,26 L588,24"},"band":"M48,245 L70,215 L93,195 L116,182 L138,169 L160,160 L183,151 L206,145 L228,139 L250,133 L273,129 L296,125 L318,121 L340,118 L363,114 L386,111 L408,110 L430,108 L453,106 L476,104 L498,102 L520,100 L543,98 L566,96 L588,95 L588,38 L566,40 L543,42 L520,44 L498,46 L476,47 L453,49 L430,51 L408,53 L386,55 L363,58 L340,61 L318,64 L296,68 L273,72 L250,76 L228,82 L206,88 L183,95 L160,104 L138,113 L116,125 L93,139 L70,159 L48,188Z","pl":"M48,220 L70,188 L93,170 L138,147 L183,130 L250,114 L318,102 L386,96 L410,93","pts":[[48,220],[70,188],[93,170],[138,147],[183,130],[250,114],[318,102],[386,96],[410,93]],"ticks":[[30,261],[35,204],[40,148],[45,91],[50,35]],"end":{"-3":109,"-2":95,"-1":80,"0":66,"1":52,"2":38,"3":24},"ylab":"Perímetro cefálico (cm)","val":"44,8 cm","z":"−0,86","name":"Perímetro cefálico para la edad"}};
+const dark = !!this.props.dark;
+const doctor = (this.props.variant ?? 'medico') === 'medico';
+const k = D[this.props.ind] ? this.props.ind : 'peso';
+const r = D[k];
+const c = dark ? {
+bg:'#0f172a', tx:'#f1f5f9', tx2:'#cbd5e1', grid:'#1e293b', axis:'#475569', tick:'#94a3b8',
+median:'#e2e8f0', sd1:'#facc15', sd2:'#fb923c', sd3:'#f87171', line:'#60a5fa',
+bandOk:'#22c55e', o1: doctor ? 0.10 : 0.16, tipBg:'#1e293b', tipBd:'#334155'
+} : {
+bg:'#ffffff', tx:'#0f172a', tx2:'#475569', grid:'#f1f5f9', axis:'#cbd5e1', tick:'#64748b',
+median:'#334155', sd1:'#ca8a04', sd2:'#ea580c', sd3:'#dc2626', line:'#1d4ed8',
+bandOk:'#16a34a', o1: doctor ? 0.07 : 0.12, tipBg:'#ffffff', tipBd:'#cbd5e1'
+};
+c.mw = doctor ? 2 : 1.5; c.md = doctor ? '0' : '5 4'; c.w2 = doctor ? 1.5 : 1;
+const last = r.pts[r.pts.length - 1];
+const ty = last[1] > 150 ? last[1] - 76 : last[1] + 16;
+const d = {
+band: r.band, l0: r.l['0'], l1: r.l['1'], lm1: r.l['-1'], l2: r.l['2'], lm2: r.l['-2'], l3: r.l['3'], lm3: r.l['-3'],
+pl: r.pl, pts: r.pts.slice(0, -1).map(p => ({x: p[0], y: p[1]})), lx: last[0], ly: last[1], tly: last[1] + 9,
+ticks: r.ticks.map(t => ({v: t[0], y: t[1], ly: t[1] + 3})), ylab: r.ylab, val: r.val, z: r.z,
+ty, ty1: ty + 18, ty2: ty + 36, ty3: ty + 53
+};
+const L = doctor ? [['3','+3',c.sd3],['2','+2',c.sd2],['1','+1',c.sd1],['0','0',c.median],['-1','−1',c.sd1],['-2','−2',c.sd2],['-3','−3',c.sd3]] : [['2','+2',c.sd2],['0','0',c.median],['-2','−2',c.sd2]];
+return {
+c, d, doctor, parent: !doctor,
+labels: L.map(([z,t,col]) => ({t, c: col, y: r.end[z] + 3})),
+tip: this.props.tooltip ?? true,
+tipH: doctor ? 48 : 62,
+xlabel: this.props.corrected ? 'Edad corregida (meses)' : 'Edad (meses)',
+aria: `${r.name}, niña, 0 a 2 años; última medición ${r.val}, Z ${r.z}`
+};
+}
+}
+</script>
+</body>
+</html>

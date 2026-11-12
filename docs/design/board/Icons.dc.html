@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Ícono y splash</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+.ib{font-family:Inter,system-ui,sans-serif;color:#0f172a;font-variant-numeric:tabular-nums}
+.ib *{box-sizing:border-box}.ib h1,.ib h2,.ib p{margin:0}
+.k{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:20px;display:flex;flex-direction:column;gap:14px}
+.s{font-size:13px;color:#475569}
+.sz{display:flex;align-items:flex-end;gap:14px}
+</style>
+</helmet>
+<div class="ib" style="width: 1200px; height: 800px; background: #f8fafc; padding: 40px; display: flex; flex-direction: column; gap: 24px;">
+<div>
+<p style="font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: #64748b;">Ícono de la app · neutral para cualquier clínica</p>
+<h1 style="font-size: 28px; font-weight: 700; margin-top: 6px;">Tres conceptos + splash PWA</h1>
+<p class="s" style="margin-top: 6px; max-width: 900px;">El fondo toma el primario de la clínica (aquí teal #0f766e); el trazo es blanco. Sin niños, sin cruces rojas, sin rosa/azul. El elegido reemplaza <code>public/favicon.svg</code> y <code>pwa-assets.config.ts</code> genera los PNG.</p>
+</div>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) 260px; gap: 20px; flex: 1;">
+
+<div class="k">
+<div style="display: flex; justify-content: space-between; align-items: baseline;"><h2 style="font-size: 16px; font-weight: 600;">A · Curva</h2><span style="font-size: 12px; font-weight: 600; color: #115e59; background: #f0fdfa; padding: 3px 8px; border-radius: 99px;">Recomendado</span></div>
+<svg viewBox="0 0 64 64" width="128" height="128" role="img" aria-label="Concepto A: curva de crecimiento ascendente"><rect width="64" height="64" rx="14" fill="#0f766e"></rect><path d="M14 46C24 44 30 36 36 28S46 18 50 17" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round"></path><circle cx="50" cy="17" r="5" fill="#fff"></circle><path d="M14 52h36" stroke="#99f6e4" stroke-width="3" stroke-linecap="round"></path></svg>
+<div class="sz">
+<svg viewBox="0 0 64 64" width="48" height="48" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#0f766e"></rect><path d="M14 46C24 44 30 36 36 28S46 18 50 17" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round"></path><circle cx="50" cy="17" r="5" fill="#fff"></circle><path d="M14 52h36" stroke="#99f6e4" stroke-width="3" stroke-linecap="round"></path></svg>
+<svg viewBox="0 0 64 64" width="32" height="32" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#0f766e"></rect><path d="M14 46C24 44 30 36 36 28S46 18 50 17" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round"></path><circle cx="50" cy="17" r="6" fill="#fff"></circle></svg>
+<svg viewBox="0 0 64 64" width="16" height="16" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#0f766e"></rect><path d="M14 46C24 44 30 36 36 28S46 18 50 17" fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round"></path></svg>
+<svg viewBox="0 0 64 64" width="48" height="48" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#6d28d9"></rect><path d="M14 46C24 44 30 36 36 28S46 18 50 17" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round"></path><circle cx="50" cy="17" r="5" fill="#fff"></circle><path d="M14 52h36" stroke="#ddd6fe" stroke-width="3" stroke-linecap="round"></path></svg>
+</div>
+<p class="s">Abstrae el gráfico de crecimiento: lo que hace la app. Legible a 16 px (se omite la base). Último ícono: misma forma con el primario de otra clínica.</p>
+</div>
+
+<div class="k">
+<h2 style="font-size: 16px; font-weight: 600;">B · Brote</h2>
+<svg viewBox="0 0 64 64" width="128" height="128" role="img" aria-label="Concepto B: brote con dos hojas"><rect width="64" height="64" rx="14" fill="#0f766e"></rect><path d="M32 52V31" stroke="#fff" stroke-width="5" stroke-linecap="round"></path><path d="M32 33c0-9 6-15 16-15 0 10-6 15-16 15z" fill="#fff"></path><path d="M32 39c0-7-5-12-13-12 0 8 5 12 13 12z" fill="#99f6e4"></path></svg>
+<div class="sz">
+<svg viewBox="0 0 64 64" width="48" height="48" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#0f766e"></rect><path d="M32 52V31" stroke="#fff" stroke-width="5" stroke-linecap="round"></path><path d="M32 33c0-9 6-15 16-15 0 10-6 15-16 15z" fill="#fff"></path><path d="M32 39c0-7-5-12-13-12 0 8 5 12 13 12z" fill="#99f6e4"></path></svg>
+<svg viewBox="0 0 64 64" width="32" height="32" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#0f766e"></rect><path d="M32 52V31" stroke="#fff" stroke-width="6" stroke-linecap="round"></path><path d="M32 33c0-9 6-15 16-15 0 10-6 15-16 15z" fill="#fff"></path><path d="M32 39c0-7-5-12-13-12 0 8 5 12 13 12z" fill="#99f6e4"></path></svg>
+<svg viewBox="0 0 64 64" width="16" height="16" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#0f766e"></rect><path d="M32 52V31" stroke="#fff" stroke-width="7" stroke-linecap="round"></path><path d="M32 33c0-9 6-15 16-15 0 10-6 15-16 15z" fill="#fff"></path></svg>
+</div>
+<p class="s">Crecimiento y cuidado, tono cálido. Riesgo: se parece a apps de jardinería o bienestar genérico.</p>
+</div>
+
+<div class="k">
+<h2 style="font-size: 16px; font-weight: 600;">C · Marcas de talla</h2>
+<svg viewBox="0 0 64 64" width="128" height="128" role="img" aria-label="Concepto C: tres barras redondeadas de altura creciente"><rect width="64" height="64" rx="14" fill="#0f766e"></rect><rect x="14" y="36" width="9" height="16" rx="4.5" fill="#99f6e4"></rect><rect x="27.5" y="27" width="9" height="25" rx="4.5" fill="#ccfbf1"></rect><rect x="41" y="14" width="9" height="38" rx="4.5" fill="#fff"></rect></svg>
+<div class="sz">
+<svg viewBox="0 0 64 64" width="48" height="48" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#0f766e"></rect><rect x="14" y="36" width="9" height="16" rx="4.5" fill="#99f6e4"></rect><rect x="27.5" y="27" width="9" height="25" rx="4.5" fill="#ccfbf1"></rect><rect x="41" y="14" width="9" height="38" rx="4.5" fill="#fff"></rect></svg>
+<svg viewBox="0 0 64 64" width="32" height="32" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#0f766e"></rect><rect x="14" y="36" width="9" height="16" rx="4.5" fill="#99f6e4"></rect><rect x="27.5" y="27" width="9" height="25" rx="4.5" fill="#ccfbf1"></rect><rect x="41" y="14" width="9" height="38" rx="4.5" fill="#fff"></rect></svg>
+<svg viewBox="0 0 64 64" width="16" height="16" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#0f766e"></rect><rect x="12" y="34" width="11" height="18" rx="5" fill="#fff"></rect><rect x="41" y="12" width="11" height="40" rx="5" fill="#fff"></rect></svg>
+</div>
+<p class="s">Hermanos midiéndose contra la pared. Muy legible pequeño; riesgo: se lee como «señal» o «estadísticas».</p>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 12px;">
+<div style="flex: 1; border-radius: 28px; border: 1px solid #cbd5e1; background: #ffffff; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; position: relative;">
+<svg viewBox="0 0 64 64" width="88" height="88" role="img" aria-label="Ícono"><rect width="64" height="64" rx="14" fill="#0f766e"></rect><path d="M14 46C24 44 30 36 36 28S46 18 50 17" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round"></path><circle cx="50" cy="17" r="5" fill="#fff"></circle><path d="M14 52h36" stroke="#99f6e4" stroke-width="3" stroke-linecap="round"></path></svg>
+<p style="font-size: 18px; font-weight: 600;">Pediatría Demo</p>
+<p style="position: absolute; bottom: 28px; font-size: 12px; color: #64748b;">con Control Pediátrico</p>
+</div>
+<p class="s" style="text-align: center;">Splash: fondo #ffffff (manifest), ícono 88 px, nombre de la clínica. En oscuro: fondo #020617.</p>
+</div>
+
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1200,"height":800}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

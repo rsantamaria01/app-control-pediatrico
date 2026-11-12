@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Agenda en teléfono</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:inherit}
+.cp{--bg:#fff;--bg2:#f8fafc;--bg3:#f1f5f9;--bd:#e2e8f0;--bd2:#cbd5e1;--tx:#0f172a;--tx2:#475569;--tx3:#64748b;--pr:#0f766e;--prt:#0f766e;--pro:#fff;--prs:#f0fdfa;--prst:#115e59;--wab:#fef9c3;--wat:#713f12;--oub:#fee2e2;--out:#991b1b;--okb:#dcfce7;--okt:#166534;--nab:#f1f5f9;--nat:#475569;font-family:Inter,system-ui,sans-serif;color:var(--tx);background:var(--bg2);font-size:15px;line-height:1.45;font-variant-numeric:tabular-nums}
+.cp.dark{--bg:#0f172a;--bg2:#020617;--bg3:#1e293b;--bd:#1e293b;--bd2:#334155;--tx:#f1f5f9;--tx2:#cbd5e1;--tx3:#94a3b8;--pr:#2dd4bf;--prt:#5eead4;--pro:#042f2e;--prs:rgba(45,212,191,.12);--prst:#99f6e4;--wab:rgba(234,179,8,.18);--wat:#fde047;--oub:rgba(239,68,68,.2);--out:#fca5a5;--okb:rgba(34,197,94,.16);--okt:#86efac;--nab:#1e293b;--nat:#cbd5e1}
+.cp *{box-sizing:border-box}.cp h1,.cp h2,.cp p{margin:0}
+.t2{color:var(--tx2)}.t3{color:var(--tx3)}.sm{font-size:13px}.xs{font-size:12px}
+.card{background:var(--bg);border:1px solid var(--bd);border-radius:12px;overflow:hidden}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:0 14px;border-radius:10px;font:600 14px/1 Inter,sans-serif;border:1px solid transparent;text-decoration:none;white-space:nowrap}
+.bp{background:var(--pr);color:var(--pro)}.bo{background:var(--bg);color:var(--tx);border-color:var(--bd2)}.danger{color:var(--out)}
+.bd{display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap}
+.zwa{background:var(--wab);color:var(--wat)}.zna{background:var(--nab);color:var(--nat)}.zpr{background:var(--prs);color:var(--prst)}.zok{background:var(--okb);color:var(--okt)}
+.ph{width:375px;height:812px;flex:none;background:var(--bg2);border:1px solid var(--bd2);border-radius:32px;overflow:hidden;display:flex;flex-direction:column}
+.ab{height:56px;flex:none;display:flex;align-items:center;gap:8px;padding:0 12px 0 16px;background:var(--bg);border-bottom:1px solid var(--bd)}
+.bdy{flex:1;overflow:hidden;padding:14px;display:flex;flex-direction:column;gap:12px}
+.tbar{display:flex;border-top:1px solid var(--bd);background:var(--bg);height:64px;flex:none}
+.tab{flex:1;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;color:var(--tx3)}.tab.on{color:var(--prt);font-weight:700}
+.seg{display:flex;padding:3px;border-radius:10px;background:var(--bg3);gap:2px}.seg a{flex:1;display:flex;align-items:center;justify-content:center;min-height:38px;border-radius:8px;font-size:13px;font-weight:500;color:var(--tx2);text-decoration:none}.seg a.on{background:var(--bg);color:var(--tx);font-weight:700;box-shadow:0 1px 2px rgba(15,23,42,.1)}
+.li{display:flex;align-items:center;gap:10px;padding:10px 12px;border-top:1px solid var(--bd);min-height:56px}
+.cpt{font-size:13px;font-weight:600;color:var(--tx2);margin-bottom:10px}
+.chip{flex:none;display:inline-flex;flex-direction:column;align-items:center;justify-content:center;min-width:56px;min-height:52px;border:1px solid var(--bd2);border-radius:10px;background:var(--bg);font-size:12px}
+.chip.on{background:var(--pr);border-color:var(--pr);color:var(--pro)}
+.slot{display:flex;align-items:center;justify-content:center;min-height:42px;border:1px solid var(--bd2);border-radius:8px;font-weight:600;font-size:13px;background:var(--bg)}.slot.on{background:var(--pr);border-color:var(--pr);color:var(--pro)}
+.in{display:flex;align-items:center;justify-content:space-between;height:46px;border:1px solid var(--bd2);border-radius:10px;background:var(--bg);padding:0 12px}
+.lb{display:block;font-size:13px;font-weight:500;color:var(--tx2);margin-bottom:6px}
+</style>
+</helmet>
+<div class="{{theme}}" style="width: 2115px; height: 940px; padding: 40px; display: flex; gap: 40px;">
+
+<div><p class="cpt">1 · Día</p><div class="ph">
+<div class="ab"><h1 style="font-size: 17px; font-weight: 600; flex: 1;">Agenda</h1><a href="#" class="btn bp" style="min-height: 38px;">+ Cita</a></div>
+<div class="bdy"><div class="seg"><a href="#" class="on">Día</a><a href="#">Semana</a><a href="#">Mes</a></div>
+<div style="display: flex; justify-content: space-between; align-items: center;"><span class="t3">‹</span><b>Martes 10 de noviembre · hoy</b><span class="t3">›</span></div>
+<a href="#" class="card" style="padding: 10px 12px; display: flex; align-items: center; gap: 8px; text-decoration: none;"><span class="bd zwa">2</span><span class="sm" style="flex: 1; font-weight: 600;">Solicitudes de familias nuevas</span><span class="t3">›</span></a>
+<div class="card"><sc-for list="{{today}}" as="a" hint-placeholder-count="5"><div class="li" style="background: {{a.bg}};"><b style="width: 44px;">{{a.t}}</b><span style="flex: 1;"><b class="sm">{{a.p}}</b><br><span class="xs t3">{{a.m}}</span></span><span class="bd {{a.cls}}">{{a.s}}</span></div></sc-for></div>
+<p class="xs t3">9 horas libres · almuerzo 13:00–14:00</p></div>
+<div class="tbar"><span class="tab">Inicio</span><span class="tab">Pacientes</span><span class="tab on">Agenda</span><span class="tab">Avisos</span><span class="tab">Perfil</span></div>
+</div></div>
+
+<div><p class="cpt">2 · Semana</p><div class="ph">
+<div class="ab"><h1 style="font-size: 17px; font-weight: 600; flex: 1;">Agenda</h1></div>
+<div class="bdy"><div class="seg"><a href="#">Día</a><a href="#" class="on">Semana</a><a href="#">Mes</a></div>
+<div style="display: flex; justify-content: space-between;"><span class="t3">‹</span><b>9 al 14 de noviembre</b><span class="t3">›</span></div>
+<div class="card"><sc-for list="{{week}}" as="w" hint-placeholder-count="6"><div class="li" style="background: {{w.bg}};"><b style="flex: 1;">{{w.d}}</b><span class="xs t3" style="max-width: 150px; text-align: right;">{{w.first}}</span><span class="bd zna">{{w.n}}</span></div></sc-for></div>
+<p class="xs t3">En teléfono la semana es una lista por día; en escritorio, una grilla de columnas.</p></div>
+<div class="tbar"><span class="tab">Inicio</span><span class="tab">Pacientes</span><span class="tab on">Agenda</span><span class="tab">Avisos</span><span class="tab">Perfil</span></div>
+</div></div>
+
+<div><p class="cpt">3 · Mes</p><div class="ph">
+<div class="ab"><h1 style="font-size: 17px; font-weight: 600; flex: 1;">Agenda</h1></div>
+<div class="bdy"><div class="seg"><a href="#">Día</a><a href="#">Semana</a><a href="#" class="on">Mes</a></div>
+<div class="card" style="padding: 10px;"><p style="text-align: center; font-weight: 700; margin-bottom: 8px;">Noviembre 2026</p>
+<div style="display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px; text-align: center;" class="xs t3"><b>L</b><b>M</b><b>X</b><b>J</b><b>V</b><b>S</b><b>D</b></div>
+<div style="display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px; margin-top: 4px;"><sc-for list="{{cells}}" as="c" hint-placeholder-count="35"><span style="min-height: 46px; border-radius: 8px; border: 1px solid {{c.bc}}; background: {{c.bg}}; display: flex; flex-direction: column; align-items: center; justify-content: center; opacity: {{c.op}};"><b class="sm">{{c.n}}</b><span class="xs" style="color: var(--prst); font-weight: 600;">{{c.t}}</span></span></sc-for></div></div>
+<p class="xs t3">Número = citas del día. Toque un día para abrirlo.</p></div>
+<div class="tbar"><span class="tab">Inicio</span><span class="tab">Pacientes</span><span class="tab on">Agenda</span><span class="tab">Avisos</span><span class="tab">Perfil</span></div>
+</div></div>
+
+<div><p class="cpt">4 · Detalle de cita · reprogramar</p><div class="ph">
+<div class="ab"><span class="t3" style="font-size: 20px;">‹</span><h1 style="font-size: 17px; font-weight: 600; flex: 1;">Cita</h1></div>
+<div class="bdy">
+<div class="card" style="padding: 12px;"><p><b>Sofía Cevallos</b></p><p class="sm t2">Jueves 12 de noviembre, 10:00 · Control de niño sano</p><span class="bd zna" style="margin-top: 6px;">Confirmada</span></div>
+<div style="display: flex; gap: 8px;"><a href="#" class="btn bp" style="flex: 1;">Abrir ficha</a><a href="#" class="btn bo danger" style="flex: 1;">Cancelar cita</a></div>
+<p class="sm" style="font-weight: 700;">Reprogramar</p>
+<div style="display: flex; gap: 6px; overflow: hidden;"><span class="chip"><span>vie</span><b>13</b></span><span class="chip"><span>sáb</span><b>14</b></span><span class="chip on"><span>lun</span><b>16</b></span><span class="chip"><span>mar</span><b>17</b></span><span class="chip"><span>mié</span><b>18</b></span></div>
+<div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px;"><span class="slot">08:30</span><span class="slot on">09:00</span><span class="slot">10:30</span><span class="slot">11:00</span><span class="slot">14:00</span><span class="slot">15:00</span><span class="slot">15:30</span><span class="slot">16:30</span></div>
+<a href="#" class="btn bp">Guardar cambio · lun 16, 09:00</a>
+<p class="xs t3">Asistente: misma pantalla sin «Abrir ficha». Cancelar pide confirmación y avisa a la familia.</p></div>
+</div></div>
+
+<div><p class="cpt">5 · Nueva cita</p><div class="ph">
+<div class="ab"><span class="t3" style="font-size: 18px;">✕</span><h1 style="font-size: 17px; font-weight: 600; flex: 1;">Nueva cita</h1></div>
+<div class="bdy">
+<div><span class="lb">Paciente</span><div class="in"><span>Valentina Ríos</span><span class="t3">▾</span></div></div>
+<div><span class="lb">Motivo</span><div class="in"><span>Control de niño sano</span><span class="t3">▾</span></div></div>
+<div><span class="lb">Día</span><div style="display: flex; gap: 6px; overflow: hidden;"><span class="chip"><span>mié</span><b>11</b></span><span class="chip on"><span>jue</span><b>12</b></span><span class="chip"><span>vie</span><b>13</b></span><span class="chip"><span>sáb</span><b>14</b></span><span class="chip"><span>lun</span><b>16</b></span></div></div>
+<div><span class="lb">Hora libre</span><div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px;"><span class="slot">08:00</span><span class="slot">09:30</span><span class="slot on">10:30</span><span class="slot">11:30</span><span class="slot">14:30</span><span class="slot">15:30</span><span class="slot">16:00</span><span class="slot">16:30</span></div></div>
+<p class="xs t3">La familia recibe la confirmación por sus canales de recordatorio.</p>
+<a href="#" class="btn bp" style="margin-top: auto;">Guardar cita</a></div>
+</div></div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"dark":{"editor":"boolean","default":false},"$preview":{"width":2115,"height":940}}'>
+class Component extends DCLogic {
+renderVals() {
+const A = (t,p,m,s,cls,cur) => ({t,p,m,s,cls,bg: cur ? 'var(--prs)' : 'transparent'});
+const today = [A('08:30','Camila Ordóñez','Control 2 meses','Atendida','zna'),A('09:15','Valentina Ríos','Control 16 meses','En consulta','zpr',true),A('10:00','Daniel Pino','Primera consulta','Nueva','zok'),A('11:30','Joaquín Mendoza','Seguimiento de peso','Confirmada','zna'),A('15:00','Martina Loor','Control anual','Por confirmar','zwa')];
+const week = [['Lunes 9','4','08:30 Sofía C.'],['Martes 10 · hoy','5','08:30 Camila O.'],['Miércoles 11','6','09:00 Renata V.'],['Jueves 12','5','08:30 Tomás V.'],['Viernes 13','3','09:00 Sebastián M.'],['Sábado 14','2','09:00 Gael S.']].map(([d,n,first],i) => ({d, n: n + ' citas', first, bg: i === 1 ? 'var(--prs)' : 'transparent'}));
+const counts = {2:4,3:5,4:3,5:6,6:4,7:2,9:4,10:5,11:6,12:5,13:3,14:2,16:5,17:4,18:6,19:3,20:4,21:2,23:4,24:5,25:3,26:5,27:4,28:2,30:3};
+const cells = [];
+for (let i = 0; i < 6; i++) cells.push({n:'', t:'', bc:'transparent', bg:'transparent', op:1});
+for (let d = 1; d <= 30; d++) { const sun = d % 7 === 1; cells.push({n:String(d), t: sun ? '' : (counts[d] || ''), bc: d === 12 ? 'var(--pr)' : 'var(--bd)', bg: d === 10 ? 'var(--prs)' : 'var(--bg)', op: sun ? 0.4 : 1}); }
+return { theme: this.props.dark ? 'cp dark' : 'cp', today, week, cells };
+}
+}
+</script>
+</body>
+</html>

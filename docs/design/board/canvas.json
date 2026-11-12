@@ -1,0 +1,344 @@
+{
+"v": 3,
+"createdOnFiles": {
+"v": 1,
+"at": "2026-11-10T20:10:00Z"
+},
+"title": "Control Pediátrico — UI v2",
+"launch": {
+"view": "canvas"
+},
+"pages": [],
+"boards": {
+"Main.dc.html": {
+"x": 0,
+"y": 0,
+"w": 1440,
+"h": 1560,
+"title": "Fundamentos y tokens",
+"expand": "fill"
+},
+"ChartSpec.dc.html": {
+"x": 1520,
+"y": 0,
+"w": 1440,
+"h": 1480,
+"title": "Z-score y gráfico (ECharts)",
+"expand": "fill"
+},
+"GrowthChart.dc.html": {
+"x": 3040,
+"y": 0,
+"w": 640,
+"h": 360,
+"title": "Componente: gráfico de crecimiento"
+},
+"Icons.dc.html": {
+"x": 3760,
+"y": 0,
+"w": 1200,
+"h": 800,
+"title": "Ícono y splash (3 conceptos)"
+},
+"NavMap.dc.html": {
+"x": 5040,
+"y": 0,
+"w": 1440,
+"h": 1000,
+"title": "Mapa de navegación por rol",
+"expand": "fill"
+},
+"Handoff.dc.html": {
+"x": 6560,
+"y": 0,
+"w": 1440,
+"h": 1700,
+"title": "Mapeo Nuxt UI y decisiones",
+"expand": "fill"
+},
+"Dashboard1440.dc.html": {
+"x": 0,
+"y": 2200,
+"w": 1440,
+"h": 1000,
+"title": "Médico · Inicio · 1440",
+"expand": "fill"
+},
+"PatientDetail1440.dc.html": {
+"x": 1520,
+"y": 2200,
+"w": 1440,
+"h": 1500,
+"title": "Médico · Paciente · 1440",
+"expand": "fill"
+},
+"Tablet1024.dc.html": {
+"x": 3040,
+"y": 2200,
+"w": 1024,
+"h": 1100,
+"title": "Médico · Paciente + Nueva visita · 1024",
+"expand": "fill"
+},
+"Agenda1440.dc.html": {
+"x": 4144,
+"y": 2200,
+"w": 1440,
+"h": 1000,
+"title": "Médico · Agenda · 1440",
+"expand": "fill"
+},
+"VaccinesMilestones1440.dc.html": {
+"x": 5664,
+"y": 2200,
+"w": 1440,
+"h": 1560,
+"title": "Médico · Vacunas e hitos · 1440",
+"expand": "fill"
+},
+"ReportA4.dc.html": {
+"x": 7184,
+"y": 2200,
+"w": 794,
+"h": 1123,
+"title": "Informe de crecimiento · A4",
+"paper": "a4"
+},
+"DoctorMobile.dc.html": {
+"x": 8058,
+"y": 2200,
+"w": 2115,
+"h": 940,
+"title": "Médico · 375"
+},
+"ParentMobile.dc.html": {
+"x": 0,
+"y": 4120,
+"w": 2115,
+"h": 940,
+"title": "Padres · 375"
+},
+"ParentDesktop1440.dc.html": {
+"x": 2195,
+"y": 4120,
+"w": 1440,
+"h": 1000,
+"title": "Padres · Hijo · 1440",
+"expand": "fill"
+},
+"AuthMobile.dc.html": {
+"x": 0,
+"y": 5540,
+"w": 2115,
+"h": 940,
+"title": "Acceso e invitación · 375"
+},
+"BookingMobile.dc.html": {
+"x": 2195,
+"y": 5540,
+"w": 2115,
+"h": 940,
+"title": "Reserva pública · 375"
+},
+"PwaSystemMobile.dc.html": {
+"x": 4390,
+"y": 5540,
+"w": 2115,
+"h": 940,
+"title": "PWA, avisos y sistema · 375"
+},
+"Login1440.dc.html": {
+"x": 6585,
+"y": 5540,
+"w": 1440,
+"h": 900,
+"title": "Acceso · 1440",
+"expand": "fill"
+},
+"AdminWizard1440.dc.html": {
+"x": 0,
+"y": 6900,
+"w": 1440,
+"h": 1000,
+"title": "Admin · Configuración inicial · 1440",
+"expand": "fill"
+},
+"AdminAudit1440.dc.html": {
+"x": 1520,
+"y": 6900,
+"w": 1440,
+"h": 1100,
+"title": "Admin · Usuarios y auditoría · 1440",
+"expand": "fill"
+},
+"ClinicSettings1440.dc.html": {
+"x": 3040,
+"y": 6900,
+"w": 1440,
+"h": 1320,
+"title": "Admin · Clínica › Recordatorios y WhatsApp · 1440",
+"expand": "fill"
+},
+"PatientDetailDark.dc.html": {
+"x": 0,
+"y": 8420,
+"w": 1440,
+"h": 1500,
+"title": "Oscuro · Paciente · 1440",
+"expand": "fill"
+},
+"DoctorMobileDark.dc.html": {
+"x": 1520,
+"y": 8420,
+"w": 2115,
+"h": 940,
+"title": "Oscuro · Médico · 375"
+},
+"ParentMobileDark.dc.html": {
+"x": 3715,
+"y": 8420,
+"w": 2115,
+"h": 940,
+"title": "Oscuro · Padres · 375"
+},
+"AgendaViews1440.dc.html": {
+"x": 10253,
+"y": 2200,
+"w": 1440,
+"h": 1000,
+"title": "Médico · Agenda mes + detalle de cita · 1440",
+"expand": "fill"
+},
+"Availability1440.dc.html": {
+"x": 11773,
+"y": 2200,
+"w": 1440,
+"h": 940,
+"title": "Médico/asistente · Horarios de atención · 1440",
+"expand": "fill"
+},
+"NewPatient1440.dc.html": {
+"x": 13293,
+"y": 2200,
+"w": 1440,
+"h": 1360,
+"title": "Médico · Nuevo paciente · 1440",
+"expand": "fill"
+},
+"AgendaMobile.dc.html": {
+"x": 14813,
+"y": 2200,
+"w": 2115,
+"h": 940,
+"title": "Agenda · día, semana, mes, cita, horarios · 375"
+},
+"ReportA4p2.dc.html": {
+"x": 17008,
+"y": 2200,
+"w": 794,
+"h": 1123,
+"title": "Informe · hoja 2 (curvas)",
+"paper": "a4"
+},
+"ReportA4p3.dc.html": {
+"x": 17882,
+"y": 2200,
+"w": 794,
+"h": 1123,
+"title": "Informe · hoja 3 (indicaciones, vacunas)",
+"paper": "a4"
+}
+},
+"order": [
+"Main.dc.html",
+"ChartSpec.dc.html",
+"GrowthChart.dc.html",
+"Icons.dc.html",
+"NavMap.dc.html",
+"Handoff.dc.html",
+"Dashboard1440.dc.html",
+"PatientDetail1440.dc.html",
+"Tablet1024.dc.html",
+"Agenda1440.dc.html",
+"VaccinesMilestones1440.dc.html",
+"ReportA4.dc.html",
+"DoctorMobile.dc.html",
+"ParentMobile.dc.html",
+"ParentDesktop1440.dc.html",
+"AuthMobile.dc.html",
+"BookingMobile.dc.html",
+"PwaSystemMobile.dc.html",
+"Login1440.dc.html",
+"AdminWizard1440.dc.html",
+"AdminAudit1440.dc.html",
+"ClinicSettings1440.dc.html",
+"AgendaViews1440.dc.html",
+"Availability1440.dc.html",
+"NewPatient1440.dc.html",
+"AgendaMobile.dc.html",
+"ReportA4p2.dc.html",
+"ReportA4p3.dc.html",
+"PatientDetailDark.dc.html",
+"DoctorMobileDark.dc.html",
+"ParentMobileDark.dc.html"
+],
+"notes": {
+"t1": {
+"x": 0,
+"y": -300,
+"text": "Fundamentos, especificaciones y entrega",
+"kind": "title1",
+"maxW": 8000
+},
+"t2": {
+"x": 0,
+"y": 1900,
+"text": "Médico — escritorio, tablet y teléfono",
+"kind": "title1",
+"maxW": 18676
+},
+"t3": {
+"x": 0,
+"y": 3820,
+"text": "Padres (datos clínicos solo lectura)",
+"kind": "title1",
+"maxW": 3635
+},
+"t4": {
+"x": 0,
+"y": 5240,
+"text": "Público, acceso, PWA y sistema",
+"kind": "title1",
+"maxW": 8025
+},
+"t5": {
+"x": 0,
+"y": 6600,
+"text": "Administración",
+"kind": "title1",
+"maxW": 4480
+},
+"t6": {
+"x": 0,
+"y": 8120,
+"text": "Modo oscuro (cada artboard tiene el ajuste «dark» en Tweaks)",
+"kind": "title1",
+"maxW": 5830
+},
+"s1": {
+"x": 8100,
+"y": 0,
+"text": "Pacientes, médicos y la clínica «Pediatría Demo» son ficticios. Curvas ilustrativas (no tablas OMS reales). Vacunas y hitos no motores marcados «ejemplo». Decisiones clínicas confirmadas por la pediatra el 10 nov 2026 (ver artboard «Mapeo Nuxt UI y decisiones»).",
+"w": 360,
+"fill": "orange"
+},
+"s2": {
+"x": 7184,
+"y": 3363,
+"text": "Vista previa en pantalla del informe: barra superior con «Descargar PDF», «Imprimir» y «Compartir» (Web Share API; en escritorio copia el enlace). La hoja A4 se renderiza igual en @media print.",
+"w": 380,
+"fill": "teal"
+}
+},
+"designSystems": []
+}

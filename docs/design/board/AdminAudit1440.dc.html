@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Usuarios y auditoría</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:inherit}
+.cp{--bg:#fff;--bg2:#f8fafc;--bg3:#f1f5f9;--bd:#e2e8f0;--bd2:#cbd5e1;--tx:#0f172a;--tx2:#475569;--tx3:#64748b;--pr:#0f766e;--prt:#0f766e;--pro:#fff;--prs:#f0fdfa;--prst:#115e59;--okb:#dcfce7;--okt:#166534;--wab:#fef9c3;--wat:#713f12;--oub:#fee2e2;--out:#991b1b;--nab:#f1f5f9;--nat:#475569;font-family:Inter,system-ui,sans-serif;color:var(--tx);background:var(--bg2);font-size:14px;line-height:1.45;font-variant-numeric:tabular-nums}
+.cp.dark{--bg:#0f172a;--bg2:#020617;--bg3:#1e293b;--bd:#1e293b;--bd2:#334155;--tx:#f1f5f9;--tx2:#cbd5e1;--tx3:#94a3b8;--pr:#2dd4bf;--prt:#5eead4;--pro:#042f2e;--prs:rgba(45,212,191,.12);--prst:#99f6e4;--okb:rgba(34,197,94,.16);--okt:#86efac;--wab:rgba(234,179,8,.18);--wat:#fde047;--oub:rgba(239,68,68,.2);--out:#fca5a5;--nab:#1e293b;--nat:#cbd5e1}
+.cp *{box-sizing:border-box}.cp h1,.cp h2,.cp p{margin:0}
+.t2{color:var(--tx2)}.t3{color:var(--tx3)}.sm{font-size:13px}.xs{font-size:12px}
+.card{background:var(--bg);border:1px solid var(--bd);border-radius:12px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:0 16px;border-radius:8px;font:600 14px/1 Inter,sans-serif;border:1px solid transparent;cursor:pointer;text-decoration:none;white-space:nowrap}
+.bp{background:var(--pr);color:var(--pro)}.bo{background:var(--bg);color:var(--tx);border-color:var(--bd2)}.bg{background:transparent;color:var(--tx2)}.bs{min-height:36px;padding:0 12px;font-size:13px}
+.bd{display:inline-flex;align-items:center;gap:4px;height:24px;padding:0 8px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap}
+.zok{background:var(--okb);color:var(--okt)}.zwa{background:var(--wab);color:var(--wat)}.zou{background:var(--oub);color:var(--out)}.zna{background:var(--nab);color:var(--nat)}.zpr{background:var(--prs);color:var(--prst)}
+.flt{display:inline-flex;align-items:center;gap:8px;height:40px;border:1px solid var(--bd2);border-radius:8px;background:var(--bg);padding:0 12px;font-size:13px;color:var(--tx2)}
+.ic{width:20px;height:20px;flex:none;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}.ic4{width:16px;height:16px}
+.nav{display:flex;align-items:center;gap:10px;min-height:40px;padding:0 12px;border-radius:8px;color:var(--tx2);font-weight:500;text-decoration:none}.nav.on{background:var(--prs);color:var(--prst)}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--bd)}.tabs a{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 14px;font-weight:500;color:var(--tx2);text-decoration:none;border-bottom:2px solid transparent;margin-bottom:-1px}.tabs a.on{color:var(--prt);border-color:var(--pr);font-weight:600}
+.tb{width:100%;border-collapse:collapse}.tb th{text-align:left;font-size:12px;font-weight:500;color:var(--tx3);padding:9px 16px;border-bottom:1px solid var(--bd)}.tb td{padding:10px 16px;border-bottom:1px solid var(--bd);font-size:13px}
+.cp :focus-visible{outline:2px solid var(--pr);outline-offset:2px}
+</style>
+</helmet>
+<div class="{{theme}}" style="width: 100%; min-height: 1100px; display: flex; flex-wrap: wrap;">
+<aside style="flex: 1 1 240px; max-width: 256px; background: var(--bg); border-right: 1px solid var(--bd); padding: 16px 12px; display: flex; flex-direction: column; gap: 2px;">
+<div style="display: flex; align-items: center; gap: 10px; padding: 4px 8px 16px;"><svg viewBox="0 0 64 64" width="32" height="32" aria-hidden="true"><rect width="64" height="64" rx="14" fill="var(--pr)"></rect><path d="M14 46C24 44 30 36 36 28S46 18 50 17" fill="none" stroke="var(--pro)" stroke-width="5" stroke-linecap="round"></path><circle cx="50" cy="17" r="5" fill="var(--pro)"></circle></svg><div><p style="font-weight: 600;">Pediatría Demo</p><p class="xs t3">Administración</p></div></div>
+<a href="#" class="nav"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>Configuración inicial</a>
+<a href="#" class="nav"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"></path></svg>Usuarios</a>
+<a href="#" class="nav"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"></path></svg>Clínica</a>
+<a href="#" class="nav on"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>Auditoría</a>
+</aside>
+<main style="flex: 999 1 640px; min-width: 0; padding: 24px; display: flex; flex-direction: column; gap: 20px;">
+
+<section class="card">
+<div style="padding: 16px 16px 0; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;"><h1 style="font-size: 18px; font-weight: 600; flex: 1;">Usuarios</h1><a href="#" class="btn bo bs">Invitar padre/madre</a><a href="#" class="btn bp bs"><svg class="ic ic4" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Invitar médico o asistente</a></div>
+<nav class="tabs" aria-label="Tipo de usuario" style="padding: 0 12px; margin-top: 8px;"><a href="#" class="on">Médicos y asistentes <span class="bd zna" style="height: 20px;">4</span></a><a href="#">Padres <span class="bd zna" style="height: 20px;">214</span></a></nav>
+<div style="overflow-x: auto;"><table class="tb">
+<thead><tr><th>Nombre</th><th>Email</th><th>Rol</th><th>Estado</th><th>Último acceso</th><th></th></tr></thead>
+<tbody>
+<sc-for list="{{users}}" as="u" hint-placeholder-count="3"><tr><td style="font-weight: 600;">{{u.n}}</td><td class="t2">{{u.e}}</td><td><span class="bd zna">{{u.r}}</span></td><td><span class="bd {{u.sc}}">{{u.s}}</span></td><td class="t2">{{u.l}}</td><td style="text-align: right;"><button class="btn bg bs" aria-label="Acciones para {{u.n}}" style="width: 36px; padding: 0;"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 13a1 1 0 1 0 0-2 1 1 0 0 0 0 2zM19 13a1 1 0 1 0 0-2 1 1 0 0 0 0 2zM5 13a1 1 0 1 0 0-2 1 1 0 0 0 0 2z"></path></svg></button></td></tr></sc-for>
+</tbody></table></div>
+</section>
+
+<div style="display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 20px; align-items: start;">
+<section class="card">
+<div style="padding: 16px; display: flex; flex-direction: column; gap: 12px;">
+<div style="display: flex; align-items: center; gap: 8px;"><h2 style="font-size: 18px; font-weight: 600; flex: 1;">Registro de auditoría</h2><a href="#" class="btn bo bs"><svg class="ic ic4" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"></path></svg>Exportar CSV</a></div>
+<div style="display: flex; gap: 8px; flex-wrap: wrap;">
+<span class="flt">Usuario: <b style="color: var(--tx);">Todos</b></span><span class="flt">Paciente: <b style="color: var(--tx);">Valentina Ríos</b><svg class="ic ic4" viewBox="0 0 24 24" aria-label="Quitar filtro" role="img"><path d="M18 6 6 18M6 6l12 12"></path></svg></span><span class="flt">Acción: <b style="color: var(--tx);">Todas</b></span><span class="flt">1 – 10 nov 2026</span>
+</div>
+</div>
+<div style="overflow-x: auto;"><table class="tb">
+<thead><tr><th>Fecha y hora</th><th>Usuario</th><th>Acción</th><th>Registro</th><th>Detalle</th></tr></thead>
+<tbody>
+<sc-for list="{{log}}" as="l" hint-placeholder-count="7"><tr><td class="t2" style="white-space: nowrap;">{{l.t}}</td><td style="font-weight: 600;">{{l.u}}</td><td><span class="bd {{l.ac}}">{{l.a}}</span></td><td>{{l.r}}</td><td class="t2">{{l.d}}</td></tr></sc-for>
+</tbody></table></div>
+<div style="padding: 12px 16px; display: flex; justify-content: space-between; align-items: center;" class="sm t2"><span>7 de 7 eventos</span><span>Se conservan 5 años</span></div>
+</section>
+
+<section class="card" aria-labelledby="req">
+<div style="padding: 16px; display: flex; align-items: center; justify-content: space-between;"><h2 id="req" style="font-size: 16px; font-weight: 600;">Solicitudes de datos</h2><span class="bd zwa">2 abiertas</span></div>
+<sc-for list="{{reqs}}" as="r" hint-placeholder-count="2"><div style="padding: 14px 16px; border-top: 1px solid var(--bd); display: flex; flex-direction: column; gap: 6px;">
+<div style="display: flex; gap: 8px; align-items: center;"><span class="bd {{r.tc}}">{{r.type}}</span><span class="xs t3" style="margin-left: auto;">{{r.due}}</span></div>
+<p style="font-weight: 600;">{{r.who}}</p><p class="sm t2">{{r.d}}</p>
+<div style="display: flex; gap: 8px; margin-top: 4px;"><a href="#" class="btn bp bs" style="flex: 1;">{{r.cta}}</a><a href="#" class="btn bo bs">Rechazar</a></div>
+</div></sc-for>
+</section>
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"dark":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":1100}}'>
+class Component extends DCLogic {
+renderVals() {
+const users = [
+{n:'Dra. Andrea Salazar',e:'andrea.salazar@pediatria-demo.ec',r:'Médico · Admin',s:'Activo',sc:'zok',l:'Hoy, 09:24'},
+{n:'Dr. Felipe Arteaga',e:'felipe.arteaga@pediatria-demo.ec',r:'Médico',s:'Activo',sc:'zok',l:'Ayer, 17:02'},
+{n:'Adelita Mora',e:'adelita@pediatria-demo.ec',r:'Asistente · agenda',s:'Activo',sc:'zok',l:'Hoy, 08:40'},
+{n:'Dra. Lucía Benítez',e:'lucia.benitez@pediatria-demo.ec',r:'Médico',s:'Invitación enviada',sc:'zwa',l:'—'}
+];
+const L = (t,u,a,ac,r,d) => ({t,u,a,ac,r,d});
+const log = [
+L('10 nov 09:24','Dra. Salazar','Creó','zpr','Visita · Valentina Ríos','Peso, longitud, PC, recomendación'),
+L('10 nov 09:12','Dra. Salazar','Vio','zna','Ficha · Valentina Ríos','Pestaña Crecimiento'),
+L('10 nov 08:40','Adelita Mora','Aprobó','zpr','Solicitud · Daniel Pino','Primera consulta 10:00'),
+L('10 nov 07:48','María Cedeño','Vio','zna','Ficha · Valentina Ríos','Portal de padres'),
+L('9 nov 18:30','María Cedeño','Descargó','zna','Informe PDF · Valentina Ríos','Informe de crecimiento'),
+L('5 nov 10:02','Dr. Arteaga','Vio','zna','Ficha · Valentina Ríos','Reemplazo de turno'),
+L('3 nov 15:41','Dra. Salazar','Editó','zwa','Antecedentes · Valentina Ríos','Peso al nacer 3,10 → 3,15 kg'),
+L('1 nov 08:05','Sistema','Envió','zna','Recordatorio · Valentina Ríos','WhatsApp · cita 5 nov')
+];
+const reqs = [
+{type:'Exportación',tc:'zpr',due:'Vence en 13 días',who:'María Cedeño',d:'Pide exportar los datos de Valentina y Tomás.',cta:'Generar exportación'},
+{type:'Eliminación',tc:'zou',due:'Vence en 9 días',who:'Jorge Paz',d:'Pide eliminar su cuenta. Las historias clínicas se conservan según la ley.',cta:'Revisar'}
+];
+return { theme: this.props.dark ? 'cp dark' : 'cp', users, log, reqs };
+}
+}
+</script>
+</body>
+</html>

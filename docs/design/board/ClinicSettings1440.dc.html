@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Ajustes de la clínica · Recordatorios</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:inherit}
+.cp{--bg:#fff;--bg2:#f8fafc;--bg3:#f1f5f9;--bd:#e2e8f0;--bd2:#cbd5e1;--tx:#0f172a;--tx2:#475569;--tx3:#64748b;--pr:#0f766e;--prt:#0f766e;--pro:#fff;--prs:#f0fdfa;--prst:#115e59;--okb:#dcfce7;--okt:#166534;--wab:#fef9c3;--wat:#713f12;--oub:#fee2e2;--out:#991b1b;--nab:#f1f5f9;--nat:#475569;--inb:#eff6ff;--int:#1e40af;font-family:Inter,system-ui,sans-serif;color:var(--tx);background:var(--bg2);font-size:14px;line-height:1.45;font-variant-numeric:tabular-nums}
+.cp.dark{--bg:#0f172a;--bg2:#020617;--bg3:#1e293b;--bd:#1e293b;--bd2:#334155;--tx:#f1f5f9;--tx2:#cbd5e1;--tx3:#94a3b8;--pr:#2dd4bf;--prt:#5eead4;--pro:#042f2e;--prs:rgba(45,212,191,.12);--prst:#99f6e4;--okb:rgba(34,197,94,.16);--okt:#86efac;--wab:rgba(234,179,8,.18);--wat:#fde047;--oub:rgba(239,68,68,.2);--out:#fca5a5;--nab:#1e293b;--nat:#cbd5e1;--inb:rgba(59,130,246,.16);--int:#93c5fd}
+.cp *{box-sizing:border-box}.cp h1,.cp h2,.cp h3,.cp p{margin:0}
+.t2{color:var(--tx2)}.t3{color:var(--tx3)}.sm{font-size:13px}.xs{font-size:12px}
+.card{background:var(--bg);border:1px solid var(--bd);border-radius:12px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:0 16px;border-radius:8px;font:600 14px/1 Inter,sans-serif;border:1px solid transparent;cursor:pointer;text-decoration:none;white-space:nowrap}
+.bp{background:var(--pr);color:var(--pro)}.bo{background:var(--bg);color:var(--tx);border-color:var(--bd2)}.bg{background:transparent;color:var(--tx2)}.bs{min-height:36px;padding:0 12px;font-size:13px}
+.bd{display:inline-flex;align-items:center;gap:4px;height:24px;padding:0 8px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap}
+.zok{background:var(--okb);color:var(--okt)}.zwa{background:var(--wab);color:var(--wat)}.zna{background:var(--nab);color:var(--nat)}.zpr{background:var(--prs);color:var(--prst)}
+.in{display:flex;align-items:center;gap:8px;height:44px;border:1px solid var(--bd2);border-radius:8px;background:var(--bg);color:var(--tx);padding:0 12px;font:400 14px Inter,sans-serif;width:100%}
+.in input{border:0;outline:0;background:transparent;color:inherit;font:inherit;width:100%;min-width:0}
+.in.ro{background:var(--bg3);color:var(--tx2)}
+.lb{display:block;font-size:13px;font-weight:500;color:var(--tx2);margin-bottom:6px}
+.ic{width:20px;height:20px;flex:none;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}.ic4{width:16px;height:16px}
+.nav{display:flex;align-items:center;gap:10px;min-height:40px;padding:0 12px;border-radius:8px;color:var(--tx2);font-weight:500;text-decoration:none}.nav.on{background:var(--prs);color:var(--prst)}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--bd)}.tabs a{display:inline-flex;align-items:center;min-height:44px;padding:0 14px;font-weight:500;color:var(--tx2);text-decoration:none;border-bottom:2px solid transparent;margin-bottom:-1px}.tabs a.on{color:var(--prt);border-color:var(--pr);font-weight:600}
+.seg{display:inline-flex;padding:3px;border-radius:8px;background:var(--bg3);gap:2px}.seg a{display:inline-flex;align-items:center;min-height:36px;padding:0 14px;border-radius:6px;font-size:13px;font-weight:500;color:var(--tx2);text-decoration:none}.seg a.on{background:var(--bg);color:var(--tx);font-weight:600;box-shadow:0 1px 2px rgba(15,23,42,.08)}
+.chan{display:flex;gap:14px;padding:16px;border-top:1px solid var(--bd)}
+.cico{width:40px;height:40px;border-radius:10px;background:var(--bg3);color:var(--tx2);display:flex;align-items:center;justify-content:center;flex:none}
+.tb{width:100%;border-collapse:collapse}.tb th{text-align:left;font-size:12px;font-weight:500;color:var(--tx3);padding:9px 14px;border-bottom:1px solid var(--bd)}.tb td{padding:10px 14px;border-bottom:1px solid var(--bd);font-size:13px}
+.ck{width:20px;height:20px;border-radius:5px;display:inline-flex;align-items:center;justify-content:center}
+.sw{width:40px;height:24px;border-radius:99px;background:var(--bd2);position:relative;display:inline-block}.sw::after{content:"";position:absolute;left:3px;top:3px;width:18px;height:18px;border-radius:99px;background:#fff}
+.sw.on{background:var(--pr)}.sw.on::after{left:auto;right:3px;background:var(--pro)}
+.sel{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 10px;border:1px solid var(--bd2);border-radius:6px;font-size:13px;background:var(--bg)}
+.var{display:inline-block;padding:0 4px;border-radius:4px;background:var(--prs);color:var(--prst);font-weight:600}
+.cp :focus-visible{outline:2px solid var(--pr);outline-offset:2px}
+</style>
+</helmet>
+<div class="{{theme}}" style="width: 100%; min-height: 1320px; display: flex; flex-wrap: wrap;">
+<aside style="flex: 1 1 240px; max-width: 256px; background: var(--bg); border-right: 1px solid var(--bd); padding: 16px 12px; display: flex; flex-direction: column; gap: 2px;">
+<div style="display: flex; align-items: center; gap: 10px; padding: 4px 8px 16px;"><svg viewBox="0 0 64 64" width="32" height="32" aria-hidden="true"><rect width="64" height="64" rx="14" fill="var(--pr)"></rect><path d="M14 46C24 44 30 36 36 28S46 18 50 17" fill="none" stroke="var(--pro)" stroke-width="5" stroke-linecap="round"></path><circle cx="50" cy="17" r="5" fill="var(--pro)"></circle></svg><div><p style="font-weight: 600;">Pediatría Demo</p><p class="xs t3">Administración</p></div></div>
+<a href="#" class="nav"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>Configuración inicial</a>
+<a href="#" class="nav"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"></path></svg>Usuarios</a>
+<a href="#" class="nav on" aria-current="page"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"></path></svg>Clínica</a>
+<a href="#" class="nav"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>Auditoría</a>
+</aside>
+
+<main style="flex: 999 1 640px; min-width: 0; display: flex; flex-direction: column;">
+<div style="background: var(--bg); border-bottom: 1px solid var(--bd); padding: 16px 24px 0;">
+<div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;"><h1 style="font-size: 20px; font-weight: 700; flex: 1;">Ajustes de la clínica</h1><span class="sm t3">Cambios guardados hace 1 min</span></div>
+<nav class="tabs" aria-label="Secciones" style="margin-top: 8px;"><a href="#">Marca</a><a href="#">Contacto</a><a href="#" class="on">Recordatorios</a></nav>
+</div>
+
+<div style="padding: 24px; display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: 20px; align-items: start; max-width: 1240px; width: 100%; margin: 0 auto;">
+<div style="display: flex; flex-direction: column; gap: 20px;">
+
+<section class="card" aria-labelledby="ch">
+<div style="padding: 16px;"><h2 id="ch" style="font-size: 17px; font-weight: 600;">Canales</h2><p class="sm t2">Los padres eligen sus canales en su perfil. WhatsApp solo se envía a quien lo aceptó.</p></div>
+
+<div class="chan"><span class="cico"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zM22 7l-10 6L2 7"></path></svg></span>
+<div style="flex: 1;"><p style="font-weight: 600;">Email</p><p class="sm t2">Remitente: Pediatría Demo &lt;no-responder@pediatria-demo.ec&gt;</p></div><span class="bd zok"><svg class="ic ic4" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>Activo</span></div>
+
+<div class="chan" style="flex-direction: column; gap: 14px;">
+<div style="display: flex; gap: 14px; align-items: center;"><span class="cico"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 11.5a8.4 8.4 0 0 1-12.4 7.4L3 21l2.1-5.6A8.4 8.4 0 1 1 21 11.5z"></path></svg></span>
+<div style="flex: 1;"><p style="font-weight: 600;">WhatsApp</p><p class="sm t2">Número de la clínica: +593 4 000 0000</p></div>
+<span class="bd zok"><svg class="ic ic4" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>Conectado · verificado hace 2 min</span></div>
+
+<sc-if value="{{locked}}" hint-placeholder-val="{{ false }}">
+<div style="display: flex; gap: 10px; padding: 12px; border-radius: 10px; background: var(--inb); color: var(--int);"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 11h14v10H5zM8 11V7a4 4 0 0 1 8 0v4"></path></svg><div class="sm"><p style="font-weight: 600;">Configurado en el servidor</p><p>Proveedor Meta Cloud API, definido en las variables de entorno. Para cambiarlo, contacte al administrador técnico.</p></div></div>
+<div style="display: flex; gap: 8px;"><a href="#" class="btn bo bs">Probar envío</a></div>
+</sc-if>
+
+<sc-if value="{{editable}}" hint-placeholder-val="{{ true }}">
+<div style="display: flex; flex-direction: column; gap: 12px; padding-left: 54px;">
+<div><p class="lb">Proveedor</p><div class="seg" role="radiogroup" aria-label="Proveedor"><a href="#" class="on" role="radio" aria-checked="true">Meta Cloud API</a><a href="#" role="radio" aria-checked="false">Twilio</a></div></div>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px;">
+<div><label class="lb" for="w-pid">Phone number ID</label><div class="in"><input id="w-pid" value="100000000000001"></div></div>
+<div><label class="lb" for="w-waba">WhatsApp Business Account ID</label><div class="in"><input id="w-waba" value="200000000000002"></div></div>
+</div>
+<div><label class="lb" for="w-tok">Token de acceso</label><div style="display: flex; gap: 8px;"><div class="in ro"><input id="w-tok" value="•••••••••••••••• 4f2a" readonly></div><a href="#" class="btn bo">Reemplazar</a></div><p class="xs t3" style="margin-top: 6px; display: flex; gap: 6px; align-items: center;"><svg class="ic ic4" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 11h14v10H5zM8 11V7a4 4 0 0 1 8 0v4"></path></svg>Se guarda cifrado y no se vuelve a mostrar. Si hay variables de entorno, estas tienen prioridad.</p></div>
+<div style="display: flex; gap: 8px;"><a href="#" class="btn bo bs">Probar envío</a><a href="#" class="btn bp bs">Guardar conexión</a></div>
+</div>
+</sc-if>
+
+<div style="margin-left: 54px; border: 1px solid var(--bd); border-radius: 10px; overflow: hidden;">
+<div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; background: var(--bg3);"><p class="sm" style="font-weight: 600;">Plantillas de mensaje</p><span class="xs t2">3 de 4 aprobadas por Meta</span></div>
+<sc-for list="{{tpls}}" as="t" hint-placeholder-count="4"><div style="display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-top: 1px solid var(--bd);"><span class="sm" style="flex: 1; font-family: ui-monospace, Menlo, monospace;">{{t.n}}</span><span class="bd {{t.cls}}">{{t.s}}</span></div></sc-for>
+</div>
+</div>
+
+<div class="chan"><span class="cico"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0"></path></svg></span>
+<div style="flex: 1;"><p style="font-weight: 600;">En la app</p><p class="sm t2">Centro de avisos y notificación del sistema si instalaron la app.</p></div><span class="bd zok"><svg class="ic ic4" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>Siempre activo</span></div>
+</section>
+
+<section class="card" aria-labelledby="rl">
+<div style="padding: 16px;"><h2 id="rl" style="font-size: 17px; font-weight: 600;">Qué recordatorios se envían</h2><p class="sm t2">Hora de envío: 08:00–20:00. Fuera de ese rango se envían a las 08:00.</p></div>
+<div style="overflow-x: auto;"><table class="tb" style="min-width: 720px;">
+<thead><tr><th>Recordatorio</th><th>Cuándo</th><th style="text-align: center;">Email</th><th style="text-align: center;">WhatsApp</th><th style="text-align: center;">App</th><th style="text-align: right;">Activo</th></tr></thead>
+<tbody>
+<sc-for list="{{rules}}" as="r" hint-placeholder-count="7"><tr>
+<td><p style="font-weight: 600;">{{r.n}}</p><p class="xs t3">{{r.d}}</p></td>
+<td><span class="sel">{{r.w}}<svg class="ic ic4" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></span></td>
+<sc-for list="{{r.ch}}" as="c" hint-placeholder-count="3"><td style="text-align: center;"><span class="ck" role="checkbox" aria-checked="{{c.on}}" aria-label="{{c.l}}" style="border: 2px solid {{c.bc}}; background: {{c.bg}}; color: var(--pro);"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width: 13px; height: 13px; stroke-width: 3; opacity: {{c.op}};"><path d="M20 6 9 17l-5-5"></path></svg></span></td></sc-for>
+<td style="text-align: right;"><span class="{{r.sw}}" role="switch" aria-checked="{{r.on}}" aria-label="Activar {{r.n}}"></span></td>
+</tr></sc-for>
+</tbody></table></div>
+</section>
+</div>
+
+<section class="card" aria-labelledby="pv" style="padding: 16px; display: flex; flex-direction: column; gap: 14px;">
+<div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap;"><h2 id="pv" style="font-size: 17px; font-weight: 600;">Vista previa</h2><span class="sel">Cita próxima · 24 h<svg class="ic ic4" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></span></div>
+
+<p class="xs t3" style="font-weight: 600; letter-spacing: .06em;">EMAIL</p>
+<div style="border: 1px solid var(--bd); border-radius: 10px; overflow: hidden;">
+<div style="padding: 10px 12px; background: var(--bg3);" class="sm"><p><span class="t3">Asunto:</span> <b>Recordatorio: cita de Valentina mañana a las 09:00</b></p></div>
+<div style="padding: 16px; display: flex; flex-direction: column; gap: 10px;" class="sm">
+<div style="display: flex; align-items: center; gap: 8px;"><svg viewBox="0 0 64 64" width="24" height="24" aria-hidden="true"><rect width="64" height="64" rx="14" fill="var(--pr)"></rect><path d="M14 46C24 44 30 36 36 28S46 18 50 17" fill="none" stroke="var(--pro)" stroke-width="5" stroke-linecap="round"></path></svg><b>Pediatría Demo</b></div>
+<p>Hola <span class="var">María</span>,</p>
+<p>Le recordamos la cita de <span class="var">Valentina</span> con la <span class="var">Dra. Andrea Salazar</span> el <span class="var">jueves 10 de diciembre a las 09:00</span>.</p>
+<p class="t2">Av. Ejemplo 123, Guayaquil · 04 000 0000</p>
+<div style="display: flex; gap: 8px;"><span class="btn bp bs">Confirmar asistencia</span><span class="btn bo bs">Reprogramar</span></div>
+<p class="xs t3">Recibe este mensaje porque activó recordatorios por email. Cambiar preferencias.</p>
+</div>
+</div>
+
+<p class="xs t3" style="font-weight: 600; letter-spacing: .06em;">WHATSAPP · recordatorio_cita_v1</p>
+<div style="border: 1px solid var(--bd); border-radius: 10px; padding: 14px; background: var(--bg3);">
+<div style="max-width: 300px; background: var(--bg); border: 1px solid var(--bd); border-radius: 12px 12px 12px 4px; padding: 12px;" class="sm">
+<p style="font-weight: 700;">Pediatría Demo</p>
+<p style="margin-top: 4px;">Hola <span class="var">María</span>, le recordamos la cita de <span class="var">Valentina</span> con la <span class="var">Dra. Andrea Salazar</span> el <span class="var">jue 10 dic, 09:00</span>.</p>
+<p class="xs t3" style="text-align: right; margin-top: 6px;">08:00</p>
+<div style="border-top: 1px solid var(--bd); margin-top: 8px; display: flex;"><span style="flex: 1; text-align: center; padding-top: 8px; color: var(--prt); font-weight: 600;">Confirmar</span><span style="flex: 1; text-align: center; padding-top: 8px; color: var(--prt); font-weight: 600; border-left: 1px solid var(--bd);">Reprogramar</span></div>
+</div>
+</div>
+<p class="xs t3">Los campos resaltados se rellenan con los datos reales. El texto de WhatsApp solo cambia si Meta aprueba una nueva plantilla.</p>
+</section>
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"dark":{"editor":"boolean","default":false},"envLocked":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":1320}}'>
+class Component extends DCLogic {
+renderVals() {
+const locked = !!this.props.envLocked;
+const tpls = [
+{n:'recordatorio_cita_v1',s:'Aprobada',cls:'zok'},
+{n:'control_pendiente_v1',s:'Aprobada',cls:'zok'},
+{n:'nueva_recomendacion_v1',s:'Aprobada',cls:'zok'},
+{n:'vacuna_pendiente_v1',s:'En revisión',cls:'zwa'}
+];
+const C = (on, l) => ({on: on ? 'true' : 'false', l, bc: on ? 'var(--pr)' : 'var(--bd2)', bg: on ? 'var(--pr)' : 'transparent', op: on ? 1 : 0});
+const R = (n,d,w,e,wa,app,on) => ({n,d,w,ch:[C(e,'Email'),C(wa,'WhatsApp'),C(app,'App')],on: on ? 'true' : 'false',sw: on ? 'sw on' : 'sw'});
+const rules = [
+R('Cita próxima','Primer aviso','24 h antes',true,true,true,true),
+R('Cita próxima','Segundo aviso','2 h antes',false,true,true,true),
+R('Control de niño sano por vencer','Según el calendario de controles','7 días antes',true,true,true,true),
+R('Control atrasado','Se repite hasta que agenden','Cada 7 días · máx. 3',true,true,true,true),
+R('Vacuna por aplicar o atrasada','Esquema MSP','7 días antes',true,false,true,true),
+R('Nueva recomendación','Cuando la doctora guarda la visita','Al momento',false,true,true,true),
+R('Solicitud de reserva','Familias nuevas: recibida y respondida','Al momento',true,false,false,true)
+];
+return { theme: this.props.dark ? 'cp dark' : 'cp', locked, editable: !locked, tpls, rules };
+}
+}
+</script>
+</body>
+</html>

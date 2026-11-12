@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Fundamentos y tokens</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#0f766e}a:hover{color:#115e59}
+.cp{--bg:#fff;--bg2:#f8fafc;--bg3:#f1f5f9;--bd:#e2e8f0;--bd2:#cbd5e1;--tx:#0f172a;--tx2:#475569;--tx3:#64748b;--pr:#0f766e;--prt:#0f766e;--pro:#fff;--prs:#f0fdfa;--prst:#115e59;--okb:#dcfce7;--okt:#166534;--wab:#fef9c3;--wat:#713f12;--rib:#ffedd5;--rit:#9a3412;--oub:#fee2e2;--out:#991b1b;--nab:#f1f5f9;--nat:#475569;font-family:Inter,system-ui,sans-serif;color:var(--tx);background:var(--bg2);font-size:14px;line-height:1.45;font-variant-numeric:tabular-nums}
+.cp.dark{--bg:#0f172a;--bg2:#020617;--bg3:#1e293b;--bd:#1e293b;--bd2:#334155;--tx:#f1f5f9;--tx2:#cbd5e1;--tx3:#94a3b8;--pr:#2dd4bf;--prt:#5eead4;--pro:#042f2e;--prs:rgba(45,212,191,.12);--prst:#99f6e4;--okb:rgba(34,197,94,.16);--okt:#86efac;--wab:rgba(234,179,8,.18);--wat:#fde047;--rib:rgba(249,115,22,.18);--rit:#fdba74;--oub:rgba(239,68,68,.2);--out:#fca5a5;--nab:#1e293b;--nat:#cbd5e1}
+.cp *{box-sizing:border-box}.cp h1,.cp h2,.cp h3,.cp p{margin:0}
+.h1{font-size:24px;font-weight:600;letter-spacing:-.01em}.h2{font-size:18px;font-weight:600}.h3{font-size:15px;font-weight:600}
+.t2{color:var(--tx2)}.t3{color:var(--tx3)}.sm{font-size:13px}.xs{font-size:12px}
+.card{background:var(--bg);border:1px solid var(--bd);border-radius:12px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:0 16px;border-radius:8px;font:600 14px/1 Inter,sans-serif;border:1px solid transparent;cursor:pointer;text-decoration:none;white-space:nowrap}
+.bp{background:var(--pr);color:var(--pro)}.bo{background:var(--bg);color:var(--tx);border-color:var(--bd2)}.bg{background:transparent;color:var(--tx2)}
+.bd{display:inline-flex;align-items:center;gap:4px;height:24px;padding:0 8px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap}
+.zok{background:var(--okb);color:var(--okt)}.zwa{background:var(--wab);color:var(--wat)}.zri{background:var(--rib);color:var(--rit)}.zou{background:var(--oub);color:var(--out)}.zna{background:var(--nab);color:var(--nat)}
+.in{display:flex;align-items:center;gap:8px;height:44px;border:1px solid var(--bd2);border-radius:8px;background:var(--bg);color:var(--tx);padding:0 12px;font:400 15px Inter,sans-serif;width:100%}
+.lb{display:block;font-size:13px;font-weight:500;color:var(--tx2);margin-bottom:6px}
+.ic{width:20px;height:20px;flex:none;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}.ic4{width:16px;height:16px}
+.cap{font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--tx3)}
+.sw{height:56px;border-radius:8px;border:1px solid var(--bd)}
+pre{margin:0;padding:16px;border-radius:8px;background:var(--bg3);font:12.5px/1.6 ui-monospace,Menlo,monospace;color:var(--tx);overflow-x:auto;white-space:pre}
+.cp :focus-visible{outline:2px solid var(--pr);outline-offset:2px}
+</style>
+</helmet>
+<div class="{{theme}}" style="width: 100%; min-height: 1560px; padding: 48px 40px;">
+<div style="max-width: 1360px; margin: 0 auto; display: flex; flex-direction: column; gap: 32px;">
+
+<header style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 16px;">
+<div>
+<p class="cap">Sistema de diseño · v1 · 10 nov 2026</p>
+<h1 style="font-size: 36px; font-weight: 700; letter-spacing: -0.02em; margin-top: 8px;">Control Pediátrico — fundamentos</h1>
+<p class="t2" style="margin-top: 8px; max-width: 760px;">Clínico y sereno: blanco y teal, superficies quietas, bordes sutiles en vez de sombras, Inter con numerales tabulares. Solo el color primario y el logo cambian por clínica; neutros, colores Z y curvas del gráfico son fijos.</p>
+</div>
+<div style="display: flex; gap: 8px; flex-wrap: wrap;">
+<span class="bd zna">Nuxt UI v4</span><span class="bd zna">Tailwind v4</span><span class="bd zna">WCAG 2.2 AA</span>
+</div>
+</header>
+
+<section style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px;">
+<div class="card" style="padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+<div><h2 class="h2">Primario (por clínica) — default teal</h2><p class="t3 sm">app.config: primary: 'brand' · escala generada desde el color de la clínica</p></div>
+<div style="display: grid; grid-template-columns: repeat(11, minmax(0, 1fr)); gap: 6px;">
+<sc-for list="{{teal}}" as="s" hint-placeholder-count="11"><div style="display: flex; flex-direction: column; gap: 4px;"><div class="sw" style="background: {{s.hex}};"></div><span class="xs" style="font-weight: 600;">{{s.n}}</span><span class="xs t3">{{s.hex}}</span></div></sc-for>
+</div>
+<p class="sm t2">Claro usa <b>700</b> (#0f766e, 5,5:1 con texto blanco). Oscuro usa <b>400</b> (#2dd4bf) con texto #042f2e. Regla white-label: si el 700 de la clínica no llega a 4,5:1 con blanco, se oscurece hasta cumplir.</p>
+</div>
+<div class="card" style="padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+<div><h2 class="h2">Neutro — slate (fijo)</h2><p class="t3 sm">app.config: neutral: 'slate'</p></div>
+<div style="display: grid; grid-template-columns: repeat(11, minmax(0, 1fr)); gap: 6px;">
+<sc-for list="{{slate}}" as="s" hint-placeholder-count="11"><div style="display: flex; flex-direction: column; gap: 4px;"><div class="sw" style="background: {{s.hex}};"></div><span class="xs" style="font-weight: 600;">{{s.n}}</span><span class="xs t3">{{s.hex}}</span></div></sc-for>
+</div>
+<p class="sm t2">Texto secundario: slate-600 en claro (7,6:1), slate-400 en oscuro sobre slate-900 (7:1). Nunca slate-400 sobre blanco.</p>
+</div>
+</section>
+
+<section class="card" style="padding: 24px;">
+<h2 class="h2">Tokens semánticos</h2>
+<div style="overflow-x: auto; margin-top: 12px;">
+<table style="width: 100%; border-collapse: collapse; min-width: 760px;">
+<thead><tr><th class="xs t3" style="text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--bd);">Token (Nuxt UI)</th><th class="xs t3" style="text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--bd);">Claro</th><th class="xs t3" style="text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--bd);">Oscuro</th><th class="xs t3" style="text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--bd);">Uso</th></tr></thead>
+<tbody>
+<sc-for list="{{sem}}" as="r" hint-placeholder-count="8"><tr>
+<td style="padding: 10px 12px; border-bottom: 1px solid var(--bd); font-family: ui-monospace, monospace; font-size: 13px;">{{r.t}}</td>
+<td style="padding: 10px 12px; border-bottom: 1px solid var(--bd);"><span style="display: inline-flex; align-items: center; gap: 8px;"><span style="width: 20px; height: 20px; border-radius: 4px; border: 1px solid #cbd5e1; background: {{r.l}};"></span><span class="sm">{{r.l}}</span></span></td>
+<td style="padding: 10px 12px; border-bottom: 1px solid var(--bd);"><span style="display: inline-flex; align-items: center; gap: 8px;"><span style="width: 20px; height: 20px; border-radius: 4px; border: 1px solid #334155; background: {{r.d}};"></span><span class="sm">{{r.d}}</span></span></td>
+<td class="sm t2" style="padding: 10px 12px; border-bottom: 1px solid var(--bd);">{{r.u}}</td>
+</tr></sc-for>
+</tbody>
+</table>
+</div>
+</section>
+
+<section style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px;">
+<div class="card" style="padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+<h2 class="h2">Puntuación Z — cómo se muestra</h2>
+<p class="sm t2">Decisión de la pediatra: sin «Vigilar» ni «Riesgo». Se muestra el valor Z y solo se nombra lo que tiene nombre OMS.</p>
+<div style="display: flex; flex-wrap: wrap; gap: 8px;">
+<span class="bd zna">Z −1,39</span>
+<span class="bd zri"><svg class="ic ic4" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>Talla baja · −2,41</span>
+<span class="bd zri"><svg class="ic ic4" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>Microcefalia · −3,20</span>
+<span class="bd zwa"><svg class="ic ic4" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>Riesgo de sobrepeso · +1,45</span>
+<span class="bd zna">Sin dato</span>
+</div>
+<div style="overflow-x: auto;">
+<table style="width: 100%; border-collapse: collapse;">
+<tbody>
+<sc-for list="{{zt}}" as="z" hint-placeholder-count="4"><tr>
+<td style="padding: 8px 0; border-bottom: 1px solid var(--bd); width: 120px;"><span style="display: inline-block; width: 40px; height: 16px; border-radius: 4px; background: {{z.solid}};"></span></td>
+<td class="sm" style="padding: 8px; border-bottom: 1px solid var(--bd); font-weight: 600;">{{z.lab}}</td>
+<td class="sm t2" style="padding: 8px; border-bottom: 1px solid var(--bd);">{{z.rule}}</td>
+<td class="xs t3" style="padding: 8px; border-bottom: 1px solid var(--bd);">{{z.hex}}</td>
+</tr></sc-for>
+</tbody>
+</table>
+</div>
+<p class="sm t2">Nombres en <code>shared/utils/clinical-labels.ts</code>. Amarillo siempre con texto oscuro (#713f12). Estos colores no cambian con la marca de la clínica. Padres: Z + «dentro / fuera del rango esperado», sin palabras que alarmen.</p>
+</div>
+<div class="card" style="padding: 24px; display: flex; flex-direction: column; gap: 14px;">
+<h2 class="h2">Tipografía — Inter, numerales tabulares</h2>
+<sc-for list="{{type}}" as="t" hint-placeholder-count="7"><div style="display: flex; align-items: baseline; gap: 16px; border-bottom: 1px solid var(--bd); padding-bottom: 10px;">
+<span class="xs t3" style="width: 150px; flex: none;">{{t.n}}</span>
+<span style="font-size: {{t.s}}; font-weight: {{t.w}}; line-height: 1.25;">{{t.ex}}</span>
+</div></sc-for>
+<p class="sm t2">Teléfono: cuerpo 15 px, inputs 16 px (evita zoom en iOS). <code>font-variant-numeric: tabular-nums</code> en tablas, valores y fechas. Decimales con coma (es-EC).</p>
+</div>
+</section>
+
+<section style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px;">
+<div class="card" style="padding: 24px; display: flex; flex-direction: column; gap: 12px;">
+<h2 class="h2">Radio</h2>
+<div style="display: flex; gap: 12px; align-items: flex-end;">
+<sc-for list="{{radius}}" as="r" hint-placeholder-count="5"><div style="display: flex; flex-direction: column; align-items: center; gap: 6px;"><div style="width: 52px; height: 52px; background: var(--prs); border: 1.5px solid var(--pr); border-radius: {{r.v}};"></div><span class="xs" style="font-weight: 600;">{{r.n}}</span><span class="xs t3">{{r.v}}</span></div></sc-for>
+</div>
+<p class="sm t2">--ui-radius: 0.5rem. Botones/inputs 8, tarjetas 12, hojas y modales 16, insignias full.</p>
+</div>
+<div class="card" style="padding: 24px; display: flex; flex-direction: column; gap: 12px;">
+<h2 class="h2">Espaciado (base 4)</h2>
+<sc-for list="{{space}}" as="s" hint-placeholder-count="8"><div style="display: flex; align-items: center; gap: 12px;"><span class="xs t3" style="width: 32px;">{{s.n}}</span><div style="height: 12px; border-radius: 3px; background: var(--pr); width: {{s.v}};"></div><span class="xs t3">{{s.v}}</span></div></sc-for>
+</div>
+<div class="card" style="padding: 24px; display: flex; flex-direction: column; gap: 14px;">
+<h2 class="h2">Controles base</h2>
+<div style="display: flex; flex-wrap: wrap; gap: 8px;"><button class="btn bp">Nueva visita</button><button class="btn bo">Cancelar</button><button class="btn bg">Ver detalles</button></div>
+<div><label class="lb" for="m-peso">Peso (kg)</label><div class="in" style="border-color: var(--pr); box-shadow: 0 0 0 3px var(--prs);"><input id="m-peso" value="8,20" style="border: 0; outline: 0; background: transparent; color: inherit; font: inherit; width: 100%;"><span class="t3 sm">kg</span></div><p class="xs t3" style="margin-top: 6px;">Foco: borde primario + halo 3 px. Objetivo táctil mínimo 44 px.</p></div>
+<div style="display: flex; gap: 10px; padding: 12px; border-radius: 8px; background: var(--wab); color: var(--wat);"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg><span class="sm">UAlert color="warning" variant="soft"</span></div>
+</div>
+</section>
+
+<section style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px;">
+<div class="card" style="padding: 24px; display: flex; flex-direction: column; gap: 12px;">
+<h2 class="h2">app/app.config.ts</h2>
+<pre>export default defineAppConfig({
+  ui: {
+    colors: {
+      primary: 'brand',   // escala por clínica (default teal)
+      neutral: 'slate'
+    },
+    button: { defaultVariants: { size: 'lg' } } // 44 px
+  }
+})</pre>
+</div>
+<div class="card" style="padding: 24px; display: flex; flex-direction: column; gap: 12px;">
+<h2 class="h2">app/assets/css/main.css</h2>
+<pre>@import "tailwindcss";
+@import "@nuxt/ui";
+
+@theme static {
+  --font-sans: "Inter", system-ui, sans-serif;
+  --color-brand-50: #f0fdfa;  --color-brand-100: #ccfbf1;
+  --color-brand-200: #99f6e4; --color-brand-300: #5eead4;
+  --color-brand-400: #2dd4bf; --color-brand-500: #14b8a6;
+  --color-brand-600: #0d9488; --color-brand-700: #0f766e;
+  --color-brand-800: #115e59; --color-brand-900: #134e4a;
+  --color-brand-950: #042f2e;
+  /* Z (fijos) */
+  --color-z-flag: #ea580c;    --color-z-watch: #eab308;
+  --color-z-band: #16a34a;  /* área −2…+2 */
+  /* curvas OMS + paciente (fijos) */
+  --color-curve-median: #334155; --color-curve-sd1: #ca8a04;
+  --color-curve-sd2: #ea580c;    --color-curve-sd3: #dc2626;
+  --color-patient: #1d4ed8;
+}
+:root { --ui-primary: var(--ui-color-primary-700); --ui-radius: .5rem; }
+.dark { --ui-primary: var(--ui-color-primary-400); }</pre>
+</div>
+</section>
+
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"dark":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":1560}}'>
+class Component extends DCLogic {
+renderVals() {
+const teal = [['50','#f0fdfa'],['100','#ccfbf1'],['200','#99f6e4'],['300','#5eead4'],['400','#2dd4bf'],['500','#14b8a6'],['600','#0d9488'],['700','#0f766e'],['800','#115e59'],['900','#134e4a'],['950','#042f2e']].map(([n,hex])=>({n,hex}));
+const slate = [['50','#f8fafc'],['100','#f1f5f9'],['200','#e2e8f0'],['300','#cbd5e1'],['400','#94a3b8'],['500','#64748b'],['600','#475569'],['700','#334155'],['800','#1e293b'],['900','#0f172a'],['950','#020617']].map(([n,hex])=>({n,hex}));
+const sem = [
+{t:'--ui-bg',l:'#ffffff',d:'#0f172a',u:'Tarjetas, paneles, inputs'},
+{t:'--ui-bg-muted',l:'#f8fafc',d:'#020617',u:'Fondo de página'},
+{t:'--ui-bg-elevated',l:'#f1f5f9',d:'#1e293b',u:'Filas activas, código, chips'},
+{t:'--ui-border',l:'#e2e8f0',d:'#1e293b',u:'Bordes de tarjeta y tablas'},
+{t:'--ui-border-accented',l:'#cbd5e1',d:'#334155',u:'Bordes de input y botón outline'},
+{t:'--ui-text',l:'#0f172a',d:'#f1f5f9',u:'Texto principal'},
+{t:'--ui-text-muted',l:'#475569',d:'#cbd5e1',u:'Texto secundario'},
+{t:'--ui-text-dimmed',l:'#64748b',d:'#94a3b8',u:'Metadatos (≥4,5:1)'},
+{t:'--ui-primary',l:'#0f766e',d:'#2dd4bf',u:'Acción principal, foco, pestaña activa'}
+];
+const zt = [
+{solid:'#cbd5e1',lab:'Sin nombre',rule:'Dentro de ±2 DE: solo el valor Z',hex:'#f1f5f9 / #475569'},
+{solid:'#eab308',lab:'Nombre dentro de ±2',rule:'Riesgo de sobrepeso (> +1, < 5 a) · Sobrepeso (> +1, ≥ 5 a)',hex:'#fef9c3 / #713f12'},
+{solid:'#ea580c',lab:'Fuera de ±2 DE',rule:'Nombre OMS + Z (talla baja, emaciación, microcefalia…)',hex:'#ffedd5 / #9a3412'},
+{solid:'#1d4ed8',lab:'Tendencia',rule:'Cambio de carril entre visitas (criterio por definir)',hex:'línea del paciente'}
+];
+const type = [
+{n:'Display 30/36 · 700',s:'30px',w:700,ex:'Valentina Ríos'},
+{n:'H1 24/32 · 600',s:'24px',w:600,ex:'Requieren atención'},
+{n:'H2 18/28 · 600',s:'18px',w:600,ex:'Peso para la edad'},
+{n:'H3 15/22 · 600',s:'15px',w:600,ex:'Controles pendientes'},
+{n:'Cuerpo 14/20 · 400',s:'14px',w:400,ex:'Última medición hace 12 días'},
+{n:'Valor 28 · 600 tnum',s:'28px',w:600,ex:'8,20 kg · 76,4 cm'},
+{n:'Leyenda 12/16 · 500',s:'12px',w:500,ex:'Z −1,39 · 10 nov 2026'}
+];
+const radius = [{n:'sm',v:'4px'},{n:'md',v:'8px'},{n:'lg',v:'12px'},{n:'xl',v:'16px'},{n:'full',v:'999px'}];
+const space = [4,8,12,16,24,32,48,64].map((v,i)=>({n:String(i+1),v:v+'px'}));
+return { theme: this.props.dark ? 'cp dark' : 'cp', teal, slate, sem, zt, type, radius, space };
+}
+}
+</script>
+</body>
+</html>

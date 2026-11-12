@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Reserva pública</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:var(--prt)}
+.cp{--bg:#fff;--bg2:#f8fafc;--bg3:#f1f5f9;--bd:#e2e8f0;--bd2:#cbd5e1;--tx:#0f172a;--tx2:#475569;--tx3:#64748b;--pr:#0f766e;--prt:#0f766e;--pro:#fff;--prs:#f0fdfa;--prst:#115e59;--okb:#dcfce7;--okt:#166534;--wab:#fef9c3;--wat:#713f12;font-family:Inter,system-ui,sans-serif;color:var(--tx);background:var(--bg2);font-size:15px;line-height:1.5}
+.cp.dark{--bg:#0f172a;--bg2:#020617;--bg3:#1e293b;--bd:#1e293b;--bd2:#334155;--tx:#f1f5f9;--tx2:#cbd5e1;--tx3:#94a3b8;--pr:#2dd4bf;--prt:#5eead4;--pro:#042f2e;--prs:rgba(45,212,191,.12);--prst:#99f6e4;--okb:rgba(34,197,94,.16);--okt:#86efac;--wab:rgba(234,179,8,.18);--wat:#fde047}
+.cp *{box-sizing:border-box}.cp h1,.cp h2,.cp p{margin:0}
+.t2{color:var(--tx2)}.t3{color:var(--tx3)}.sm{font-size:13px}.xs{font-size:12px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:48px;padding:0 16px;border-radius:10px;font:600 15px/1 Inter,sans-serif;border:1px solid transparent;cursor:pointer;text-decoration:none;white-space:nowrap}
+.bp{background:var(--pr);color:var(--pro)}.bo{background:var(--bg);color:var(--tx);border-color:var(--bd2)}
+.in{display:flex;align-items:center;gap:8px;height:48px;border:1px solid var(--bd2);border-radius:10px;background:var(--bg);color:var(--tx);padding:0 14px;font:400 16px Inter,sans-serif;width:100%}
+.in input{border:0;outline:0;background:transparent;color:inherit;font:inherit;width:100%;min-width:0}
+.lb{display:block;font-size:13px;font-weight:500;color:var(--tx2);margin-bottom:6px}
+.ic{width:20px;height:20px;flex:none;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.ph{width:375px;height:812px;flex:none;background:var(--bg2);border:1px solid var(--bd2);border-radius:32px;overflow:hidden;display:flex;flex-direction:column}
+.top{background:var(--bg);border-bottom:1px solid var(--bd);padding:12px 16px;display:flex;flex-direction:column;gap:8px}
+.bar{height:4px;border-radius:99px;background:var(--bg3);overflow:hidden}.bar span{display:block;height:100%;background:var(--pr);border-radius:99px}
+.bdy{flex:1;overflow:hidden;padding:16px;display:flex;flex-direction:column;gap:14px}
+.ft{padding:12px 16px;border-top:1px solid var(--bd);background:var(--bg)}
+.cpt{font-size:13px;font-weight:600;color:var(--tx2);margin-bottom:10px}
+.slot{display:flex;align-items:center;justify-content:center;min-height:44px;border-radius:8px;border:1px solid var(--bd2);font-weight:600;font-size:14px;text-decoration:none;background:var(--bg);color:var(--tx)}
+.day{display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:58px;min-height:64px;border-radius:10px;border:1px solid var(--bd2);background:var(--bg);text-decoration:none;color:var(--tx)}
+.rd{display:flex;align-items:center;gap:10px;min-height:48px;padding:0 12px;border:1px solid var(--bd2);border-radius:10px;flex:1;font-weight:500;background:var(--bg)}.rd.on{border-color:var(--pr);background:var(--prs);color:var(--prst)}
+.dot{width:16px;height:16px;border-radius:99px;border:2px solid var(--bd2);flex:none}.rd.on .dot{border:5px solid var(--pr)}
+.sec{font-size:13px;font-weight:700}
+.otp{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
+.otp span{height:52px;border:1px solid var(--bd2);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;background:var(--bg)}
+.box{width:22px;height:22px;border-radius:6px;border:2px solid var(--pr);background:var(--pr);color:var(--pro);flex:none;display:flex;align-items:center;justify-content:center}
+.cp :focus-visible{outline:2px solid var(--pr);outline-offset:2px}
+</style>
+</helmet>
+<div class="{{theme}}" style="width: 2115px; height: 940px; padding: 40px; display: flex; gap: 40px;">
+
+<div><p class="cpt">1 · Página de la clínica</p>
+<div class="ph" style="background: var(--bg);">
+<div style="padding: 40px 24px 20px; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 10px; background: var(--prs);">
+<svg viewBox="0 0 64 64" width="64" height="64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="var(--pr)"></rect><path d="M14 46C24 44 30 36 36 28S46 18 50 17" fill="none" stroke="var(--pro)" stroke-width="5" stroke-linecap="round"></path><circle cx="50" cy="17" r="5" fill="var(--pro)"></circle></svg>
+<h1 style="font-size: 22px; font-weight: 700;">Pediatría Demo</h1>
+<p class="t2 sm">Control de niño sano, vacunas y seguimiento del crecimiento</p>
+</div>
+<div class="bdy">
+<div style="display: flex; gap: 12px; align-items: flex-start;"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--prt);"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0zM12 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"></path></svg><div><p style="font-weight: 600;">Av. Ejemplo 123, Guayaquil</p><a href="#" class="sm">Abrir en mapas</a></div></div>
+<div style="display: flex; gap: 12px; align-items: flex-start;"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--prt);"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2z"></path></svg><div><p style="font-weight: 600;">04 000 0000</p><p class="sm t3">Lun–Vie 08:00–17:00 · Sáb 08:00–12:00</p></div></div>
+<div style="border-radius: 12px; border: 1px solid var(--bd); padding: 14px;"><p style="font-weight: 600;">Primera cita para su hijo/a</p><p class="sm t2" style="margin-top: 4px;">Elija un horario libre. La doctora confirmará la solicitud y le llegará un email.</p></div>
+<a href="#" class="btn bp" style="margin-top: auto;">Reservar primera cita</a>
+<p class="sm t2" style="text-align: center;">¿Ya es paciente? <a href="#" style="font-weight: 600;">Ingresar</a></p>
+</div>
+</div></div>
+
+<div><p class="cpt">2 · Fecha y horario</p>
+<div class="ph">
+<div class="top"><div style="display: flex; justify-content: space-between;" class="sm"><b>Fecha y horario</b><span class="t3">Paso 1 de 4</span></div><div class="bar"><span style="width: 25%;"></span></div></div>
+<div class="bdy">
+<p class="sm t2" style="font-weight: 500;">Noviembre 2026</p>
+<div style="display: flex; gap: 8px; overflow: hidden;">
+<sc-for list="{{days}}" as="d" hint-placeholder-count="5"><a href="#" class="day" style="display: flex; {{d.st}}"><span class="xs" style="font-weight: 600; opacity: .8;">{{d.w}}</span><span style="font-size: 18px; font-weight: 700;">{{d.n}}</span></a></sc-for>
+</div>
+<p class="sm t2" style="font-weight: 500;">Jueves 12 · primera consulta 45 min</p>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px;">
+<a href="#" class="slot">08:00</a><a href="#" class="slot" style="border-color: var(--pr); background: var(--pr); color: var(--pro);">09:00</a><a href="#" class="slot">10:00</a><a href="#" class="slot">14:00</a><a href="#" class="slot">15:00</a><a href="#" class="slot">16:00</a>
+</div>
+<p class="xs t3">Solo se muestran horarios libres según la disponibilidad de la doctora.</p>
+</div>
+<div class="ft"><a href="#" class="btn bp" style="width: 100%;">Continuar</a></div>
+</div></div>
+
+<div><p class="cpt">3 · Datos del niño/a y representante</p>
+<div class="ph">
+<div class="top"><div style="display: flex; justify-content: space-between;" class="sm"><b>Datos</b><span class="t3">Paso 2 de 4</span></div><div class="bar"><span style="width: 50%;"></span></div></div>
+<div class="bdy" style="gap: 10px;">
+<p class="sec">Niño/a</p>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px;"><div><label class="lb" for="b-n">Nombres</label><div class="in"><input id="b-n" value="Renata"></div></div><div><label class="lb" for="b-a">Apellidos</label><div class="in"><input id="b-a" value="Vélez Mora"></div></div></div>
+<fieldset style="border: 0; margin: 0; padding: 0;"><legend class="lb">Sexo</legend><div style="display: flex; gap: 8px;"><label class="rd"><span class="dot"></span>Masculino</label><label class="rd on"><span class="dot"></span>Femenino</label></div></fieldset>
+<div><label class="lb" for="b-d">Fecha de nacimiento</label><div class="in"><input id="b-d" value="02/08/2026"></div></div>
+<p class="sec" style="margin-top: 4px;">Representante</p>
+<div style="display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 8px;"><div><label class="lb" for="b-r">Nombre</label><div class="in"><input id="b-r" value="Paula Mora"></div></div><div><label class="lb" for="b-p">Parentesco</label><div class="in" style="justify-content: space-between;"><span>Madre</span><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width: 16px; height: 16px;"><path d="m6 9 6 6 6-6"></path></svg></div></div></div>
+<div><label class="lb" for="b-e">Email</label><div class="in"><input id="b-e" type="email" value="paula.mora@correo.ec"></div></div>
+<div><label class="lb" for="b-t">Teléfono / WhatsApp</label><div class="in"><span class="t3">+593</span><input id="b-t" value="99 000 0000"></div></div>
+</div>
+<div class="ft"><a href="#" class="btn bp" style="width: 100%;">Continuar</a></div>
+</div></div>
+
+<div><p class="cpt">4 · Consentimiento y verificación</p>
+<div class="ph">
+<div class="top"><div style="display: flex; justify-content: space-between;" class="sm"><b>Verificar email</b><span class="t3">Paso 4 de 4</span></div><div class="bar"><span style="width: 100%;"></span></div></div>
+<div class="bdy">
+<div style="display: flex; gap: 12px; align-items: flex-start; padding: 12px; border: 1px solid var(--bd); border-radius: 10px; background: var(--bg);"><span class="box"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width: 14px; height: 14px; stroke-width: 3;"><path d="M20 6 9 17l-5-5"></path></svg></span><span class="sm">Autorizo el tratamiento de los datos de salud de Renata (paso 3). <a href="#">Ver</a></span></div>
+<div><h1 style="font-size: 20px; font-weight: 700;">Ingrese el código</h1><p class="sm t2" style="margin-top: 4px;">Lo enviamos a <b style="color: var(--tx);">paula.mora@correo.ec</b> para confirmar que el email es suyo.</p></div>
+<div class="otp" role="group" aria-label="Código de 6 dígitos"><span>2</span><span>7</span><span>0</span><span style="border-color: var(--pr); box-shadow: 0 0 0 3px var(--prs);"></span><span></span><span></span></div>
+<p class="sm t2" style="text-align: center;">¿No llegó? <a href="#" style="font-weight: 600;">Reenviar código</a></p>
+<div style="border-radius: 10px; background: var(--bg3); padding: 12px;" class="sm">
+<p style="font-weight: 600;">Resumen</p>
+<p class="t2">Renata Vélez Mora · jue 12 nov, 09:00 · Primera consulta</p>
+</div>
+</div>
+<div class="ft"><a href="#" class="btn bp" style="width: 100%;">Enviar solicitud</a></div>
+</div></div>
+
+<div><p class="cpt">5 · Solicitud enviada</p>
+<div class="ph" style="background: var(--bg);">
+<div class="bdy" style="justify-content: center; align-items: center; text-align: center; gap: 14px;">
+<span style="width: 72px; height: 72px; border-radius: 99px; background: var(--okb); color: var(--okt); display: flex; align-items: center; justify-content: center;"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width: 34px; height: 34px;"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4z"></path></svg></span>
+<h1 style="font-size: 24px; font-weight: 700;">Solicitud enviada</h1>
+<p class="t2">La Dra. Salazar revisará su solicitud para el <b style="color: var(--tx);">jueves 12 de noviembre a las 09:00</b>.</p>
+<div style="border-radius: 10px; background: var(--wab); color: var(--wat); padding: 10px 12px; display: flex; gap: 8px; text-align: left;" class="sm"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 6v6l4 2"></path></svg><span>Aún no está confirmada. Le escribiremos a su email cuando la doctora responda.</span></div>
+<a href="#" class="btn bo" style="width: 100%; margin-top: 12px;">Volver a la página de la clínica</a>
+</div>
+</div></div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"dark":{"editor":"boolean","default":false},"$preview":{"width":2115,"height":940}}'>
+class Component extends DCLogic {
+renderVals() {
+const days = [['Mié','11',0],['Jue','12',1],['Vie','13',0],['Sáb','14',0],['Lun','16',0]].map(([w,n,on]) => ({w,n,st: on ? 'background: var(--pr); color: var(--pro); border-color: var(--pr);' : 'opacity: 1;'}));
+return { theme: this.props.dark ? 'cp dark' : 'cp', days };
+}
+}
+</script>
+</body>
+</html>

@@ -1,5 +1,10 @@
 # Handoff — UI design phase (Claude Design session)
 
+> **Done (12 Nov 2026).** This was the brief for the design session. The result is in
+> `docs/design/`, the decisions in `docs/decisions/2026-11-10-ui-and-clinical.md` and the next
+> step in `docs/handoff/planning.md`. Where this brief disagrees with them (Z labels, roles,
+> indicators), they win.
+
 Repo (public): https://github.com/rsantamaria01/app-control-pediatrico — branch `main`.
 Read first: `README.md`, `AGENTS.md`, `nuxt.config.ts`, `app/app.config.ts`, `shared/utils/zscore.ts`.
 

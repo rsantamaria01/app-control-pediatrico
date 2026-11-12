@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Padres en teléfono</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:inherit}
+.cp{--bg:#fff;--bg2:#f8fafc;--bg3:#f1f5f9;--bd:#e2e8f0;--bd2:#cbd5e1;--tx:#0f172a;--tx2:#475569;--tx3:#64748b;--pr:#0f766e;--prt:#0f766e;--pro:#fff;--prs:#f0fdfa;--prst:#115e59;--okb:#dcfce7;--okt:#166534;--wab:#fef9c3;--wat:#713f12;--oub:#fee2e2;--out:#991b1b;--nab:#f1f5f9;--nat:#475569;font-family:Inter,system-ui,sans-serif;color:var(--tx);background:var(--bg2);font-size:15px;line-height:1.45;font-variant-numeric:tabular-nums}
+.cp.dark{--bg:#0f172a;--bg2:#020617;--bg3:#1e293b;--bd:#1e293b;--bd2:#334155;--tx:#f1f5f9;--tx2:#cbd5e1;--tx3:#94a3b8;--pr:#2dd4bf;--prt:#5eead4;--pro:#042f2e;--prs:rgba(45,212,191,.12);--prst:#99f6e4;--okb:rgba(34,197,94,.16);--okt:#86efac;--wab:rgba(234,179,8,.18);--wat:#fde047;--oub:rgba(239,68,68,.2);--out:#fca5a5;--nab:#1e293b;--nat:#cbd5e1}
+.cp *{box-sizing:border-box}.cp h1,.cp h2,.cp h3,.cp p{margin:0}
+.t2{color:var(--tx2)}.t3{color:var(--tx3)}.sm{font-size:13px}.xs{font-size:12px}
+.card{background:var(--bg);border:1px solid var(--bd);border-radius:14px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:48px;padding:0 16px;border-radius:10px;font:600 15px/1 Inter,sans-serif;border:1px solid transparent;cursor:pointer;text-decoration:none;white-space:nowrap}
+.bp{background:var(--pr);color:var(--pro)}.bo{background:var(--bg);color:var(--tx);border-color:var(--bd2)}.bg{background:transparent;color:var(--tx2)}.bi{width:44px;min-height:44px;padding:0}
+.bd{display:inline-flex;align-items:center;gap:4px;height:24px;padding:0 8px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap}
+.zok{background:var(--okb);color:var(--okt)}.zwa{background:var(--wab);color:var(--wat)}.zou{background:var(--oub);color:var(--out)}.zna{background:var(--nab);color:var(--nat)}.zpr{background:var(--prs);color:var(--prst)}
+.ic{width:20px;height:20px;flex:none;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}.ic4{width:16px;height:16px}
+.ph{width:375px;height:812px;flex:none;background:var(--bg2);border:1px solid var(--bd2);border-radius:32px;overflow:hidden;display:flex;flex-direction:column}
+.ab{height:56px;flex:none;display:flex;align-items:center;gap:4px;padding:0 6px 0 16px;background:var(--bg);border-bottom:1px solid var(--bd)}
+.bdy{flex:1;overflow:hidden;padding:16px;display:flex;flex-direction:column;gap:14px}
+.tbar{display:flex;border-top:1px solid var(--bd);background:var(--bg);height:64px;flex:none}
+.tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:11px;font-weight:500;color:var(--tx3);text-decoration:none}.tab.on{color:var(--prt);font-weight:600}
+.cpt{font-size:13px;font-weight:600;color:var(--tx2);margin-bottom:10px}
+.st{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--bd)}
+.sti{width:28px;height:28px;border-radius:99px;display:flex;align-items:center;justify-content:center;flex:none}
+.seg{display:flex;padding:3px;border-radius:10px;background:var(--bg3);gap:2px}.seg a{flex:1;display:flex;align-items:center;justify-content:center;min-height:38px;border-radius:8px;font-size:13px;font-weight:500;color:var(--tx2);text-decoration:none}.seg a.on{background:var(--bg);color:var(--tx);font-weight:600;box-shadow:0 1px 2px rgba(15,23,42,.08)}
+.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:2px;text-align:center}
+.cd{height:40px;display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:8px;font-size:14px;position:relative}
+.slot{display:flex;align-items:center;justify-content:center;min-height:44px;border-radius:8px;border:1px solid var(--bd2);font-weight:600;font-size:14px;text-decoration:none;background:var(--bg)}
+.cp :focus-visible{outline:2px solid var(--pr);outline-offset:2px}
+</style>
+</helmet>
+<div class="{{theme}}" style="width: 2115px; height: 940px; padding: 40px; display: flex; gap: 40px;">
+
+<div><p class="cpt">1 · Inicio</p>
+<div class="ph">
+<div class="ab"><svg viewBox="0 0 64 64" width="28" height="28" aria-hidden="true"><rect width="64" height="64" rx="14" fill="var(--pr)"></rect><path d="M14 46C24 44 30 36 36 28S46 18 50 17" fill="none" stroke="var(--pro)" stroke-width="5" stroke-linecap="round"></path></svg><p style="font-weight: 600; margin-left: 6px; flex: 1;">Pediatría Demo</p></div>
+<div class="bdy">
+<h1 style="font-size: 22px; font-weight: 700;">Hola, María</h1>
+<a href="#" class="card" style="padding: 16px; display: flex; flex-direction: column; gap: 10px; text-decoration: none;">
+<div style="display: flex; align-items: center; gap: 12px;"><span style="width: 44px; height: 44px; border-radius: 99px; background: var(--prs); color: var(--prst); display: flex; align-items: center; justify-content: center; font-weight: 700;">V</span><div style="flex: 1;"><p style="font-weight: 700; font-size: 17px;">Valentina</p><p class="sm t3">1 año 4 meses · visita de hoy</p></div><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--tx3);"><path d="m9 18 6-6-6-6"></path></svg></div>
+<div>
+<div class="st"><span class="sti zok"><svg class="ic ic4" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg></span><p class="sm" style="flex: 1;"><b>Estatura:</b> dentro del rango esperado <span class="t3">· Z −0,62</span></p></div>
+<div class="st"><span class="sti zok"><svg class="ic ic4" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg></span><p class="sm" style="flex: 1;"><b>Peso:</b> dentro del rango esperado <span class="t3">· Z −1,39</span></p></div>
+<div class="st"><span class="sti zok"><svg class="ic ic4" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg></span><p class="sm" style="flex: 1;"><b>Cabeza:</b> dentro del rango esperado <span class="t3">· Z −0,31</span></p></div>
+</div>
+<div style="border-radius: 10px; background: var(--prs); padding: 10px 12px;"><p class="xs" style="font-weight: 600; color: var(--prst);">Recomendación de la Dra. Salazar · hoy</p><p class="sm" style="margin-top: 2px;">Ofrecer 3 comidas y 2 refrigerios al día…</p></div>
+<div style="display: flex; align-items: center; gap: 8px;" class="sm"><svg class="ic ic4" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--prt);"><path d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"></path></svg><span>Próximo control: <b>jue 10 dic, 09:00</b></span></div>
+</a>
+<a href="#" class="card" style="padding: 16px; display: flex; flex-direction: column; gap: 10px; text-decoration: none;">
+<div style="display: flex; align-items: center; gap: 12px;"><span style="width: 44px; height: 44px; border-radius: 99px; background: var(--bg3); color: var(--tx2); display: flex; align-items: center; justify-content: center; font-weight: 700;">T</span><div style="flex: 1;"><p style="font-weight: 700; font-size: 17px;">Tomás</p><p class="sm t3">4 años 2 meses</p></div><span class="bd zok"><svg class="ic ic4" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>Todo bien</span></div>
+<div style="display: flex; align-items: center; gap: 8px;" class="sm"><svg class="ic ic4" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--out);"><path d="M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 6v6l4 2"></path></svg><span>Control anual pendiente · <a href="#" style="color: var(--prt); font-weight: 600;">Agendar</a></span></div>
+</a>
+</div>
+<nav class="tbar" aria-label="Principal"><sc-for list="{{tabs0}}" as="t" hint-placeholder-count="4"><a href="#" class="{{t.cls}}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{t.d}}"></path></svg>{{t.l}}</a></sc-for></nav>
+</div></div>
+
+<div><p class="cpt">2 · Hijo/a · Crecimiento</p>
+<div class="ph">
+<div class="ab" style="padding-left: 4px;"><a href="#" class="btn bg bi" aria-label="Volver"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg></a><p style="font-weight: 600; flex: 1;">Valentina</p><a href="#" class="btn bg bi" aria-label="Descargar informe"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"></path></svg></a></div>
+<div class="bdy" style="gap: 12px;">
+<a href="#" class="btn bo"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M8 13h8M8 17h5"></path></svg>Ver informe PDF</a>
+<nav class="seg" aria-label="Secciones"><a href="#" class="on">Crecimiento</a><a href="#">Vacunas</a><a href="#">Hitos</a><a href="#">Consejos</a></nav>
+<div class="card" style="padding: 14px;"><p style="font-weight: 600;">Las medidas de Valentina están dentro del rango esperado.</p><p class="sm t2" style="margin-top: 4px;">La Z compara con niñas de su edad: 0 es el promedio; entre −2 y +2 es lo esperado.</p></div>
+<div class="seg" aria-label="Medida"><a href="#">Estatura</a><a href="#" class="on">Peso</a><a href="#">Cabeza</a></div>
+<div class="card" style="padding: 8px 4px;"><dc-import name="GrowthChart" dark="{{dark}}" variant="padres" tooltip="{{ true }}" hint-size="100%,190px"></dc-import>
+<div style="display: flex; gap: 14px; padding: 4px 10px 6px;" class="xs t2"><span style="display: inline-flex; gap: 6px; align-items: center;"><span style="width: 14px; height: 10px; border-radius: 2px; background: rgba(22,163,74,.2);"></span>Zona esperada</span><span style="display: inline-flex; gap: 6px; align-items: center;"><span style="width: 14px; height: 3px; background: {{lineC}};"></span>Valentina</span></div></div>
+<button class="btn bo" style="justify-content: space-between;" aria-expanded="false">Ver detalles<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button>
+</div>
+<nav class="tbar" aria-label="Principal"><sc-for list="{{tabs0}}" as="t" hint-placeholder-count="4"><a href="#" class="{{t.cls}}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{t.d}}"></path></svg>{{t.l}}</a></sc-for></nav>
+</div></div>
+
+<div><p class="cpt">3 · Vacunas, hitos y consejos</p>
+<div class="ph">
+<div class="ab" style="padding-left: 4px;"><a href="#" class="btn bg bi" aria-label="Volver"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg></a><p style="font-weight: 600; flex: 1;">Valentina</p></div>
+<div class="bdy" style="gap: 12px;">
+<nav class="seg" aria-label="Secciones"><a href="#">Crecimiento</a><a href="#" class="on">Vacunas</a><a href="#">Hitos</a><a href="#">Consejos</a></nav>
+<div class="card" style="padding: 14px; border-color: var(--out); display: flex; gap: 12px;"><span class="sti zou" style="width: 36px; height: 36px;"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 6v6l4 2"></path></svg></span><div style="flex: 1;"><p style="font-weight: 700;">SRP · 1.ª dosis <span class="xs t3" style="font-weight: 500;">(ejemplo)</span></p><p class="sm t2">Atrasada desde el 6 jul 2026. Pida que se la apliquen en la próxima cita.</p></div></div>
+<div class="card" style="overflow: hidden;">
+<p class="xs t3" style="font-weight: 600; padding: 10px 14px 6px;">PRÓXIMAS · 18 MESES (6 ENE 2027)</p>
+<div style="padding: 8px 14px; border-top: 1px solid var(--bd);" class="sm">SRP · 2.ª dosis <span class="t3">(ejemplo)</span></div>
+<div style="padding: 8px 14px; border-top: 1px solid var(--bd);" class="sm">DPT · refuerzo <span class="t3">(ejemplo)</span></div>
+</div>
+<div class="card" style="overflow: hidden;">
+<p class="xs t3" style="font-weight: 600; padding: 10px 14px 6px;">APLICADAS · 11</p>
+<div style="padding: 8px 14px; border-top: 1px solid var(--bd);" class="sm">Varicela <span class="t3">· 7 jul 2026</span></div>
+<div style="padding: 8px 14px; border-top: 1px solid var(--bd);" class="sm">Pentavalente 3.ª <span class="t3">· 7 ene 2026</span></div>
+<div style="padding: 8px 14px 12px; border-top: 1px solid var(--bd);" class="sm t2"><a href="#" style="color: var(--prt); font-weight: 600;">Ver las 11 aplicadas</a></div>
+</div>
+<p style="font-weight: 700; margin-top: 4px;">Hitos</p>
+<div class="card" style="overflow: hidden;">
+<sc-for list="{{ms}}" as="m" hint-placeholder-count="4"><div style="display: flex; align-items: center; gap: 10px; padding: 9px 14px; border-top: 1px solid var(--bd);"><span class="sti {{m.cls}}" style="width: 24px; height: 24px;"><svg class="ic ic4" viewBox="0 0 24 24" aria-hidden="true"><path d="{{m.d}}"></path></svg></span><p class="sm" style="flex: 1;"><b>{{m.n}}</b><br><span class="t3">{{m.s}}</span></p></div></sc-for>
+</div>
+</div>
+<nav class="tbar" aria-label="Principal"><sc-for list="{{tabs0}}" as="t" hint-placeholder-count="4"><a href="#" class="{{t.cls}}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{t.d}}"></path></svg>{{t.l}}</a></sc-for></nav>
+</div></div>
+
+<div><p class="cpt">4 · Agendar cita</p>
+<div class="ph">
+<div class="ab" style="padding-left: 4px;"><a href="#" class="btn bg bi" aria-label="Volver"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg></a><p style="font-weight: 600; flex: 1;">Agendar cita</p></div>
+<div class="bdy" style="gap: 12px;">
+<fieldset style="border: 0; margin: 0; padding: 0;"><legend class="sm t2" style="font-weight: 500; margin-bottom: 6px;">¿Para quién?</legend><div style="display: flex; gap: 8px;"><label class="slot" style="flex: 1; border-color: var(--pr); background: var(--prs); color: var(--prst);">Valentina</label><label class="slot" style="flex: 1;">Tomás</label></div></fieldset>
+<div class="card" style="padding: 12px;">
+<div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;"><button class="btn bg bi" aria-label="Mes anterior"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg></button><p style="font-weight: 600;">Noviembre 2026</p><button class="btn bg bi" aria-label="Mes siguiente"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg></button></div>
+<div class="cal xs t3" style="font-weight: 600; margin-bottom: 2px;"><span>L</span><span>M</span><span>X</span><span>J</span><span>V</span><span>S</span><span>D</span></div>
+<div class="cal"><sc-for list="{{cal}}" as="c" hint-placeholder-count="35"><span class="cd" style="position: relative; {{c.st}}">{{c.n}}<sc-if value="{{c.dot}}" hint-placeholder-val="{{ false }}"><span style="position: absolute; bottom: 5px; width: 4px; height: 4px; border-radius: 99px; background: var(--pr);"></span></sc-if></span></sc-for></div>
+</div>
+<p class="sm t2" style="font-weight: 500;">Jueves 12 de noviembre · horarios libres</p>
+<div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px;">
+<a href="#" class="slot">08:30</a><a href="#" class="slot">09:00</a><a href="#" class="slot" style="border-color: var(--pr); background: var(--pr); color: var(--pro);">10:30</a><a href="#" class="slot">14:00</a><a href="#" class="slot">14:30</a><a href="#" class="slot">15:30</a><a href="#" class="slot">16:00</a><a href="#" class="slot">16:30</a>
+</div>
+<div style="display: flex; gap: 10px; padding: 10px 12px; border-radius: 10px; background: var(--bg3);" class="sm t2"><svg class="ic ic4" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0"></path></svg><span>Le recordaremos por <b>email</b> y <b>WhatsApp</b> 24 h antes. <a href="#" style="color: var(--prt);">Cambiar</a></span></div>
+<button class="btn bp" style="margin-top: auto;">Confirmar cita · jue 12, 10:30</button>
+</div>
+</div></div>
+
+<div><p class="cpt">5 · Cita confirmada</p>
+<div class="ph">
+<div class="ab"><p style="font-weight: 600; flex: 1;">Citas</p></div>
+<div class="bdy" style="align-items: stretch;">
+<div style="display: flex; flex-direction: column; align-items: center; text-align: center; gap: 10px; padding: 24px 8px 8px;">
+<span class="sti zok" style="width: 64px; height: 64px;"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width: 32px; height: 32px;"><path d="M20 6 9 17l-5-5"></path></svg></span>
+<h1 style="font-size: 22px; font-weight: 700;">Cita confirmada</h1>
+<p class="t2">Le enviamos los detalles a su email.</p>
+</div>
+<div class="card" style="padding: 16px; display: flex; flex-direction: column; gap: 10px;">
+<div style="display: flex; justify-content: space-between;"><span class="t3 sm">Paciente</span><b>Valentina</b></div>
+<div style="display: flex; justify-content: space-between;"><span class="t3 sm">Fecha</span><b>Jue 12 nov 2026</b></div>
+<div style="display: flex; justify-content: space-between;"><span class="t3 sm">Hora</span><b>10:30</b></div>
+<div style="display: flex; justify-content: space-between;"><span class="t3 sm">Con</span><b>Dra. Andrea Salazar</b></div>
+<div style="display: flex; justify-content: space-between;"><span class="t3 sm">Lugar</span><b>Av. Ejemplo 123</b></div>
+<div style="display: flex; gap: 6px; flex-wrap: wrap; padding-top: 6px; border-top: 1px solid var(--bd);"><span class="bd zna">Email</span><span class="bd zna">WhatsApp</span><span class="bd zna">En la app</span></div>
+</div>
+<div style="display: flex; gap: 8px; margin-top: auto;"><a href="#" class="btn bo" style="flex: 1;">Reprogramar</a><a href="#" class="btn bo" style="flex: 1; color: var(--out);">Cancelar cita</a></div>
+<a href="#" class="btn bp">Volver al inicio</a>
+</div>
+<nav class="tbar" aria-label="Principal"><sc-for list="{{tabs1}}" as="t" hint-placeholder-count="4"><a href="#" class="{{t.cls}}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{t.d}}"></path></svg>{{t.l}}</a></sc-for></nav>
+</div></div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"dark":{"editor":"boolean","default":false},"$preview":{"width":2115,"height":940}}'>
+class Component extends DCLogic {
+renderVals() {
+const dark = !!this.props.dark;
+const T = [
+{l:'Inicio',d:'M3 10l9-7 9 7v10a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z'},
+{l:'Citas',d:'M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z'},
+{l:'Avisos',d:'M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0'},
+{l:'Perfil',d:'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0'}
+];
+const tabs = on => T.map((t,i) => ({...t, cls: i === on ? 'tab on' : 'tab'}));
+const CK = 'M20 6 9 17l-5-5', CL = 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 6v6l4 2';
+const ms = [
+{n:'Se sienta sin apoyo',s:'Lo logró a los 6 meses',cls:'zok',d:CK},
+{n:'Gatea',s:'Lo logró a los 8 meses',cls:'zok',d:CK},
+{n:'Se para sola',s:'Lo logró a los 13 meses',cls:'zok',d:CK},
+{n:'Camina sola',s:'Suele lograrse entre los 8 y 18 meses',cls:'zna',d:CL}
+];
+const cal = [];
+for (let i = 0; i < 6; i++) cal.push({n:'',st:'',dot:false});
+const busy = [13, 20, 27];
+for (let d = 1; d <= 30; d++) {
+const dow = (6 + d - 1) % 7;
+const sunday = dow === 6;
+let st = 'color: var(--tx);', dot = false;
+if (d < 10 || sunday) st = 'color: var(--tx3); opacity: .55;';
+else if (d === 12) st = 'background: var(--pr); color: var(--pro); font-weight: 700;';
+else if (d === 10) st = 'box-shadow: inset 0 0 0 1.5px var(--bd2); font-weight: 600;';
+else if (!busy.includes(d)) dot = true;
+else st = 'color: var(--tx3); text-decoration: line-through;';
+cal.push({n:String(d),st,dot});
+}
+return { theme: dark ? 'cp dark' : 'cp', dark, tabs0: tabs(0), tabs1: tabs(1), ms, cal, lineC: dark ? '#60a5fa' : '#1d4ed8' };
+}
+}
+</script>
+</body>
+</html>

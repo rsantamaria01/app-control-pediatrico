@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Z-score y gráfico</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#0f766e}a:hover{color:#115e59}
+.cp{--bg:#fff;--bg2:#f8fafc;--bg3:#f1f5f9;--bd:#e2e8f0;--bd2:#cbd5e1;--tx:#0f172a;--tx2:#475569;--tx3:#64748b;--pr:#0f766e;--prt:#0f766e;--pro:#fff;--prs:#f0fdfa;--prst:#115e59;--okb:#dcfce7;--okt:#166534;--wab:#fef9c3;--wat:#713f12;--rib:#ffedd5;--rit:#9a3412;--oub:#fee2e2;--out:#991b1b;--nab:#f1f5f9;--nat:#475569;font-family:Inter,system-ui,sans-serif;color:var(--tx);background:var(--bg2);font-size:14px;line-height:1.45;font-variant-numeric:tabular-nums}
+.cp.dark{--bg:#0f172a;--bg2:#020617;--bg3:#1e293b;--bd:#1e293b;--bd2:#334155;--tx:#f1f5f9;--tx2:#cbd5e1;--tx3:#94a3b8;--pr:#2dd4bf;--prt:#5eead4;--pro:#042f2e;--prs:rgba(45,212,191,.12);--prst:#99f6e4;--okb:rgba(34,197,94,.16);--okt:#86efac;--wab:rgba(234,179,8,.18);--wat:#fde047;--rib:rgba(249,115,22,.18);--rit:#fdba74;--oub:rgba(239,68,68,.2);--out:#fca5a5;--nab:#1e293b;--nat:#cbd5e1}
+.cp *{box-sizing:border-box}.cp h1,.cp h2,.cp h3,.cp p{margin:0}
+.h2{font-size:18px;font-weight:600}.h3{font-size:15px;font-weight:600}
+.t2{color:var(--tx2)}.t3{color:var(--tx3)}.sm{font-size:13px}.xs{font-size:12px}
+.card{background:var(--bg);border:1px solid var(--bd);border-radius:12px}
+.bd{display:inline-flex;align-items:center;gap:4px;height:24px;padding:0 8px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap}
+.zok{background:var(--okb);color:var(--okt)}.zwa{background:var(--wab);color:var(--wat)}.zri{background:var(--rib);color:var(--rit)}.zou{background:var(--oub);color:var(--out)}.zna{background:var(--nab);color:var(--nat)}
+.ic{width:16px;height:16px;flex:none;stroke:currentColor;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.cap{font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--tx3)}
+.tb{width:100%;border-collapse:collapse}.tb th{text-align:left;font-size:12px;font-weight:500;color:var(--tx3);padding:8px 12px;border-bottom:1px solid var(--bd)}.tb td{padding:10px 12px;border-bottom:1px solid var(--bd);font-size:13px;vertical-align:top}
+pre{margin:0;padding:16px;border-radius:8px;background:var(--bg3);font:12px/1.6 ui-monospace,Menlo,monospace;color:var(--tx);overflow-x:auto;white-space:pre}
+</style>
+</helmet>
+<div class="{{theme}}" style="width: 100%; min-height: 1480px; padding: 48px 40px;">
+<div style="max-width: 1360px; margin: 0 auto; display: flex; flex-direction: column; gap: 28px;">
+<header>
+<p class="cap">Especificación · ECharts (vue-echarts)</p>
+<h1 style="font-size: 32px; font-weight: 700; letter-spacing: -0.02em; margin-top: 8px;">Gráfico de crecimiento y semántica Z</h1>
+<p class="t2" style="margin-top: 8px; max-width: 820px;">Curvas OMS genéricas (ilustrativas en este mockup). Siete curvas DE de fondo, área suave entre −2 y +2 (rango esperado), mediana enfatizada, ±2 y ±3 marcadas con color y etiqueta numérica al final de cada curva. Mismo gráfico para peso, longitud/talla, peso/longitud, IMC y perímetro cefálico. Paciente en azul fijo (#1d4ed8), independiente de la marca.</p>
+</header>
+
+<section style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px;">
+<div class="card" style="padding: 16px; display: flex; flex-direction: column; gap: 10px;">
+<div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap;"><h3 class="h3">Médico · claro</h3><span class="bd zna">Niña · 0–2 años</span></div>
+<dc-import name="GrowthChart" dark="{{ false }}" variant="medico" tooltip="{{ true }}" hint-size="100%,300px"></dc-import>
+<p class="xs t3">Punto seleccionado: halo 9 px + línea guía; tooltip con fecha, edad, valor y Z.</p>
+</div>
+<div class="card" style="padding: 16px; display: flex; flex-direction: column; gap: 10px;">
+<div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap;"><h3 class="h3">Padres · simplificado</h3><span class="bd zna">Niña</span></div>
+<dc-import name="GrowthChart" dark="{{ false }}" variant="padres" tooltip="{{ true }}" hint-size="100%,300px"></dc-import>
+<p class="xs t3">Rango esperado (−2 a +2) con sus líneas, promedio punteado y el valor Z en el detalle. Sin palabras que alarmen.</p>
+</div>
+<div class="card" style="padding: 16px; display: flex; flex-direction: column; gap: 10px; background: #020617; border-color: #1e293b; color: #f1f5f9;">
+<div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap;"><h3 class="h3">Médico · oscuro</h3><span class="bd" style="background: #1e293b; color: #cbd5e1;">Niña · 0–2 años</span></div>
+<dc-import name="GrowthChart" dark="{{ true }}" variant="medico" tooltip="{{ true }}" hint-size="100%,300px"></dc-import>
+<p class="xs" style="color: #94a3b8;">Curvas un tono más claro (400) para ≥3:1 sobre slate-900.</p>
+</div>
+</section>
+
+<section style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px;">
+<div class="card" style="padding: 20px;">
+<h2 class="h2">Estilo de series</h2>
+<div style="overflow-x: auto; margin-top: 8px;">
+<table class="tb">
+<thead><tr><th>Elemento</th><th>Claro</th><th>Oscuro</th><th>Trazo</th></tr></thead>
+<tbody>
+<tr><td>Mediana (0)</td><td>#334155</td><td>#e2e8f0</td><td>2 px sólido · padres: 1,5 px punteado</td></tr>
+<tr><td>±1 DE</td><td>#ca8a04</td><td>#facc15</td><td>1 px guion 4/3</td></tr>
+<tr><td>±2 DE</td><td>#ea580c</td><td>#fb923c</td><td>1,5 px sólido</td></tr>
+<tr><td>±3 DE</td><td>#dc2626</td><td>#f87171</td><td>1,5 px sólido</td></tr>
+<tr><td>Área −2…+2</td><td>#16a34a 7 % (padres 12 %)</td><td>#22c55e 10 % (padres 16 %)</td><td>área apilada entre −2 y +2</td></tr>
+<tr><td>Paciente</td><td>#1d4ed8</td><td>#60a5fa</td><td>2,5 px + puntos 7 px huecos</td></tr>
+<tr><td>Rejilla</td><td>#f1f5f9</td><td>#1e293b</td><td>1 px; vertical punteada</td></tr>
+<tr><td>Ejes / ticks</td><td>#cbd5e1 / #64748b</td><td>#475569 / #94a3b8</td><td>Inter 11 px tnum</td></tr>
+</tbody>
+</table>
+</div>
+<p class="xs t3" style="margin-top: 10px;">Las etiquetas «+2», «−3»… van al final de cada curva (endLabel), así ninguna curva depende solo del color.</p>
+</div>
+<div class="card" style="padding: 20px;">
+<h2 class="h2">Comportamiento</h2>
+<table class="tb" style="margin-top: 8px;">
+<tbody>
+<tr><td style="width: 150px; font-weight: 600;">Ejes</td><td>0–5 años: X en meses. 5–19 años: X en años. Peso/longitud-talla: X en cm. Y = valor con unidad.</td></tr>
+<tr><td style="font-weight: 600;">Zoom / pan</td><td>Escritorio y tablet: dataZoom inside (rueda + arrastre) + slider de 24 px; botón «Restablecer». 375 px: sin slider; rango por defecto = edad actual ±6 meses; selector «6 m · 1 a · Todo».</td></tr>
+<tr><td style="font-weight: 600;">Selección</td><td>Clic / toque en punto: emphasis (radio 5 + halo), tooltip fijo; en la tabla se resalta la misma fila.</td></tr>
+<tr><td style="font-weight: 600;">Tooltip</td><td>Fecha · edad (y «edad corregida» si aplica) · valor con unidad · Z. Si tiene nombre OMS, el chip lo muestra (p. ej. «Talla baja · −2,41»). Padres: valor, Z y «dentro / fuera del rango esperado».</td></tr>
+<tr><td style="font-weight: 600;">Indicadores</td><td>0–5 a: talla/longitud, peso, peso/longitud-talla, IMC y perímetro cefálico. 5–19 a (OMS 2007): talla, IMC y peso (hasta 10 a).</td></tr>
+<tr><td style="font-weight: 600;">Etiquetas</td><td>Chip de sexo «Niña» / «Niño» en gris neutro, nunca rosa/azul. Prematuros &lt; 24 m: chip «Edad corregida» y eje «Edad corregida (meses)».</td></tr>
+<tr><td style="font-weight: 600;">Accesibilidad</td><td><code>aria.enabled: true</code>, descripción generada; alternativa siempre disponible: «Ver tabla».</td></tr>
+<tr><td style="font-weight: 600;">Datos</td><td>Curvas desde columnas SD precalculadas de las tablas OMS; Z del paciente con LMS (correctZ).</td></tr>
+</tbody>
+</table>
+</div>
+</section>
+
+<section class="card" style="padding: 20px;">
+<div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;"><h2 class="h2">Nombres OMS por indicador</h2><span class="bd zok"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>Confirmado por la pediatra · 10 nov 2026</span></div>
+<div style="overflow-x: auto; margin-top: 8px;">
+<table class="tb" style="min-width: 900px;">
+<thead><tr><th>Indicador</th><th>Z &lt; −3</th><th>Z &lt; −2</th><th>−2 … +2</th><th>Z &gt; +1</th><th>Z &gt; +2</th><th>Z &gt; +3</th></tr></thead>
+<tbody>
+<tr><td style="font-weight: 600;">Talla/longitud para la edad</td><td>Talla baja severa</td><td>Talla baja</td><td>solo Z</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td style="font-weight: 600;">Peso para la edad</td><td>Bajo peso severo</td><td>Bajo peso</td><td>solo Z</td><td>—</td><td>Revisar peso/longitud (&lt; 2 a) o IMC/edad (≥ 2 a)</td><td>ídem</td></tr>
+<tr><td style="font-weight: 600;">Peso/longitud-talla e IMC · &lt; 5 a</td><td>Emaciación severa</td><td>Emaciación</td><td>solo Z</td><td>Riesgo de sobrepeso</td><td>Sobrepeso</td><td>Obesidad</td></tr>
+<tr><td style="font-weight: 600;">IMC para la edad · ≥ 5 a</td><td>Delgadez severa</td><td>Delgadez</td><td>solo Z</td><td>Sobrepeso</td><td>Obesidad</td><td>Obesidad</td></tr>
+<tr><td style="font-weight: 600;">Perímetro cefálico</td><td>Microcefalia</td><td>Microcefalia</td><td>solo Z</td><td>—</td><td>Macrocefalia</td><td>Macrocefalia</td></tr>
+</tbody>
+</table>
+</div>
+<p class="xs t3" style="margin-top: 10px;">Exceso de peso: peso/longitud antes de los 2 años e IMC/edad desde los 2 años. Padres: «Peso: dentro del rango esperado · Z −1,39» o «fuera del rango esperado. La doctora lo revisará con usted».</p>
+</section>
+
+<section class="card" style="padding: 20px; display: flex; flex-direction: column; gap: 10px;">
+<h2 class="h2">Opción ECharts base (doctor)</h2>
+<pre>const option = {
+  aria: { enabled: true },
+  textStyle: { fontFamily: 'Inter', fontSize: 11 },
+  grid: { left: 48, right: 36, top: 16, bottom: 56, containLabel: true },
+  xAxis: { type: 'value', name: 'Edad (meses)', min: 0, max: 24, interval: 3,
+           axisLine: { lineStyle: { color: c.axis } }, splitLine: { lineStyle: { color: c.grid, type: 'dashed' } } },
+  yAxis: { type: 'value', name: 'Peso (kg)', splitLine: { lineStyle: { color: c.grid } } },
+  dataZoom: isDesktop ? [{ type: 'inside' }, { type: 'slider', height: 24 }] : [{ type: 'inside', zoomOnMouseWheel: false }],
+  tooltip: { trigger: 'item', confine: true, borderColor: c.border, backgroundColor: c.bg, formatter: tooltipFmt },
+  series: [
+    ...sdBands(c),                       // 'line' stack + areaStyle, silent: true, symbol: 'none'
+    ...SD.map(z =&gt; ({ type: 'line', name: label(z), data: curve(z), symbol: 'none', silent: true,
+         lineStyle: style(z, c), endLabel: { show: true, formatter: label(z), color: color(z, c) } })),
+    { type: 'line', name: 'Paciente', data: patient, symbolSize: 7, z: 10,
+      lineStyle: { width: 2.5, color: c.patient }, itemStyle: { color: c.bg, borderColor: c.patient, borderWidth: 2 },
+      emphasis: { scale: 1.6, itemStyle: { color: c.patient } }, selectedMode: 'single' }
+  ]
+}</pre>
+</section>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"dark":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":1480}}'>
+class Component extends DCLogic {
+renderVals() {
+return { theme: this.props.dark ? 'cp dark' : 'cp' };
+}
+}
+</script>
+</body>
+</html>

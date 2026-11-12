@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Informe hoja 2</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+.rp{font-family:Inter,system-ui,sans-serif;color:#0f172a;font-size:12px;line-height:1.45;font-variant-numeric:tabular-nums}
+.rp *{box-sizing:border-box}.rp h1,.rp h2,.rp p{margin:0}
+.k{font-size:10.5px;color:#64748b}
+</style>
+</helmet>
+<div class="rp" style="width: 794px; height: 1123px; background: #ffffff; padding: 48px 52px; display: flex; flex-direction: column; gap: 18px;">
+<header style="display: flex; align-items: center; gap: 14px; padding-bottom: 14px; border-bottom: 2px solid #0f766e;">
+<svg viewBox="0 0 64 64" width="40" height="40" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#0f766e"></rect><path d="M14 46C24 44 30 36 36 28S46 18 50 17" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round"></path><circle cx="50" cy="17" r="5" fill="#fff"></circle></svg>
+<div style="flex: 1;"><p style="font-size: 15px; font-weight: 700;">Pediatría Demo</p><p class="k">Av. Ejemplo 123, Guayaquil · 04 000 0000</p></div>
+<div style="text-align: right;"><h1 style="font-size: 16px; font-weight: 700; color: #0f766e;">Informe de crecimiento</h1><p class="k">Valentina Ríos Cedeño · emitido el 10 nov 2026</p></div>
+</header>
+<section style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 12px;">
+<div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px;"><h2 style="font-size: 13px; font-weight: 700;">Longitud para la edad · Niña · 0 a 2 años</h2><span class="k">Z −0,80 · dentro de ±2 DE</span></div>
+<dc-import name="GrowthChart" dark="{{ false }}" variant="medico" ind="talla" tooltip="{{ false }}" hint-size="100%,330px"></dc-import>
+</section>
+<section style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 12px;">
+<div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px;"><h2 style="font-size: 13px; font-weight: 700;">Perímetro cefálico para la edad · Niña · 0 a 2 años</h2><span class="k">Z −0,86 · dentro de ±2 DE</span></div>
+<dc-import name="GrowthChart" dark="{{ false }}" variant="medico" ind="pc" tooltip="{{ false }}" hint-size="100%,330px"></dc-import>
+</section>
+<p class="k">Línea azul: mediciones de Valentina. Curvas: −3 a +3 desviaciones estándar (OMS). Área verde: rango esperado (−2 a +2). Peso/longitud e IMC/edad: ver la tabla de la hoja 1.</p>
+<footer style="margin-top: auto; display: flex; justify-content: space-between; align-items: flex-end; border-top: 1px solid #e2e8f0; padding-top: 12px;">
+<div><p style="font-weight: 600;">Dra. Andrea Salazar</p><p class="k">Pediatra · Reg. EJ-0000</p></div>
+<p class="k" style="text-align: right;">No incluye notas clínicas privadas · Página 2 de 3</p>
+</footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":794,"height":1123}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

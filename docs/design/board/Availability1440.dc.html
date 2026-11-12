@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Horarios de atención</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:inherit}
+.cp{--bg:#fff;--bg2:#f8fafc;--bg3:#f1f5f9;--bd:#e2e8f0;--bd2:#cbd5e1;--tx:#0f172a;--tx2:#475569;--tx3:#64748b;--pr:#0f766e;--pro:#fff;--prs:#f0fdfa;--prst:#115e59;font-family:Inter,system-ui,sans-serif;color:var(--tx);background:var(--bg2);font-size:14px;line-height:1.45;font-variant-numeric:tabular-nums}
+.cp.dark{--bg:#0f172a;--bg2:#020617;--bg3:#1e293b;--bd:#1e293b;--bd2:#334155;--tx:#f1f5f9;--tx2:#cbd5e1;--tx3:#94a3b8;--pr:#2dd4bf;--pro:#042f2e;--prs:rgba(45,212,191,.12);--prst:#99f6e4}
+.cp *{box-sizing:border-box}.cp h1,.cp h2,.cp p{margin:0}
+.t2{color:var(--tx2)}.t3{color:var(--tx3)}.sm{font-size:13px}.xs{font-size:12px}
+.card{background:var(--bg);border:1px solid var(--bd);border-radius:12px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:0 16px;border-radius:8px;font:600 14px/1 Inter,sans-serif;border:1px solid transparent;cursor:pointer;text-decoration:none;white-space:nowrap}
+.bp{background:var(--pr);color:var(--pro)}.bo{background:var(--bg);color:var(--tx);border-color:var(--bd2)}
+.nav{display:flex;align-items:center;gap:10px;min-height:40px;padding:0 12px;border-radius:8px;color:var(--tx2);font-weight:500;text-decoration:none}.nav.on{background:var(--prs);color:var(--prst)}
+.sel{display:inline-flex;align-items:center;justify-content:space-between;gap:8px;height:40px;min-width:110px;padding:0 10px;border:1px solid var(--bd2);border-radius:8px;background:var(--bg)}
+.sw{width:44px;height:26px;border-radius:99px;background:var(--bd2);position:relative;flex:none;display:inline-block}.sw::after{content:"";position:absolute;left:3px;top:3px;width:20px;height:20px;border-radius:99px;background:#fff}
+.sw.on{background:var(--pr)}.sw.on::after{left:auto;right:3px;background:var(--pro)}
+.seg{display:inline-flex;padding:3px;border-radius:8px;background:var(--bg3);gap:2px}.seg a{display:inline-flex;align-items:center;min-height:36px;padding:0 14px;border-radius:6px;font-size:13px;font-weight:500;color:var(--tx2);text-decoration:none}.seg a.on{background:var(--bg);color:var(--tx);font-weight:600;box-shadow:0 1px 2px rgba(15,23,42,.08)}
+.row{display:flex;align-items:center;gap:12px;padding:12px 16px;border-top:1px solid var(--bd);min-height:64px}
+.cp :focus-visible{outline:2px solid var(--pr);outline-offset:2px}
+</style>
+</helmet>
+<div class="{{theme}}" style="width: 100%; min-height: 940px; display: flex; flex-wrap: wrap;">
+<aside style="flex: 1 1 240px; max-width: 256px; background: var(--bg); border-right: 1px solid var(--bd); padding: 16px 12px; display: flex; flex-direction: column; gap: 2px;">
+<div style="display: flex; align-items: center; gap: 10px; padding: 4px 8px 16px;"><svg viewBox="0 0 64 64" width="32" height="32" aria-hidden="true"><rect width="64" height="64" rx="14" fill="var(--pr)"></rect><path d="M14 46C24 44 30 36 36 28S46 18 50 17" fill="none" stroke="var(--pro)" stroke-width="5" stroke-linecap="round"></path><circle cx="50" cy="17" r="5" fill="var(--pro)"></circle></svg><div><p style="font-weight: 600;">Pediatría Demo</p><p class="xs t3">Adelita Mora · asistente</p></div></div>
+<a href="#" class="nav">Agenda</a><a href="#" class="nav on">Horarios</a><a href="#" class="nav">Perfil</a>
+<p class="xs t3" style="margin-top: auto; padding: 8px;">Vista de la asistente: sin datos clínicos. El médico ve la misma pantalla desde Agenda › Horarios.</p>
+</aside>
+<main style="flex: 999 1 640px; min-width: 0; display: flex; flex-direction: column;">
+<div style="min-height: 64px; border-bottom: 1px solid var(--bd); background: var(--bg); display: flex; align-items: center; gap: 12px; padding: 10px 24px; flex-wrap: wrap;"><h1 style="font-size: 17px; font-weight: 600; flex: 1;">Horarios de atención</h1><a href="#" class="btn bp">Guardar horarios</a></div>
+<div style="padding: 24px; display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 20px; align-items: start; max-width: 1180px;">
+<section class="card" aria-label="Días y horas">
+<div style="padding: 14px 16px;"><h2 style="font-size: 16px; font-weight: 600;">Días y horas</h2><p class="xs t3">Definen las horas libres que ven los padres y la página pública de reservas.</p></div>
+<sc-for list="{{days}}" as="d" hint-placeholder-count="7"><div class="row"><b style="width: 86px;">{{d.n}}</b>
+<sc-if value="{{d.on}}" hint-placeholder-val="{{ true }}"><span class="sel"><span>{{d.f}}</span><span class="t3">▾</span></span><span class="t3">a</span><span class="sel"><span>{{d.t}}</span><span class="t3">▾</span></span></sc-if>
+<sc-if value="{{d.off}}" hint-placeholder-val="{{ false }}"><span class="t3" style="flex: 1;">Cerrado</span></sc-if>
+<span style="flex: 1;"></span><span class="{{d.sw}}" role="switch" aria-checked="{{d.on}}" aria-label="Atender {{d.n}}"></span></div></sc-for>
+<div class="row"><span style="flex: 1;">Pausa de almuerzo 13:00–14:00</span><span class="sw on" role="switch" aria-checked="true" aria-label="Pausa de almuerzo"></span></div>
+</section>
+<div style="display: flex; flex-direction: column; gap: 20px;">
+<section class="card" style="padding: 16px; display: flex; flex-direction: column; gap: 10px;">
+<h2 style="font-size: 16px; font-weight: 600;">Duración de las citas</h2>
+<p class="sm t2">Control y consulta</p><div class="seg"><a href="#">15 min</a><a href="#">20 min</a><a href="#" class="on">30 min</a><a href="#">45 min</a></div>
+<p class="sm t2">Primera consulta</p><div class="seg"><a href="#">30 min</a><a href="#" class="on">45 min</a><a href="#">60 min</a></div>
+</section>
+<section class="card" aria-label="Días bloqueados">
+<div style="padding: 14px 16px;"><h2 style="font-size: 16px; font-weight: 600;">Días bloqueados</h2><p class="xs t3">Feriados, vacaciones o congresos</p></div>
+<div class="row" style="min-height: 52px;"><span style="flex: 1;">24 dic 2026</span><a href="#" class="btn bo" style="min-height: 36px;">Quitar</a></div>
+<div class="row" style="min-height: 52px;"><span style="flex: 1;">25 dic 2026</span><a href="#" class="btn bo" style="min-height: 36px;">Quitar</a></div>
+<div class="row" style="min-height: 52px;"><span style="flex: 1;">13 nov 2026 · 14:00–17:00 (congreso)</span><a href="#" class="btn bo" style="min-height: 36px;">Quitar</a></div>
+<div class="row"><span class="sel" style="flex: 1;"><span class="t3">Elegir fecha o rango</span><span class="t3">▾</span></span><a href="#" class="btn bo">Bloquear</a></div>
+</section>
+</div>
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"dark":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":940}}'>
+class Component extends DCLogic {
+renderVals() {
+const days = [['Lunes',1,'08:00','17:00'],['Martes',1,'08:00','17:00'],['Miércoles',1,'08:00','17:00'],['Jueves',1,'08:00','17:00'],['Viernes',1,'08:00','17:00'],['Sábado',1,'08:00','12:00'],['Domingo',0,'',''] ].map(([n,on,f,t]) => ({n, on: !!on, off: !on, f, t, sw: on ? 'sw on' : 'sw'}));
+return { theme: this.props.dark ? 'cp dark' : 'cp', days };
+}
+}
+</script>
+</body>
+</html>

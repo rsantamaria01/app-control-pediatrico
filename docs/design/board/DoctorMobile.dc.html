@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Médico en teléfono</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:inherit}
+.cp{--bg:#fff;--bg2:#f8fafc;--bg3:#f1f5f9;--bd:#e2e8f0;--bd2:#cbd5e1;--tx:#0f172a;--tx2:#475569;--tx3:#64748b;--pr:#0f766e;--prt:#0f766e;--pro:#fff;--prs:#f0fdfa;--prst:#115e59;--okb:#dcfce7;--okt:#166534;--wab:#fef9c3;--wat:#713f12;--rib:#ffedd5;--rit:#9a3412;--oub:#fee2e2;--out:#991b1b;--nab:#f1f5f9;--nat:#475569;font-family:Inter,system-ui,sans-serif;color:var(--tx);background:var(--bg2);font-size:15px;line-height:1.45;font-variant-numeric:tabular-nums}
+.cp.dark{--bg:#0f172a;--bg2:#020617;--bg3:#1e293b;--bd:#1e293b;--bd2:#334155;--tx:#f1f5f9;--tx2:#cbd5e1;--tx3:#94a3b8;--pr:#2dd4bf;--prt:#5eead4;--pro:#042f2e;--prs:rgba(45,212,191,.12);--prst:#99f6e4;--okb:rgba(34,197,94,.16);--okt:#86efac;--wab:rgba(234,179,8,.18);--wat:#fde047;--rib:rgba(249,115,22,.18);--rit:#fdba74;--oub:rgba(239,68,68,.2);--out:#fca5a5;--nab:#1e293b;--nat:#cbd5e1}
+.cp *{box-sizing:border-box}.cp h1,.cp h2,.cp h3,.cp p{margin:0}
+.t2{color:var(--tx2)}.t3{color:var(--tx3)}.sm{font-size:13px}.xs{font-size:12px}
+.card{background:var(--bg);border:1px solid var(--bd);border-radius:12px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:0 16px;border-radius:8px;font:600 15px/1 Inter,sans-serif;border:1px solid transparent;cursor:pointer;text-decoration:none;white-space:nowrap}
+.bp{background:var(--pr);color:var(--pro)}.bo{background:var(--bg);color:var(--tx);border-color:var(--bd2)}.bg{background:transparent;color:var(--tx2)}.bi{width:44px;padding:0}
+.bd{display:inline-flex;align-items:center;gap:4px;height:24px;padding:0 8px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap}
+.zok{background:var(--okb);color:var(--okt)}.zwa{background:var(--wab);color:var(--wat)}.zri{background:var(--rib);color:var(--rit)}.zou{background:var(--oub);color:var(--out)}.zna{background:var(--nab);color:var(--nat)}.zpr{background:var(--prs);color:var(--prst)}
+.in{display:flex;align-items:center;gap:8px;height:44px;border:1px solid var(--bd2);border-radius:8px;background:var(--bg);color:var(--tx);padding:0 12px;font:400 16px Inter,sans-serif;width:100%}
+.in input{border:0;outline:0;background:transparent;color:inherit;font:inherit;width:100%;min-width:0}
+.lb{display:block;font-size:13px;font-weight:500;color:var(--tx2);margin-bottom:6px}
+.ic{width:20px;height:20px;flex:none;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}.ic4{width:16px;height:16px}
+.ph{width:375px;height:812px;flex:none;background:var(--bg2);border:1px solid var(--bd2);border-radius:32px;overflow:hidden;display:flex;flex-direction:column}
+.ab{height:56px;flex:none;display:flex;align-items:center;gap:4px;padding:0 6px 0 16px;background:var(--bg);border-bottom:1px solid var(--bd)}
+.bdy{flex:1;overflow:hidden;padding:16px;display:flex;flex-direction:column;gap:14px}
+.tbar{display:flex;border-top:1px solid var(--bd);background:var(--bg);height:64px;flex:none}
+.tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:11px;font-weight:500;color:var(--tx3);text-decoration:none;position:relative}.tab.on{color:var(--prt);font-weight:600}
+.av{width:40px;height:40px;border-radius:999px;background:var(--bg3);color:var(--tx2);display:flex;align-items:center;justify-content:center;font-weight:600;font-size:13px;flex:none}
+.li{display:flex;align-items:center;gap:12px;padding:12px 14px;border-top:1px solid var(--bd);min-height:64px;text-decoration:none}
+.cpt{font-size:13px;font-weight:600;color:var(--tx2);margin-bottom:10px}
+.hs{display:flex;gap:10px;overflow:hidden}
+.rd{display:flex;align-items:center;gap:10px;min-height:44px;padding:0 12px;border:1px solid var(--bd2);border-radius:8px;flex:1;font-weight:500}.rd.on{border-color:var(--pr);background:var(--prs);color:var(--prst)}
+.dot{width:16px;height:16px;border-radius:99px;border:2px solid var(--bd2);flex:none}.rd.on .dot{border:5px solid var(--pr)}
+.sec{font-size:13px;font-weight:700;color:var(--tx);padding-top:4px}
+.sw{width:44px;height:26px;border-radius:99px;background:var(--pr);position:relative;flex:none}.sw::after{content:"";position:absolute;right:3px;top:3px;width:20px;height:20px;border-radius:99px;background:var(--pro)}
+.cp :focus-visible{outline:2px solid var(--pr);outline-offset:2px}
+</style>
+</helmet>
+<div class="{{theme}}" style="width: 2115px; height: 940px; padding: 40px; display: flex; gap: 40px;">
+
+<div><p class="cpt">1 · Inicio</p>
+<div class="ph">
+<div class="ab"><svg viewBox="0 0 64 64" width="28" height="28" aria-hidden="true"><rect width="64" height="64" rx="14" fill="var(--pr)"></rect><path d="M14 46C24 44 30 36 36 28S46 18 50 17" fill="none" stroke="var(--pro)" stroke-width="5" stroke-linecap="round"></path></svg><p style="font-weight: 600; margin-left: 6px; flex: 1;">Pediatría Demo</p><button class="btn bg bi" aria-label="Buscar paciente"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM21 21l-4.3-4.3"></path></svg></button></div>
+<div class="bdy">
+<div><p class="sm t3">Martes 10 de noviembre</p><h1 style="font-size: 22px; font-weight: 700;">Hola, Dra. Salazar</h1></div>
+<div><div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;"><h2 style="font-size: 15px; font-weight: 600;">Citas de hoy · 5</h2><a href="#" class="sm" style="color: var(--prt); font-weight: 600; text-decoration: none;">Agenda</a></div>
+<div class="hs">
+<div class="card" style="padding: 10px 12px; min-width: 132px; border-color: var(--pr); background: var(--prs);"><p style="font-weight: 700;">09:15</p><p class="sm" style="font-weight: 600;">Valentina R.</p><span class="bd zpr" style="margin-top: 4px;">En consulta</span></div>
+<div class="card" style="padding: 10px 12px; min-width: 132px;"><p style="font-weight: 700;">10:00</p><p class="sm" style="font-weight: 600;">Daniel Pino</p><span class="bd zna" style="margin-top: 4px;">Primera</span></div>
+<div class="card" style="padding: 10px 12px; min-width: 132px;"><p style="font-weight: 700;">11:30</p><p class="sm" style="font-weight: 600;">Joaquín M.</p><span class="bd zna" style="margin-top: 4px;">Confirmada</span></div>
+</div></div>
+<a href="#" class="card" style="padding: 12px 14px; display: flex; align-items: center; gap: 10px; text-decoration: none;"><span class="bd zwa">3</span><span class="sm" style="flex: 1; font-weight: 600;">Solicitudes de reserva pendientes</span><svg class="ic ic4" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg></a>
+<section class="card" style="overflow: hidden;">
+<div style="padding: 12px 14px; display: flex; justify-content: space-between;"><h2 style="font-size: 15px; font-weight: 600;">Fuera de ±2 DE</h2><span class="bd zna">3</span></div>
+<sc-for list="{{attn}}" as="r" hint-placeholder-count="3"><a href="#" class="li"><span class="av">{{r.i}}</span><div style="flex: 1; min-width: 0;"><p style="font-weight: 600;">{{r.p}}</p><p class="xs t3">{{r.ind}} · Z {{r.zv}}</p></div><span class="bd {{r.z.cls}}"><svg class="ic ic4" viewBox="0 0 24 24" aria-hidden="true"><path d="{{r.z.d}}"></path></svg>{{r.z.l}}</span></a></sc-for>
+</section>
+<section class="card" style="overflow: hidden;">
+<div style="padding: 12px 14px;"><h2 style="font-size: 15px; font-weight: 600;">Controles pendientes</h2></div>
+<a href="#" class="li"><span class="av">IP</span><div style="flex: 1;"><p style="font-weight: 600;">Isabella Paredes</p><p class="xs t3">Control de 4 meses</p></div><span class="bd zou">Atrasado 12 d</span></a>
+</section>
+</div>
+<nav class="tbar" aria-label="Principal"><sc-for list="{{tabsA}}" as="t" hint-placeholder-count="5"><a href="#" class="{{t.cls}}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{t.d}}"></path></svg>{{t.l}}</a></sc-for></nav>
+</div></div>
+
+<div><p class="cpt">2 · Pacientes</p>
+<div class="ph">
+<div class="ab"><h1 style="font-size: 17px; font-weight: 600; flex: 1;">Pacientes</h1></div>
+<div class="bdy">
+<div class="in"><svg class="ic ic4" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--tx3);"><path d="M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM21 21l-4.3-4.3"></path></svg><input aria-label="Buscar por nombre o cédula" value="mat"></div>
+<div><p class="xs t3" style="font-weight: 600; margin-bottom: 8px;">RESULTADOS · 2</p>
+<section class="card" style="overflow: hidden;">
+<a href="#" class="li" style="border-top: 0;"><span class="av">MA</span><div style="flex: 1;"><p style="font-weight: 600;"><mark style="background: var(--wab); color: inherit;">Mat</mark>eo Andrade Vera</p><p class="xs t3">7 m · corregida 5 m · 0951111111</p></div><span class="bd zri">Riesgo</span></a>
+<a href="#" class="li"><span class="av">ML</span><div style="flex: 1;"><p style="font-weight: 600;"><mark style="background: var(--wab); color: inherit;">Mar</mark>tina Loor</p><p class="xs t3">6 a · 0952222222</p></div><span class="bd zok">Normal</span></a>
+</section></div>
+<div><p class="xs t3" style="font-weight: 600; margin-bottom: 8px;">RECIENTES</p>
+<section class="card" style="overflow: hidden;">
+<sc-for list="{{recent}}" as="r" hint-placeholder-count="4"><a href="#" class="{{r.cls}}"><span class="av">{{r.i}}</span><div style="flex: 1;"><p style="font-weight: 600;">{{r.p}}</p><p class="xs t3">{{r.a}}</p></div><span class="bd {{r.z.cls}}"><svg class="ic ic4" viewBox="0 0 24 24" aria-hidden="true"><path d="{{r.z.d}}"></path></svg>{{r.z.l}}</span></a></sc-for>
+</section></div>
+<a href="#" class="btn bp" style="margin-top: auto;"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Nuevo paciente</a>
+</div>
+<nav class="tbar" aria-label="Principal"><sc-for list="{{tabsB}}" as="t" hint-placeholder-count="5"><a href="#" class="{{t.cls}}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{t.d}}"></path></svg>{{t.l}}</a></sc-for></nav>
+</div></div>
+
+<div><p class="cpt">3 · Detalle del paciente</p>
+<div class="ph">
+<div class="ab" style="padding-left: 4px;"><a href="#" class="btn bg bi" aria-label="Volver a pacientes"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg></a><p style="font-weight: 600; flex: 1;">Valentina Ríos</p><button class="btn bg bi" aria-label="Más acciones"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 13a1 1 0 1 0 0-2 1 1 0 0 0 0 2zM19 13a1 1 0 1 0 0-2 1 1 0 0 0 0 2zM5 13a1 1 0 1 0 0-2 1 1 0 0 0 0 2z"></path></svg></button></div>
+<div class="bdy" style="gap: 12px;">
+<div style="display: flex; gap: 6px; flex-wrap: wrap;"><span class="bd zna">Niña</span><span class="bd zna">1 a 4 m</span><span class="bd zna">Nac. 6 jul 2025</span></div>
+<div style="display: flex; gap: 8px;"><a href="#" class="btn bp" style="flex: 1;"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Nueva visita</a><a href="#" class="btn bo bi" aria-label="Agendar cita"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"></path></svg></a><a href="#" class="btn bo bi" aria-label="Informe PDF"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M8 13h8M8 17h5"></path></svg></a></div>
+<div class="hs">
+<div class="card" style="padding: 12px; min-width: 150px; border-color: var(--pr);"><p class="xs t2">Peso/edad</p><p style="font-size: 20px; font-weight: 700;">8,20 <span class="sm t3">kg</span></p><span class="bd zna">Z −1,39</span></div>
+<div class="card" style="padding: 12px; min-width: 150px;"><p class="xs t2">Longitud/edad</p><p style="font-size: 20px; font-weight: 700;">76,4 <span class="sm t3">cm</span></p><span class="bd zna">Z −0,62</span></div>
+<div class="card" style="padding: 12px; min-width: 150px;"><p class="xs t2">Peso/longitud</p><p style="font-size: 20px; font-weight: 700;">−1,52</p></div>
+</div>
+<nav aria-label="Secciones" style="display: flex; gap: 2px; border-bottom: 1px solid var(--bd); overflow: hidden;"><a href="#" style="min-height: 44px; display: flex; align-items: center; padding: 0 10px; font-weight: 600; color: var(--prt); border-bottom: 2px solid var(--pr); text-decoration: none;">Crecimiento</a><a href="#" class="t2" style="min-height: 44px; display: flex; align-items: center; padding: 0 10px; text-decoration: none;">Visitas</a><a href="#" class="t2" style="min-height: 44px; display: flex; align-items: center; padding: 0 10px; text-decoration: none;">Vacunas</a><a href="#" class="t2" style="min-height: 44px; display: flex; align-items: center; padding: 0 10px; text-decoration: none;">Hitos</a></nav>
+<div style="display: flex; gap: 8px;"><div class="in" style="flex: 1; justify-content: space-between;"><span style="font-weight: 500;">Peso para la edad</span><svg class="ic ic4" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></div><a href="#" class="btn bo" style="padding: 0 12px;">Tabla</a></div>
+<div class="card" style="padding: 8px 4px;"><dc-import name="GrowthChart" dark="{{dark}}" variant="medico" tooltip="{{ true }}" hint-size="100%,190px"></dc-import></div>
+<div style="display: flex; gap: 6px;"><a href="#" class="bd zna" style="height: 32px; padding: 0 12px; text-decoration: none;">6 m</a><a href="#" class="bd zpr" style="height: 32px; padding: 0 12px; text-decoration: none;">1 año</a><a href="#" class="bd zna" style="height: 32px; padding: 0 12px; text-decoration: none;">Todo</a></div>
+</div>
+<nav class="tbar" aria-label="Principal"><sc-for list="{{tabsB}}" as="t" hint-placeholder-count="5"><a href="#" class="{{t.cls}}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{t.d}}"></path></svg>{{t.l}}</a></sc-for></nav>
+</div></div>
+
+<div><p class="cpt">4 · Nueva visita (página completa)</p>
+<div class="ph">
+<div class="ab" style="padding-left: 4px;"><a href="#" class="btn bg bi" aria-label="Cancelar"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></a><div style="flex: 1;"><p style="font-weight: 600;">Nueva visita</p><p class="xs t3">Valentina Ríos · 1 a 4 m</p></div></div>
+<div class="bdy" style="gap: 12px;">
+<div><label class="lb" for="m-d">Fecha</label><div class="in"><input id="m-d" value="10/11/2026"></div></div>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px;">
+<div><label class="lb" for="m-w">Peso</label><div class="in"><input id="m-w" value="8,20" inputmode="decimal"><span class="t3 sm">kg</span></div></div>
+<div><label class="lb" for="m-l">Longitud</label><div class="in"><input id="m-l" value="76,4" inputmode="decimal"><span class="t3 sm">cm</span></div></div>
+</div>
+<fieldset style="border: 0; margin: 0; padding: 0;"><legend class="lb">Posición <span class="t3" style="font-weight: 400;">· esperada: acostado</span></legend><div style="display: flex; gap: 8px;"><label class="rd on"><span class="dot"></span>Acostado</label><label class="rd"><span class="dot"></span>De pie</label></div></fieldset>
+<div><label class="lb" for="m-pc">Perímetro cefálico</label><div class="in"><input id="m-pc" value="44,8" inputmode="decimal"><span class="t3 sm">cm</span></div></div>
+<div class="card" style="overflow: hidden;">
+<p class="xs" style="font-weight: 600; padding: 8px 12px; background: var(--bg3);">Vista previa Z</p>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 10px 12px;">
+<span class="bd zna">Peso/edad −1,39</span><span class="bd zna">Long./edad −0,62</span><span class="bd zna">Peso/long. −1,52</span><span class="bd zna">IMC/edad −1,46</span><span class="bd zna">PC/edad −0,31</span>
+</div></div>
+<div><label class="lb" for="m-r" style="display: flex; justify-content: space-between;"><span>Recomendaciones para los padres</span><span class="bd zpr">Visible</span></label><div class="in" style="height: 64px; align-items: flex-start; padding-top: 10px;"><span class="sm">Ofrecer 3 comidas y 2 refrigerios…</span></div></div>
+</div>
+<div style="padding: 12px 16px; border-top: 1px solid var(--bd); background: var(--bg);"><button class="btn bp" style="width: 100%;">Guardar visita</button></div>
+</div></div>
+
+<div><p class="cpt">5 · Nuevo paciente</p>
+<div class="ph">
+<div class="ab" style="padding-left: 4px;"><a href="#" class="btn bg bi" aria-label="Cancelar"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></a><p style="font-weight: 600; flex: 1;">Nuevo paciente</p></div>
+<div class="bdy" style="gap: 12px;">
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px;">
+<div><label class="lb" for="n-n">Nombres</label><div class="in"><input id="n-n" value="Renata"></div></div>
+<div><label class="lb" for="n-a">Apellidos</label><div class="in"><input id="n-a" value="Vélez Mora"></div></div>
+</div>
+<fieldset style="border: 0; margin: 0; padding: 0;"><legend class="lb">Sexo</legend><div style="display: flex; gap: 8px;"><label class="rd"><span class="dot"></span>Masculino</label><label class="rd on"><span class="dot"></span>Femenino</label></div></fieldset>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px;">
+<div><label class="lb" for="n-d">Nacimiento</label><div class="in"><input id="n-d" value="02/08/2026"></div></div>
+<div><label class="lb" for="n-c">Cédula</label><div class="in"><input id="n-c" placeholder="Opcional"></div></div>
+</div>
+<p class="sec">Antecedentes al nacer</p>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px;">
+<div><label class="lb" for="n-gs">Edad gestacional</label><div class="in"><input id="n-gs" value="36"><span class="t3 sm">sem</span><input aria-label="Días" value="4" style="width: 24px;"><span class="t3 sm">d</span></div></div>
+<div><label class="lb" for="n-bw">Peso al nacer</label><div class="in"><input id="n-bw" value="2,65"><span class="t3 sm">kg</span></div></div>
+</div>
+<div style="display: flex; gap: 10px; padding: 10px 12px; border-radius: 8px; background: var(--prs); color: var(--prst);"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 16v-4M12 8h.01"></path></svg><p class="sm">Prematura: los gráficos usarán edad corregida hasta los 24 meses.</p></div>
+<p class="sec">Representante</p>
+<div><label class="lb" for="n-r">Nombre</label><div class="in"><input id="n-r" value="Paula Mora"></div></div>
+<div style="display: flex; align-items: center; gap: 12px; padding: 4px 0;"><div style="flex: 1;"><p style="font-weight: 600;">Invitar al portal</p><p class="xs t3">Se envía un enlace al email del representante</p></div><span class="sw" role="switch" aria-checked="true" aria-label="Invitar al portal"></span></div>
+</div>
+<div style="padding: 12px 16px; border-top: 1px solid var(--bd); background: var(--bg);"><button class="btn bp" style="width: 100%;">Crear paciente</button></div>
+</div></div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"dark":{"editor":"boolean","default":false},"$preview":{"width":2115,"height":940}}'>
+class Component extends DCLogic {
+renderVals() {
+const dark = !!this.props.dark;
+const ZD = {
+ok:{cls:'zok',l:'Normal',d:'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM9 12l2 2 4-4'},
+wa:{cls:'zwa',l:'Vigilar',d:'M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z'},
+ri:{cls:'zri',l:'Riesgo',d:'M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0zM12 9v4M12 17h.01'},
+ou:{cls:'zou',l:'Fuera de rango',d:'M7.9 2h8.2L22 7.9v8.2L16.1 22H7.9L2 16.1V7.9zM12 8v4M12 16h.01'}
+};
+const T = [
+{l:'Inicio',d:'M3 10l9-7 9 7v10a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z'},
+{l:'Pacientes',d:'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8'},
+{l:'Agenda',d:'M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z'},
+{l:'Avisos',d:'M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0'},
+{l:'Más',d:'M4 6h16M4 12h16M4 18h16'}
+];
+const tabs = on => T.map((t,i) => ({...t, cls: i === on ? 'tab on' : 'tab'}));
+const TRI = 'M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0zM12 9v4M12 17h.01';
+const F = l => ({cls:'zri', l, d:TRI}), N = {cls:'zna', l:'Dentro de ±2', d:'M5 12h14'};
+const A = (i,p,ind,l,zv) => ({i,p,ind,z:F(l + ' · ' + zv),zv});
+const attn = [A('EZ','Emilia Zambrano','P. cefálico','Microcefalia','−3,20'),A('JM','Joaquín Mendoza','Peso/talla','Sobrepeso','+2,62'),A('MA','Mateo Andrade','Longitud/edad','Talla baja','−2,41')];
+const recent = [
+{i:'VR',p:'Valentina Ríos Cedeño',a:'1 a 4 m · hoy',z:N},
+{i:'CO',p:'Camila Ordóñez',a:'2 m · hoy',z:N},
+{i:'JM',p:'Joaquín Mendoza',a:'3 a 2 m · 28 oct',z:F('Sobrepeso')},
+{i:'EZ',p:'Emilia Zambrano',a:'9 m · 6 nov',z:F('Microcefalia')}
+].map((r,i) => ({...r, cls: i === 0 ? 'li' : 'li'}));
+return { theme: dark ? 'cp dark' : 'cp', dark, attn, recent, tabsA: tabs(0), tabsB: tabs(1) };
+}
+}
+</script>
+</body>
+</html>

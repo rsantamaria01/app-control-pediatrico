@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Acceso escritorio</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:var(--prt)}
+.cp{--bg:#fff;--bg2:#f8fafc;--bg3:#f1f5f9;--bd:#e2e8f0;--bd2:#cbd5e1;--tx:#0f172a;--tx2:#475569;--tx3:#64748b;--pr:#0f766e;--prt:#0f766e;--pro:#fff;--prs:#f0fdfa;--prst:#115e59;font-family:Inter,system-ui,sans-serif;color:var(--tx);background:var(--bg);font-size:15px;line-height:1.5}
+.cp.dark{--bg:#0f172a;--bg2:#020617;--bg3:#1e293b;--bd:#1e293b;--bd2:#334155;--tx:#f1f5f9;--tx2:#cbd5e1;--tx3:#94a3b8;--pr:#2dd4bf;--prt:#5eead4;--pro:#042f2e;--prs:rgba(45,212,191,.12);--prst:#99f6e4}
+.cp *{box-sizing:border-box}.cp h1,.cp h2,.cp p{margin:0}
+.t2{color:var(--tx2)}.t3{color:var(--tx3)}.sm{font-size:13px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:48px;padding:0 16px;border-radius:10px;font:600 15px/1 Inter,sans-serif;border:1px solid transparent;cursor:pointer;text-decoration:none;white-space:nowrap;width:100%}
+.bp{background:var(--pr);color:var(--pro)}.bo{background:var(--bg);color:var(--tx);border-color:var(--bd2)}
+.in{display:flex;align-items:center;gap:8px;height:48px;border:1px solid var(--bd2);border-radius:10px;background:var(--bg);color:var(--tx);padding:0 14px;font:400 16px Inter,sans-serif;width:100%}
+.in input{border:0;outline:0;background:transparent;color:inherit;font:inherit;width:100%}
+.lb{display:block;font-size:13px;font-weight:500;color:var(--tx2);margin-bottom:6px}
+.cp :focus-visible{outline:2px solid var(--pr);outline-offset:2px}
+</style>
+</helmet>
+<div class="{{theme}}" style="width: 100%; min-height: 900px; display: flex; flex-wrap: wrap;">
+<section style="flex: 1 1 480px; background: var(--prs); padding: 64px; display: flex; flex-direction: column; justify-content: space-between; gap: 32px;">
+<div style="display: flex; align-items: center; gap: 12px;"><svg viewBox="0 0 64 64" width="44" height="44" aria-hidden="true"><rect width="64" height="64" rx="14" fill="var(--pr)"></rect><path d="M14 46C24 44 30 36 36 28S46 18 50 17" fill="none" stroke="var(--pro)" stroke-width="5" stroke-linecap="round"></path><circle cx="50" cy="17" r="5" fill="var(--pro)"></circle></svg><p style="font-size: 20px; font-weight: 700;">Pediatría Demo</p></div>
+<div style="max-width: 460px;">
+<h1 style="font-size: 36px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.15;">El crecimiento de cada niño, claro y a tiempo.</h1>
+<p class="t2" style="margin-top: 14px;">Médicos registran visitas y ven las curvas de la OMS. Las familias siguen el estado de sus hijos, sus vacunas y sus citas.</p>
+</div>
+<p class="sm t3">Av. Ejemplo 123, Guayaquil · 04 000 0000 · con Control Pediátrico</p>
+</section>
+<section style="flex: 1 1 480px; display: flex; align-items: center; justify-content: center; padding: 48px 24px;">
+<div style="width: 100%; max-width: 400px; display: flex; flex-direction: column; gap: 20px;">
+<div><h2 style="font-size: 26px; font-weight: 700;">Ingresar</h2><p class="t2" style="margin-top: 4px;">Le enviaremos un código de 6 dígitos a su email.</p></div>
+<div><label class="lb" for="l-e">Email</label><div class="in"><input id="l-e" type="email" placeholder="nombre@correo.ec" autocomplete="email"></div></div>
+<a href="#" class="btn bp">Enviar código</a>
+<div style="display: flex; align-items: center; gap: 12px;" class="sm t3"><span style="flex: 1; height: 1px; background: var(--bd);"></span>¿Primera vez?<span style="flex: 1; height: 1px; background: var(--bd);"></span></div>
+<a href="#" class="btn bo">Reservar una primera cita</a>
+<p class="sm t3" style="text-align: center;">Las cuentas se crean por invitación de la clínica. <a href="#">Privacidad</a></p>
+</div>
+</section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"dark":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+renderVals() { return { theme: this.props.dark ? 'cp dark' : 'cp' }; }
+}
+</script>
+</body>
+</html>

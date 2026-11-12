@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>PWA, avisos y sistema</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:var(--prt)}
+.cp{--bg:#fff;--bg2:#f8fafc;--bg3:#f1f5f9;--bd:#e2e8f0;--bd2:#cbd5e1;--tx:#0f172a;--tx2:#475569;--tx3:#64748b;--pr:#0f766e;--prt:#0f766e;--pro:#fff;--prs:#f0fdfa;--prst:#115e59;--okb:#dcfce7;--okt:#166534;--wab:#fef9c3;--wat:#713f12;--oub:#fee2e2;--out:#991b1b;--nab:#f1f5f9;--nat:#475569;font-family:Inter,system-ui,sans-serif;color:var(--tx);background:var(--bg2);font-size:15px;line-height:1.5}
+.cp.dark{--bg:#0f172a;--bg2:#020617;--bg3:#1e293b;--bd:#1e293b;--bd2:#334155;--tx:#f1f5f9;--tx2:#cbd5e1;--tx3:#94a3b8;--pr:#2dd4bf;--prt:#5eead4;--pro:#042f2e;--prs:rgba(45,212,191,.12);--prst:#99f6e4;--okb:rgba(34,197,94,.16);--okt:#86efac;--wab:rgba(234,179,8,.18);--wat:#fde047;--oub:rgba(239,68,68,.2);--out:#fca5a5;--nab:#1e293b;--nat:#cbd5e1}
+.cp *{box-sizing:border-box}.cp h1,.cp h2,.cp p{margin:0}
+.t2{color:var(--tx2)}.t3{color:var(--tx3)}.sm{font-size:13px}.xs{font-size:12px}
+.card{background:var(--bg);border:1px solid var(--bd);border-radius:14px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:48px;padding:0 16px;border-radius:10px;font:600 15px/1 Inter,sans-serif;border:1px solid transparent;cursor:pointer;text-decoration:none;white-space:nowrap}
+.bp{background:var(--pr);color:var(--pro)}.bo{background:var(--bg);color:var(--tx);border-color:var(--bd2)}.bg{background:transparent;color:var(--tx2)}.bs{min-height:40px;font-size:14px;padding:0 12px}
+.bd{display:inline-flex;align-items:center;gap:4px;height:24px;padding:0 8px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap}
+.zna{background:var(--nab);color:var(--nat)}.zpr{background:var(--prs);color:var(--prst)}
+.ic{width:20px;height:20px;flex:none;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.ph{width:375px;height:812px;flex:none;background:var(--bg2);border:1px solid var(--bd2);border-radius:32px;overflow:hidden;display:flex;flex-direction:column;position:relative}
+.ab{height:56px;flex:none;display:flex;align-items:center;gap:4px;padding:0 6px 0 16px;background:var(--bg);border-bottom:1px solid var(--bd)}
+.bdy{flex:1;overflow:hidden;padding:16px;display:flex;flex-direction:column;gap:14px}
+.tbar{display:flex;border-top:1px solid var(--bd);background:var(--bg);height:64px;flex:none}
+.tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:11px;font-weight:500;color:var(--tx3);text-decoration:none}.tab.on{color:var(--prt);font-weight:600}
+.cpt{font-size:13px;font-weight:600;color:var(--tx2);margin-bottom:10px}
+.ni{display:flex;gap:12px;padding:12px 14px;border-top:1px solid var(--bd)}
+.nic{width:36px;height:36px;border-radius:99px;display:flex;align-items:center;justify-content:center;flex:none}
+.sw{width:44px;height:26px;border-radius:99px;background:var(--bd2);position:relative;flex:none}.sw::after{content:"";position:absolute;left:3px;top:3px;width:20px;height:20px;border-radius:99px;background:#fff}
+.sw.on{background:var(--pr)}.sw.on::after{left:auto;right:3px;background:var(--pro)}
+.row{display:flex;align-items:center;gap:12px;min-height:52px;padding:0 14px;border-top:1px solid var(--bd)}
+.seg{display:flex;padding:3px;border-radius:10px;background:var(--bg3);gap:2px}.seg a{flex:1;display:flex;align-items:center;justify-content:center;min-height:38px;border-radius:8px;font-size:13px;font-weight:500;color:var(--tx2);text-decoration:none}.seg a.on{background:var(--bg);color:var(--tx);font-weight:600;box-shadow:0 1px 2px rgba(15,23,42,.08)}
+.cp :focus-visible{outline:2px solid var(--pr);outline-offset:2px}
+</style>
+</helmet>
+<div class="{{theme}}" style="width: 2115px; height: 940px; padding: 40px; display: flex; gap: 40px;">
+
+<div><p class="cpt">1 · Instalar app + aviso iOS</p>
+<div class="ph">
+<div style="background: var(--pr); color: var(--pro); padding: 10px 12px 10px 16px; display: flex; align-items: center; gap: 10px;"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"></path></svg><p class="sm" style="flex: 1; font-weight: 600;">Instale la app en su teléfono</p><a href="#" class="btn bs" style="background: var(--pro); color: var(--pr); min-height: 36px;">Instalar</a><button class="btn bs" aria-label="Cerrar aviso" style="color: var(--pro); background: transparent; width: 36px; padding: 0; min-height: 36px;"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button></div>
+<div class="ab"><p style="font-weight: 600; flex: 1;">Pediatría Demo</p></div>
+<div class="bdy"><h1 style="font-size: 22px; font-weight: 700;">Hola, María</h1><div class="card" style="height: 220px;"></div><div class="card" style="height: 100px;"></div></div>
+<div style="position: absolute; inset: 0; background: rgba(15,23,42,.45);"></div>
+<div role="dialog" aria-labelledby="ios-t" style="position: absolute; left: 0; right: 0; bottom: 0; background: var(--bg); border-radius: 20px 20px 0 0; padding: 12px 20px 28px; display: flex; flex-direction: column; gap: 14px;">
+<span style="align-self: center; width: 40px; height: 4px; border-radius: 99px; background: var(--bd2);"></span>
+<h2 id="ios-t" style="font-size: 18px; font-weight: 700;">Agregar a la pantalla de inicio</h2>
+<div style="display: flex; gap: 12px; align-items: center;"><span class="nic zpr" style="font-weight: 700;">1</span><p class="sm" style="flex: 1;">Toque <b>Compartir</b> <svg class="ic" viewBox="0 0 24 24" aria-label="ícono Compartir" role="img" style="width: 16px; height: 16px; vertical-align: -3px;"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8M16 6l-4-4-4 4M12 2v13"></path></svg> en la barra de Safari</p></div>
+<div style="display: flex; gap: 12px; align-items: center;"><span class="nic zpr" style="font-weight: 700;">2</span><p class="sm" style="flex: 1;">Elija <b>Agregar a inicio</b></p></div>
+<div style="display: flex; gap: 12px; align-items: center;"><span class="nic zpr" style="font-weight: 700;">3</span><p class="sm" style="flex: 1;">Toque <b>Agregar</b>. La app aparecerá con el ícono de la clínica.</p></div>
+<a href="#" class="btn bo">Entendido</a>
+</div>
+</div></div>
+
+<div><p class="cpt">2 · Sin conexión</p>
+<div class="ph" style="background: var(--bg);">
+<div class="bdy" style="justify-content: center; align-items: center; text-align: center; gap: 14px; padding: 32px;">
+<span class="nic" style="width: 72px; height: 72px; background: var(--bg3); color: var(--tx2);"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width: 32px; height: 32px;"><path d="M2 2l20 20M8.5 16.5a5 5 0 0 1 7 0M2 8.8a15 15 0 0 1 4.2-2.7M10.7 5.1A15 15 0 0 1 22 8.8M5 12.9a10 10 0 0 1 5.2-2.6M16.8 11.5a10 10 0 0 1 2.2 1.4M12 20h.01"></path></svg></span>
+<h1 style="font-size: 22px; font-weight: 700;">Sin conexión</h1>
+<p class="t2">Para proteger la información de sus hijos, la app no guarda datos de salud en el teléfono. Conéctese a internet para continuar.</p>
+<a href="#" class="btn bp" style="width: 100%; margin-top: 8px;">Reintentar</a>
+</div>
+</div></div>
+
+<div><p class="cpt">3 · Centro de avisos</p>
+<div class="ph">
+<div class="ab"><p style="font-weight: 600; flex: 1;">Avisos</p><a href="#" class="btn bg bs">Marcar leídos</a></div>
+<div class="bdy" style="padding: 12px 0 0; gap: 10px;">
+<div style="padding: 0 16px;"><nav class="seg" aria-label="Filtro"><a href="#" class="on">Todos</a><a href="#">Sin leer · 2</a></nav></div>
+<p class="xs t3" style="font-weight: 600; padding: 4px 16px 0;">HOY</p>
+<div style="background: var(--bg);">
+<sc-for list="{{today}}" as="n" hint-placeholder-count="2"><a href="#" class="ni" style="text-decoration: none; color: inherit; background: {{n.bg}};"><span class="nic" style="background: {{n.ib}}; color: {{n.ic}};"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{n.d}}"></path></svg></span><div style="flex: 1; min-width: 0;"><p class="sm" style="font-weight: 600;">{{n.t}}</p><p class="sm t2">{{n.b}}</p><p class="xs t3">{{n.w}}</p></div><sc-if value="{{n.unread}}" hint-placeholder-val="{{ true }}"><span aria-label="Sin leer" style="width: 8px; height: 8px; border-radius: 99px; background: var(--pr); margin-top: 6px;"></span></sc-if></a></sc-for>
+</div>
+<p class="xs t3" style="font-weight: 600; padding: 4px 16px 0;">ESTA SEMANA</p>
+<div style="background: var(--bg);">
+<sc-for list="{{week}}" as="n" hint-placeholder-count="2"><a href="#" class="ni" style="text-decoration: none; color: inherit;"><span class="nic" style="background: {{n.ib}}; color: {{n.ic}};"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{n.d}}"></path></svg></span><div style="flex: 1; min-width: 0;"><p class="sm" style="font-weight: 600;">{{n.t}}</p><p class="sm t2">{{n.b}}</p><p class="xs t3">{{n.w}}</p></div></a></sc-for>
+</div>
+</div>
+<nav class="tbar" aria-label="Principal"><sc-for list="{{tabs2}}" as="t" hint-placeholder-count="4"><a href="#" class="{{t.cls}}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{t.d}}"></path></svg>{{t.l}}</a></sc-for></nav>
+</div></div>
+
+<div><p class="cpt">4 · Perfil, recordatorios y Mis datos</p>
+<div class="ph">
+<div class="ab"><p style="font-weight: 600; flex: 1;">Perfil</p></div>
+<div class="bdy" style="gap: 12px;">
+<div class="card" style="padding: 14px; display: flex; align-items: center; gap: 12px;"><span class="nic" style="width: 44px; height: 44px; background: var(--prs); color: var(--prst); font-weight: 700;">MC</span><div style="flex: 1;"><p style="font-weight: 600;">María Cedeño</p><p class="sm t3">maria.cedeno@correo.ec</p></div><a href="#" class="btn bg bs">Editar</a></div>
+<div class="card" style="overflow: hidden;">
+<p class="sm" style="font-weight: 700; padding: 12px 14px 8px;">Recordatorios</p>
+<div class="row"><p style="flex: 1;">Email</p><span class="sw on" role="switch" aria-checked="true" aria-label="Email"></span></div>
+<div class="row"><p style="flex: 1;">WhatsApp</p><span class="sw on" role="switch" aria-checked="true" aria-label="WhatsApp"></span></div>
+<div class="row"><p style="flex: 1;">En la app</p><span class="sw" role="switch" aria-checked="false" aria-label="En la app"></span></div>
+</div>
+<div class="card" style="padding: 12px 14px; display: flex; flex-direction: column; gap: 8px;"><p class="sm" style="font-weight: 700;">Apariencia</p><nav class="seg" aria-label="Tema"><a href="#">Claro</a><a href="#">Oscuro</a><a href="#" class="on">Sistema</a></nav></div>
+<div class="card" style="overflow: hidden;">
+<p class="sm" style="font-weight: 700; padding: 12px 14px 4px;">Mis datos</p>
+<p class="xs t3" style="padding: 0 14px 8px;">Derechos según la LOPDP. Respondemos en máx. 15 días.</p>
+<a href="#" class="row" style="text-decoration: none; color: inherit;"><p style="flex: 1;">Ver mis datos</p><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--tx3);"><path d="m9 18 6-6-6-6"></path></svg></a>
+<a href="#" class="row" style="text-decoration: none; color: inherit;"><p style="flex: 1;">Exportar (PDF / JSON)</p><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="color: var(--tx3);"><path d="m9 18 6-6-6-6"></path></svg></a>
+<a href="#" class="row" style="text-decoration: none; color: var(--out);"><p style="flex: 1; font-weight: 600;">Pedir eliminación</p><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg></a>
+</div>
+<a href="#" class="btn bg bs" style="align-self: center;">Cerrar sesión</a>
+</div>
+<nav class="tbar" aria-label="Principal"><sc-for list="{{tabs3}}" as="t" hint-placeholder-count="4"><a href="#" class="{{t.cls}}"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{t.d}}"></path></svg>{{t.l}}</a></sc-for></nav>
+</div></div>
+
+<div><p class="cpt">5 · 404 · 403 · Sesión expirada</p>
+<div class="ph" style="background: var(--bg); gap: 0;">
+<sc-for list="{{errs}}" as="e" hint-placeholder-count="3"><div style="flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; gap: 8px; padding: 16px 28px; border-bottom: 1px solid var(--bd);">
+<span class="xs t3" style="font-weight: 700; letter-spacing: .08em;">{{e.code}}</span>
+<span class="nic" style="width: 48px; height: 48px; background: var(--bg3); color: var(--tx2);"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{e.d}}"></path></svg></span>
+<p style="font-size: 18px; font-weight: 700;">{{e.t}}</p>
+<p class="sm t2">{{e.b}}</p>
+<a href="#" class="btn bo bs">{{e.a}}</a>
+</div></sc-for>
+</div></div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"dark":{"editor":"boolean","default":false},"$preview":{"width":2115,"height":940}}'>
+class Component extends DCLogic {
+renderVals() {
+const T = [
+{l:'Inicio',d:'M3 10l9-7 9 7v10a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z'},
+{l:'Citas',d:'M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z'},
+{l:'Avisos',d:'M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0'},
+{l:'Perfil',d:'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0'}
+];
+const tabs = on => T.map((t,i) => ({...t, cls: i === on ? 'tab on' : 'tab'}));
+const CAL = 'M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z';
+const MSG = 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z';
+const CK = 'M20 6 9 17l-5-5';
+const CL = 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 6v6l4 2';
+const N = (t,b,w,d,kind,unread) => ({t,b,w,d,unread,bg: unread ? 'var(--prs)' : 'transparent', ib: kind === 'x' ? 'var(--oub)' : (kind === 'ok' ? 'var(--okb)' : 'var(--bg3)'), ic: kind === 'x' ? 'var(--out)' : (kind === 'ok' ? 'var(--okt)' : 'var(--tx2)')});
+const today = [
+N('Nueva recomendación','La Dra. Salazar dejó indicaciones para Valentina.','Hace 2 h',MSG,'n',true),
+N('Recordatorio de cita','Tomás · mañana mié 11, 10:30.','Hace 3 h',CAL,'n',true)
+];
+const week = [
+N('Cita confirmada','Valentina · jue 10 dic, 09:00.','Lun 9 nov',CK,'ok',false),
+N('Vacuna atrasada','Valentina · SRP 1.ª dosis (ejemplo).','Sáb 7 nov',CL,'x',false)
+];
+const errs = [
+{code:'404',t:'No encontramos esta página',b:'Puede que el enlace esté mal escrito o ya no exista.',a:'Ir al inicio',d:'M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM21 21l-4.3-4.3'},
+{code:'403',t:'No tiene acceso',b:'Esta ficha pertenece a otro representante o a otra área.',a:'Volver',d:'M5 11h14v10H5zM8 11V7a4 4 0 0 1 8 0v4'},
+{code:'SESIÓN',t:'Su sesión expiró',b:'Por seguridad cerramos la sesión tras un tiempo sin uso.',a:'Ingresar de nuevo',d:CL}
+];
+return { theme: this.props.dark ? 'cp dark' : 'cp', today, week, errs, tabs2: tabs(2), tabs3: tabs(3) };
+}
+}
+</script>
+</body>
+</html>

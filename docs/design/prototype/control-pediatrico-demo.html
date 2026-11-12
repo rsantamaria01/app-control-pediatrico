@@ -1,0 +1,1314 @@
+<title>Control Pediátrico Demo</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: guía a la izquierda + teléfono interactivo a la derecha; en teléfono, la app ocupa todo el ancho y la guía va debajo. */
+:root{
+  --bg:#eef3f2;--surface:#ffffff;--surface2:#f8fafc;--line:#e2e8f0;--line2:#cbd5e1;
+  --ink:#0f172a;--ink2:#475569;--ink3:#64748b;
+  --pri:#0f766e;--pri-ink:#ffffff;--pri-soft:#f0fdfa;--pri-soft-ink:#115e59;
+  --ok-bg:#dcfce7;--ok-ink:#166534;--wa-bg:#fef9c3;--wa-ink:#713f12;--ri-bg:#ffedd5;--ri-ink:#9a3412;--ou-bg:#fee2e2;--ou-ink:#991b1b;--na-bg:#f1f5f9;--na-ink:#475569;
+  --c-med:#334155;--c-sd1:#ca8a04;--c-sd2:#ea580c;--c-sd3:#dc2626;--c-grid:#f1f5f9;--c-axis:#cbd5e1;--c-band-ok:#16a34a;--c-band-wa:#eab308;--c-band-ri:#ea580c;--c-pt:#1d4ed8;
+  --font:"Inter",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --shadow:0 20px 50px rgba(15,23,42,.12);
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:15px;line-height:1.45;font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased}
+h1,h2,h3,p{margin:0}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--pri);outline-offset:2px}
+.wrap{max-width:1120px;margin:0 auto;padding-block:16px 32px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:16px}
+
+/* top bar */
+.top{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:10px;margin-right:auto}
+.brand b{font-size:16px}
+.brand small{display:block;font-size:12px;color:var(--ink3)}
+.roles{display:inline-flex;padding:4px;border-radius:12px;background:var(--surface);border:1px solid var(--line);gap:2px;flex-wrap:wrap}
+.roles button{border:0;background:transparent;min-height:40px;padding:0 14px;border-radius:9px;font-weight:600;font-size:14px;color:var(--ink2);cursor:pointer}
+.roles button[aria-pressed="true"]{background:var(--pri);color:var(--pri-ink)}
+.cbtn{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 14px;border-radius:10px;border:1px solid var(--line2);background:var(--surface);font-weight:600;font-size:14px;cursor:pointer}
+.fmt button{display:inline-flex;align-items:center;gap:6px}
+@media (max-width:760px){.fmt{display:none}}
+
+/* formato escritorio */
+.wrap.desk{max-width:1440px}
+.stage.desk{flex-direction:column;gap:20px}
+.stage.desk .guide{max-width:none;order:2;display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:12px 24px;align-items:start}
+.stage.desk .guide > .eyebrow,.stage.desk .guide > h2,.stage.desk .guide > p:not(.note):not(.pending){grid-column:1}
+.stage.desk .guide > .try,.stage.desk .guide > .pending,.stage.desk .guide > .note{grid-column:2}
+.side-brand{display:none}
+.device.desk{width:100%;height:820px;border-radius:18px;margin:0;flex-direction:row}
+.device.desk.topnav{flex-direction:column}
+.device.desk .tabbar{order:-1}
+.device.desk.sidenav .tabbar{flex-direction:column;width:236px;flex:none;min-height:0;border-top:0;border-right:1px solid var(--line);padding:14px 12px;gap:2px;justify-content:flex-start}
+.device.desk.topnav .tabbar{border-top:0;border-bottom:1px solid var(--line);min-height:64px;padding:0 20px;gap:4px;align-items:center}
+.device.desk .tabbar button{flex:none;flex-direction:row;justify-content:flex-start;gap:10px;font-size:14px;min-height:44px;padding:0 12px;border-radius:10px}
+.device.desk .tabbar button[aria-current="page"]{background:var(--pri-soft)}
+.device.desk .tabbar .dot{position:static;margin-left:auto}
+.device.desk.topnav .tabbar .dot{margin-left:4px}
+.device.desk .side-brand{display:flex;align-items:center;gap:10px;padding:4px 8px 14px;font-weight:700}
+.device.desk.topnav .side-brand{padding:0;margin-right:auto}
+.device.desk .side-brand small{display:block;font-weight:500;font-size:12px;color:var(--ink3)}
+.device.desk .bar .mark{display:none}
+.device.desk .bar{padding-left:24px}
+.device.desk .bar.back{padding-left:12px}
+.device.desk .screen .body{max-width:1120px;width:100%;margin:0 auto;padding:24px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}
+.device.desk .body > *{grid-column:1/-1}
+.device.desk .body > .half{grid-column:auto}
+.device.desk.narrow .screen .body{max-width:720px;display:flex}
+.device.desk .hscroll{flex-wrap:wrap;overflow:visible}
+.device.desk .mini{flex:1 1 170px}
+.device.desk .chip{min-width:150px}
+.device.desk .chartbox svg{max-height:440px}
+.device.desk .hero{padding:48px 24px 32px}
+
+/* stage */
+.stage{display:flex;gap:28px;align-items:flex-start;flex-wrap:wrap}
+.guide{flex:1 1 280px;max-width:420px;min-width:0;display:flex;flex-direction:column;gap:14px;padding-top:8px}
+.guide .eyebrow{font-size:12px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--pri-soft-ink)}
+.guide h2{font-size:24px;font-weight:700;letter-spacing:-.015em;text-wrap:balance}
+.guide p{color:var(--ink2)}
+.try{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+.try b{display:block;font-size:13px;margin-bottom:6px}
+.try ul{margin:0;padding-left:18px;color:var(--ink2);font-size:14px;display:flex;flex-direction:column;gap:4px}
+.note{font-size:13px;color:var(--ink3)}
+.pending{font-size:13px;background:var(--wa-bg);color:var(--wa-ink);border-radius:10px;padding:10px 12px}
+
+.device{flex:none;width:390px;max-width:100%;height:790px;background:var(--surface2);border:1px solid var(--line2);border-radius:38px;box-shadow:var(--shadow);overflow:hidden;display:flex;flex-direction:column;margin-left:auto}
+.screen{flex:1;overflow-y:auto;overflow-x:hidden;position:relative;scroll-behavior:smooth}
+@media (max-width:760px){
+  .stage{flex-direction:column;gap:20px}
+  .device{order:-1;width:100%;margin:0;height:auto;min-height:640px;border-radius:24px}
+  .screen{overflow:visible}
+  .guide{max-width:none}
+}
+@media (prefers-reduced-motion: reduce){.screen{scroll-behavior:auto}*{transition:none!important;animation:none!important}}
+
+/* app chrome */
+.bar{position:sticky;top:0;z-index:5;min-height:56px;display:flex;align-items:center;gap:4px;padding:0 8px 0 16px;background:var(--surface);border-bottom:1px solid var(--line)}
+.bar h1{font-size:17px;font-weight:600;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar.back{padding-left:4px}
+.ib{width:44px;height:44px;border:0;background:transparent;border-radius:10px;display:inline-flex;align-items:center;justify-content:center;color:var(--ink2);cursor:pointer;flex:none}
+.body{padding:16px;display:flex;flex-direction:column;gap:14px}
+.tabbar{flex:none;display:flex;border-top:1px solid var(--line);background:var(--surface);min-height:64px}
+.tabbar button{flex:1;border:0;background:transparent;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:11px;font-weight:500;color:var(--ink3);cursor:pointer;position:relative}
+.tabbar button[aria-current="page"]{color:var(--pri-soft-ink);font-weight:700}
+.tabbar .dot{position:absolute;top:10px;left:calc(50% + 6px);min-width:16px;height:16px;padding:0 4px;border-radius:99px;background:var(--pri);color:var(--pri-ink);font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center}
+@media (max-width:760px){.tabbar{position:sticky;bottom:0;z-index:6;padding-bottom:env(safe-area-inset-bottom,0px)}}
+
+.ic{width:20px;height:20px;flex:none;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.ic.s{width:16px;height:16px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px}
+.pad{padding:14px}
+.h{font-size:15px;font-weight:600}
+.big{font-size:22px;font-weight:700;letter-spacing:-.01em}
+.sm{font-size:13px}.xs{font-size:12px}.t2{color:var(--ink2)}.t3{color:var(--ink3)}
+.row{display:flex;align-items:center;gap:10px}
+.between{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:48px;padding:0 16px;border-radius:12px;border:1px solid transparent;font-weight:600;font-size:15px;cursor:pointer;text-decoration:none;white-space:nowrap}
+.btn.p{background:var(--pri);color:var(--pri-ink)}
+.btn.o{background:var(--surface);border-color:var(--line2);color:var(--ink)}
+.btn.g{background:transparent;color:var(--pri-soft-ink)}
+.btn.sm2{min-height:40px;font-size:14px;padding:0 12px;border-radius:10px}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+.btn.danger{color:var(--ou-ink)}
+.full{width:100%}
+.badge{display:inline-flex;align-items:center;gap:4px;height:24px;padding:0 8px;border-radius:99px;font-size:12px;font-weight:600;white-space:nowrap}
+.ok{background:var(--ok-bg);color:var(--ok-ink)}.wa{background:var(--wa-bg);color:var(--wa-ink)}.ri{background:var(--ri-bg);color:var(--ri-ink)}.ou{background:var(--ou-bg);color:var(--ou-ink)}.na{background:var(--na-bg);color:var(--na-ink)}.pr{background:var(--pri-soft);color:var(--pri-soft-ink)}
+.av{width:40px;height:40px;border-radius:99px;background:var(--na-bg);color:var(--ink2);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex:none}
+.av.pr{background:var(--pri-soft);color:var(--pri-soft-ink)}
+.list{overflow:hidden}
+.li{width:100%;display:flex;align-items:center;gap:12px;padding:12px 14px;border:0;border-top:1px solid var(--line);background:transparent;text-align:left;cursor:pointer;min-height:64px}
+.list .li:first-of-type{border-top:0}
+.li .grow{flex:1;min-width:0}
+.li .name{font-weight:600}
+.hscroll{display:flex;gap:10px;overflow-x:auto;padding-bottom:4px;scrollbar-width:thin}
+.chip{flex:none;border:1px solid var(--line2);background:var(--surface);border-radius:12px;padding:10px 12px;text-align:left;cursor:pointer;min-height:44px}
+.chip[aria-pressed="true"]{border-color:var(--pri);background:var(--pri);color:var(--pri-ink)}
+.chip[disabled]{opacity:.4;cursor:not-allowed;text-decoration:line-through}
+.seg{display:flex;padding:3px;border-radius:11px;background:var(--na-bg);gap:2px}
+.seg button{flex:1;border:0;background:transparent;min-height:38px;border-radius:8px;font-size:13px;font-weight:500;color:var(--ink2);cursor:pointer;padding:0 8px;white-space:nowrap}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);font-weight:700;box-shadow:0 1px 2px rgba(15,23,42,.1)}
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);overflow-x:auto}
+.tabs button{border:0;background:transparent;min-height:44px;padding:0 12px;font-weight:500;color:var(--ink2);border-bottom:2px solid transparent;margin-bottom:-1px;cursor:pointer;white-space:nowrap}
+.tabs button[aria-selected="true"]{color:var(--pri-soft-ink);border-color:var(--pri);font-weight:700}
+.field label,.lbl{display:block;font-size:13px;font-weight:500;color:var(--ink2);margin-bottom:6px}
+.inp{display:flex;align-items:center;gap:8px;min-height:48px;border:1px solid var(--line2);border-radius:12px;background:var(--surface);padding:0 12px}
+.inp:focus-within{border-color:var(--pri);box-shadow:0 0 0 3px var(--pri-soft)}
+.inp input,.inp select,textarea{border:0;outline:0;background:transparent;color:var(--ink);font:inherit;font-size:16px;width:100%;min-width:0}
+textarea{display:block;min-height:76px;border:1px solid var(--line2);border-radius:12px;background:var(--surface);padding:10px 12px;resize:vertical}
+textarea:focus{border-color:var(--pri);box-shadow:0 0 0 3px var(--pri-soft)}
+.unit{color:var(--ink3);font-size:13px}
+.g2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.g3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.g4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.radio{display:flex;gap:8px}
+.radio button{flex:1;min-height:48px;border:1px solid var(--line2);border-radius:12px;background:var(--surface);font-weight:500;cursor:pointer;display:flex;align-items:center;gap:10px;padding:0 12px}
+.radio button::before{content:"";width:16px;height:16px;border-radius:99px;border:2px solid var(--line2);flex:none}
+.radio button[aria-checked="true"]{border-color:var(--pri);background:var(--pri-soft);color:var(--pri-soft-ink)}
+.radio button[aria-checked="true"]::before{border:5px solid var(--pri)}
+.alert{display:flex;gap:10px;padding:10px 12px;border-radius:12px;font-size:13px}
+.kv{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-top:1px solid var(--line)}
+.kv:first-child{border-top:0}
+.status{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--line)}
+.sic{width:30px;height:30px;border-radius:99px;display:flex;align-items:center;justify-content:center;flex:none}
+.cardbtn{width:100%;text-align:left;cursor:pointer;display:flex;flex-direction:column;gap:10px}
+.mini{min-width:150px;display:flex;flex-direction:column;gap:6px;padding:12px;border-radius:12px;border:1px solid var(--line);background:var(--surface)}
+.mini.on{border-color:var(--pri)}
+.chartbox{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:10px 6px 8px}
+.chartbox svg{display:block;width:100%;height:auto}
+.legend{display:flex;gap:12px;flex-wrap:wrap;padding:6px 8px 0;font-size:12px;color:var(--ink2)}
+.legend i{display:inline-block;width:16px;height:3px;border-radius:2px;margin-right:6px;vertical-align:middle}
+.tip{font-size:13px;padding:10px 12px;border-radius:12px;background:var(--surface);border:1px solid var(--line2)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;font-weight:500;color:var(--ink3);font-size:12px;padding:8px 10px;border-bottom:1px solid var(--line)}
+td{padding:9px 10px;border-bottom:1px solid var(--line)}
+td.r,th.r{text-align:right}
+.otp{letter-spacing:.6em;font-size:24px;font-weight:700;text-align:center}
+.check{display:flex;gap:12px;align-items:flex-start;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--surface);cursor:pointer;text-align:left;width:100%}
+.box{width:22px;height:22px;border-radius:6px;border:2px solid var(--line2);flex:none;display:flex;align-items:center;justify-content:center;color:var(--pri-ink);margin-top:1px}
+.check[aria-checked="true"] .box{background:var(--pri);border-color:var(--pri)}
+.sw{width:46px;height:28px;border-radius:99px;background:var(--line2);border:0;position:relative;cursor:pointer;flex:none}
+.sw::after{content:"";position:absolute;left:3px;top:3px;width:22px;height:22px;border-radius:99px;background:#fff;transition:left .15s}
+.sw[aria-checked="true"]{background:var(--pri)}
+.sw[aria-checked="true"]::after{left:21px;background:var(--pri-ink)}
+.center{display:flex;flex-direction:column;align-items:center;text-align:center;gap:10px}
+.hero{background:var(--pri-soft);padding:28px 20px 20px}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(24px + env(safe-area-inset-bottom,0px));z-index:50;max-width:min(420px,calc(100% - 32px));background:var(--ink);color:var(--surface);padding:12px 16px;border-radius:12px;font-size:14px;font-weight:500;box-shadow:var(--shadow)}
+.hl{background:var(--pri-soft);color:var(--pri-soft-ink);padding:0 4px;border-radius:4px;font-weight:600}
+.empty{padding:24px 14px;text-align:center;color:var(--ink3);font-size:14px}
+
+/* informe PDF (hoja A4 a 96 dpi: 794 × 1123 px), siempre papel blanco */
+.rtools{position:sticky;top:56px;z-index:4;display:flex;gap:8px;flex-wrap:wrap;padding:10px 16px;background:var(--surface);border-bottom:1px solid var(--line)}
+.pages{padding:16px;display:flex;flex-direction:column;align-items:center;gap:16px;background:#e2e8f0}
+.a4wrap{width:100%;max-width:794px;overflow:hidden}
+.a4{width:794px;height:1123px;background:#fff;color:#0f172a;transform-origin:top left;padding:44px 52px;display:flex;flex-direction:column;gap:16px;font-size:12px;line-height:1.45;box-shadow:0 4px 18px rgba(15,23,42,.15)}
+.a4 h2{font-size:13px;font-weight:700;margin-bottom:6px}
+.a4 .k{font-size:10.5px;color:#64748b}
+.a4 table{font-size:11.5px}.a4 th{color:#64748b;font-size:10.5px;padding:6px 8px;border-bottom:1px solid #e2e8f0}.a4 td{padding:6px 8px;border-bottom:1px solid #e2e8f0}
+.a4 .rh{display:flex;align-items:center;gap:14px;padding-bottom:12px;border-bottom:2px solid #0f766e}
+.a4 .rg{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px 16px;padding:10px 12px;background:#f8fafc;border-radius:8px}
+.a4 .rbox{border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px}
+.a4 .rfoot{margin-top:auto;display:flex;justify-content:space-between;align-items:flex-end;border-top:1px solid #e2e8f0;padding-top:10px}
+.a4 .tag{display:inline-block;padding:1px 7px;border-radius:99px;font-size:10.5px;font-weight:600;background:#f1f5f9;color:#475569}
+.a4 .tag.f{background:#ffedd5;color:#9a3412}.a4 .tag.ok{background:#dcfce7;color:#166534}.a4 .tag.x{background:#fee2e2;color:#991b1b}
+.a4 .soft{background:#f0fdfa;border-radius:8px;padding:10px 12px}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <svg viewBox="0 0 64 64" width="36" height="36" aria-hidden="true"><rect width="64" height="64" rx="14" style="fill:var(--pri)"/><path d="M14 46C24 44 30 36 36 28S46 18 50 17" fill="none" style="stroke:var(--pri-ink)" stroke-width="5" stroke-linecap="round"/><circle cx="50" cy="17" r="5" style="fill:var(--pri-ink)"/></svg>
+      <div><b>Control Pediátrico</b><small>Demo interactiva · datos ficticios</small></div>
+    </div>
+    <div class="roles" role="group" aria-label="Ver la app como">
+      <button type="button" data-role="medico">Médico</button>
+      <button type="button" data-role="padres">Padres</button>
+      <button type="button" data-role="asistente">Asistente</button>
+      <button type="button" data-role="nueva">Familia nueva</button>
+      <button type="button" data-role="admin">Admin</button>
+      <button type="button" data-role="acceso">Acceso y sistema</button>
+    </div>
+    <div class="roles fmt" role="group" aria-label="Formato">
+      <button type="button" data-fmt="phone"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 2h8a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zM11 18h2"/></svg>Teléfono</button>
+      <button type="button" data-fmt="desk"><svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1zM8 20h8M12 16v4"/></svg>Escritorio</button>
+    </div>
+    <button type="button" class="cbtn" id="commentBtn" hidden>
+      <svg class="ic s" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Comentar esta pantalla
+    </button>
+  </header>
+
+  <div class="stage" id="stage">
+    <aside class="guide" id="guide" aria-live="polite"></aside>
+    <div class="device" id="device">
+      <div class="screen" id="screen" data-comment-target></div>
+      <nav class="tabbar" id="tabbar" aria-label="Navegación de la app"></nav>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script>
+(() => {
+/* ---------- icons ---------- */
+const P = {
+  home:'M3 10l9-7 9 7v10a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z',
+  users:'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8',
+  cal:'M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z',
+  bell:'M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0',
+  user:'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0',
+  back:'m15 18-6-6 6-6', next:'m9 18 6-6-6-6', x:'M18 6 6 18M6 6l12 12', plus:'M12 5v14M5 12h14',
+  search:'M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM21 21l-4.3-4.3',
+  check:'M20 6 9 17l-5-5', clock:'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 6v6l4 2',
+  ok:'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM9 12l2 2 4-4',
+  eye:'M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z',
+  tri:'M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0zM12 9v4M12 17h.01',
+  oct:'M7.9 2h8.2L22 7.9v8.2L16.1 22H7.9L2 16.1V7.9zM12 8v4M12 16h.01',
+  lock:'M5 11h14v10H5zM8 11V7a4 4 0 0 1 8 0v4', file:'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M8 13h8M8 17h5',
+  dl:'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3', inbox:'M22 12h-6l-2 3h-4l-2-3H2M5.5 5.1 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.9A2 2 0 0 0 16.8 4H7.2a2 2 0 0 0-1.7 1.1z',
+  send:'M22 2 11 13M22 2l-7 20-4-9-9-4z', pin:'M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0zM12 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6z',
+  msg:'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z', down:'M22 17l-8.5-8.5-5 5L2 7M16 17h6v-6', flat:'M5 12h14M13 6l6 6-6 6', up:'M22 7l-8.5 8.5-5-5L2 17M16 7h6v6'
+};
+const ic = (k, cls='') => `<svg class="ic ${cls}" viewBox="0 0 24 24" aria-hidden="true"><path d="${P[k]}"/></svg>`;
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const f = (n, d=2) => (Math.round(n * 10**d) / 10**d).toFixed(d).replace('.', ',');
+const fz = z => (z < 0 ? '−' : '+') + f(Math.abs(z), 2);
+const num = s => parseFloat(String(s).replace(',', '.'));
+
+/* ---------- illustrative growth model (NOT real WHO tables) ---------- */
+const MED = {0:3.23,1:4.19,2:5.13,3:5.85,4:6.42,5:6.9,6:7.3,7:7.64,8:7.95,9:8.23,10:8.5,11:8.74,12:8.95,15:9.6,18:10.2,21:10.9,24:11.5};
+const KS = Object.keys(MED).map(Number).sort((a,b)=>a-b);
+const M = a => { for (let i=0;i<KS.length-1;i++){const x0=KS[i],x1=KS[i+1]; if(a>=x0&&a<=x1){const t=(a-x0)/(x1-x0);return MED[x0]+t*(MED[x1]-MED[x0]);}} return MED[24]; };
+const L = 0.25, S = a => 0.14 - 0.015*Math.min(a,12)/12;
+const wAt = (z,a) => M(a)*Math.pow(1+L*S(a)*z, 1/L);
+const zW = (w,a) => (Math.pow(w/M(a), L) - 1) / (L*S(a));
+const interp = (T, a) => { const k = Object.keys(T).map(Number).sort((x,y)=>x-y); for (let i=0;i<k.length-1;i++){ if (a>=k[i]&&a<=k[i+1]){ const t=(a-k[i])/(k[i+1]-k[i]); return T[k[i]]+t*(T[k[i+1]]-T[k[i]]); } } return T[k[k.length-1]]; };
+const LEN = {0:49.1,1:53.7,2:57.1,3:59.8,4:62.1,6:65.7,9:70.1,12:74.0,15:77.5,18:80.7,21:83.7,24:86.4};
+const HC = {0:33.9,1:36.5,2:38.3,3:39.5,4:40.6,6:42.2,9:43.8,12:44.9,15:45.7,18:46.2,21:46.7,24:47.2};
+const lenAt = (z,a) => interp(LEN,a)*(1+0.035*z), pcAt = (z,a) => interp(HC,a) + 1.25*z;
+const zLen = (cm,a) => (cm/interp(LEN,a) - 1) / 0.035; // aprox. niña, ilustrativo
+const zPC = (cm,a) => (cm - interp(HC,a)) / 1.25;
+const zWL = (w,cm) => (w - (9.6 + 0.13*(cm-76.4))) / 0.92;
+const zBMI = (w,cm,a) => (w/((cm/100)**2) - 16.3) / 1.5;
+
+/* Nombres OMS por indicador (respuesta de la doctora). Sin «Vigilar/Riesgo»: se muestra la Z y se marca solo lo que tiene nombre clínico. */
+function clinName(ind, z, years) {
+  if (z == null || isNaN(z)) return null;
+  if (ind === 'talla') return z < -3 ? 'Talla baja severa' : z < -2 ? 'Talla baja' : null;
+  if (ind === 'peso') return z < -3 ? 'Bajo peso severo' : z < -2 ? 'Bajo peso' : z > 2 ? (years < 2 ? 'Revisar peso/longitud' : 'Revisar IMC/edad') : null;
+  if (ind === 'pt' || ind === 'imc') {
+    if (years >= 5) return z < -3 ? 'Delgadez severa' : z < -2 ? 'Delgadez' : z > 2 ? 'Obesidad' : z > 1 ? 'Sobrepeso' : null;
+    return z < -3 ? 'Emaciación severa' : z < -2 ? 'Emaciación' : z > 3 ? 'Obesidad' : z > 2 ? 'Sobrepeso' : z > 1 ? 'Riesgo de sobrepeso' : null;
+  }
+  if (ind === 'pc') return z < -2 ? 'Microcefalia' : z > 2 ? 'Macrocefalia' : null;
+  return null;
+}
+const zChip = (z, ind, years=1.3) => {
+  const n = clinName(ind, z, years), out = Math.abs(z) > 2;
+  if (!n) return `<span class="badge na">Z ${fz(z)}</span>`;
+  return `<span class="badge ${out ? 'ri' : 'wa'}">${ic(out ? 'tri' : 'eye','s')}${n} · ${fz(z)}</span>`;
+};
+const zBadge = z => zChip(z, 'peso');
+const plain = (thing, z) => Math.abs(z) <= 2
+  ? {t:`${thing}: dentro del rango esperado`, k:'ok'}
+  : {t:`${thing}: fuera del rango esperado. La doctora lo revisará con usted`, k:'ri'};
+
+/* ---------- demo data (fictional) ---------- */
+const S0 = () => ({
+  route: 'medico-inicio',
+  meas: [
+    {d:'6 jul 2025',a:0,w:3.1,l:49.0,pc:33.6},{d:'6 ago 2025',a:1,w:4.0,l:53.4,pc:36.4},{d:'6 sep 2025',a:2,w:4.8,l:56.8,pc:38.0},
+    {d:'6 nov 2025',a:4,w:5.9,l:61.5,pc:40.1},{d:'6 ene 2026',a:6,w:6.6,l:64.9,pc:41.6},{d:'6 abr 2026',a:9,w:7.2,l:69.0,pc:43.0},
+    {d:'7 jul 2026',a:12,w:7.7,l:72.6,pc:44.0},{d:'5 oct 2026',a:15,w:8.1,l:75.4,pc:44.6}
+  ],
+  recs: [{d:'5 oct 2026', t:'Iniciar leche entera; mantener lactancia si la desea. Control en un mes.', ind:''}],
+  draft: {w:'8,20', l:'76,4', pc:'44,8', pos:'acostado', note:'', rec:'Ofrecer 3 comidas y 2 refrigerios al día; agregar una cucharadita de aceite a la sopa. Control de peso en 4 semanas.', ind:'Sulfato ferroso gotas (ejemplo): dosis según indicación médica, por 3 meses. Exámenes: biometría hemática y ferritina.'},
+  savedToday: false,
+  dTab: 'crecimiento', dView: 'grafico', dInd: 'peso', sel: null,
+  vac: [
+    {g:'Recién nacido', n:'BCG', s:'a', f:'7 jul 2025'}, {g:'Recién nacido', n:'Hepatitis B', s:'a', f:'7 jul 2025'},
+    {g:'2, 4 y 6 meses', n:'Pentavalente (3 dosis)', s:'a', f:'7 ene 2026'}, {g:'2, 4 y 6 meses', n:'Neumococo (2 dosis)', s:'a', f:'6 nov 2025'},
+    {g:'12 meses', n:'SRP · 1.ª dosis', s:'x', f:'Prevista 6 jul 2026'}, {g:'12 meses', n:'Varicela', s:'a', f:'7 jul 2026'},
+    {g:'18 meses', n:'SRP · 2.ª dosis', s:'p', f:'Prevista 6 ene 2027'}, {g:'18 meses', n:'DPT refuerzo', s:'p', f:'Prevista 6 ene 2027'}
+  ],
+  hitos: [
+    {d:'Motor grueso', n:'Sentarse sin apoyo', w:'3,8–9,2 m', a:'6 m'}, {d:'Motor grueso', n:'Gatear', w:'5,2–13,5 m', a:'8 m'},
+    {d:'Motor grueso', n:'Pararse solo', w:'6,9–16,9 m', a:'13 m'}, {d:'Motor grueso', n:'Caminar solo', w:'8,2–17,6 m', a:null},
+    {d:'Motor fino', n:'Pinza con índice y pulgar', w:'ejemplo · 9–12 m', a:'10 m'}, {d:'Motor fino', n:'Garabatea con un crayón', w:'ejemplo · 15–18 m', a:null},
+    {d:'Lenguaje', n:'Dice 1–2 palabras con sentido', w:'ejemplo · 12 m', a:'12 m'}, {d:'Lenguaje', n:'Dice 3 o más palabras', w:'ejemplo · 15–18 m', a:null},
+    {d:'Social', n:'Señala para mostrar algo', w:'ejemplo · 12–18 m', a:'14 m'}, {d:'Social', n:'Imita juegos simples', w:'ejemplo · 15–18 m', a:null},
+    {d:'Cognitivo', n:'Busca objetos escondidos', w:'ejemplo · 9–12 m', a:'11 m'}, {d:'Cognitivo', n:'Usa objetos como se debe (taza, peine)', w:'ejemplo · 15–18 m', a:null}
+  ],
+  hDom: 'Todos',
+  screens: [
+    {n:'Tamizaje del desarrollo', t:'9 meses', s:'Hecho 6 abr 2026'},
+    {n:'Tamizaje del desarrollo', t:'18 meses', s:'Pendiente · 6 ene 2027'},
+    {n:'Tamizaje de autismo (M-CHAT)', t:'18 meses', s:'Pendiente · 6 ene 2027'},
+    {n:'Tamizaje de autismo (M-CHAT)', t:'24 meses', s:'Pendiente · 6 jul 2027'}
+  ],
+  q: '',
+  patients: [
+    {i:'EZ', n:'Emilia Zambrano', a:'9 meses', ind:'Perímetro cefálico', k:'pc', y:0.75, z:-3.2},
+    {i:'JM', n:'Joaquín Mendoza', a:'3 a 2 m', ind:'Peso para la talla', k:'pt', y:3.2, z:2.62},
+    {i:'MA', n:'Mateo Andrade Vera', a:'7 m · corregida 5 m', ind:'Longitud para la edad', k:'talla', y:0.5, z:-2.41},
+    {i:'LG', n:'Lucas Guerrero', a:'6 años', ind:'IMC para la edad', k:'imc', y:6, z:1.72},
+    {i:'SC', n:'Sofía Cevallos', a:'2 a 1 m', ind:'Talla para la edad', k:'talla', y:2.1, z:-1.85},
+    {i:'VR', n:'Valentina Ríos Cedeño', a:'1 a 4 m', ind:'Peso para la edad', k:'peso', y:1.3, z:null, vr:true},
+    {i:'CO', n:'Camila Ordóñez', a:'2 meses', ind:'Peso para la edad', k:'peso', y:0.2, z:-0.4},
+    {i:'ML', n:'Martina Loor', a:'6 años', ind:'IMC para la edad', k:'imc', y:6, z:0.6}
+  ],
+  ag: seedAgenda(),
+  agView: 'dia', agDay: 10, agSel: null, agMode: null, agForm: {p:'Valentina Ríos', m:'Control de niño sano', day:null, t:null},
+  avail: {days:[['Lun',true,'08:00','17:00'],['Mar',true,'08:00','17:00'],['Mié',true,'08:00','17:00'],['Jue',true,'08:00','17:00'],['Vie',true,'08:00','17:00'],['Sáb',true,'08:00','12:00'],['Dom',false,'08:00','12:00']], lunch:true, slot:'30', first:'45', blocked:['24 dic 2026','25 dic 2026','31 dic 2026'], newBlock:''},
+  requests: [
+    {id:1, p:'Renata Vélez', a:'3 meses', g:'Paula Mora (madre)', when:'mié 11 nov, 09:00', day:11, t:'09:00', ago:'hace 2 días'},
+    {id:2, p:'Gael Suárez', a:'4 años', g:'Diana Suárez (madre)', when:'sáb 14 nov, 09:00', day:14, t:'09:00', ago:'hace 3 h'}
+  ],
+  np: {n:'', a:'', sex:'F', dob:'', ci:'', gw:'', gd:'', bw:'', bl:'', bpc:'', notes:'', ext:false, guards:[{n:'', rel:'Madre', em:'', tel:'', inv:true}]},
+  newPts: [], curNew: null,
+  dNotifs: [
+    {t:'Nueva solicitud de reserva', b:'Gael Suárez · sáb 14 nov, 09:00.', w:'Hace 3 h', k:'inbox', new:true},
+    {t:'Cita confirmada por la familia', b:'Martina Loor · hoy 15:00.', w:'Hace 5 h', k:'check'},
+    {t:'Control atrasado', b:'Isabella Paredes · control de 4 meses.', w:'Ayer', k:'clock'}
+  ],
+  loginAs: 'medico', email: 'maria.cedeno@correo.ec', code: '', codeErr: false, invType: 'padres', invConsent: false, invWa: false, iosHint: false, dataAsk: null,
+  wz: {step:1, name:'Pediatría Demo', color:'#0f766e', addr:'Av. Ejemplo 123, Guayaquil', tel:'04 000 0000', doc:'Andrea Salazar', docEm:'andrea.salazar@pediatria-demo.ec', rc:true, rv:true, rr:true, done:false},
+  uTab: 'equipo', uInvite: null, uForm: {n:'', em:'', rol:'Asistente', child:'Valentina'},
+  team: [
+    {id:1, n:'Dra. Andrea Salazar', em:'andrea.salazar@pediatria-demo.ec', r:'Médico · Admin', on:true, s:'Activo'},
+    {id:2, n:'Dr. Felipe Arteaga', em:'felipe.arteaga@pediatria-demo.ec', r:'Médico', on:true, s:'Activo'},
+    {id:3, n:'Adelita Mora', em:'adelita@pediatria-demo.ec', r:'Asistente', on:true, s:'Activo'}
+  ],
+  parents: [
+    {id:1, n:'María Cedeño', em:'maria.cedeno@correo.ec', kids:['Valentina','Tomás'], on:true, s:'Activo'},
+    {id:2, n:'Jorge Ríos', em:'jorge.rios@correo.ec', kids:['Valentina'], on:true, s:'Invitación pendiente'},
+    {id:3, n:'Paula Mora', em:'paula.mora@correo.ec', kids:['Renata'], on:true, s:'Activo'}
+  ],
+  cTab: 'recordatorios', prov: 'meta', rules: [['Cita próxima · 24 h antes',true],['Cita próxima · 2 h antes',true],['Control por vencer · 7 días antes',true],['Control atrasado · cada 7 días, máx. 3',true],['Vacuna por aplicar o atrasada',true],['Tamizaje del desarrollo / autismo',true],['Nueva recomendación o indicación',true]],
+  auTab: 'registro', auUser: 'Todos', auAct: 'Todas',
+  dataReqs: [
+    {id:1, who:'Jorge Paz', type:'Eliminación', d:'Pide eliminar su cuenta.', s:'Abierta', due:'Vence en 9 días'},
+    {id:2, who:'María Cedeño', type:'Exportación', d:'Pide exportar los datos de Valentina y Tomás.', s:'Abierta', due:'Vence en 13 días'}
+  ],
+  pTab: 'crecimiento', pMeasure: 'peso', pDetails: false,
+  book: {child:'Valentina', day:null, slot:null, confirmed:null, cancelAsk:false},
+  notifs: [
+    {t:'Recordatorio de cita', b:'Tomás · mañana mié 11, 10:30.', w:'Hace 3 h', k:'cal'},
+    {t:'Vacuna atrasada', b:'Valentina · SRP 1.ª dosis (ejemplo).', w:'Sáb 7 nov', k:'clock', x:true}
+  ],
+  chan: {email:true, wa:true, app:false},
+  nf: {day:null, slot:null, cn:'Renata', ca:'Vélez Mora', sex:'F', dob:'02/08/2026', gn:'Paula Mora', rel:'Madre', em:'paula.mora@correo.ec', tel:'99 000 0000', consent:false, otp:''},
+  nextId: 3
+});
+let st = S0();
+
+const valAge = () => st.savedToday ? 16.1 : 15;
+const last = () => st.meas[st.meas.length-1];
+const latestZ = () => { const m = last(); return { w: zW(m.w,m.a), l: zLen(m.l,m.a), wl: zWL(m.w,m.l), bmi: zBMI(m.w,m.l,m.a), pc: zPC(m.pc,m.a) }; };
+const prevZ = () => { const m = st.meas[st.meas.length-2]; return { w: zW(m.w,m.a), l: zLen(m.l,m.a), wl: zWL(m.w,m.l), bmi: zBMI(m.w,m.l,m.a), pc: zPC(m.pc,m.a) }; };
+
+/* ---------- chart ---------- */
+const CF = {
+  peso:{at:(z,a)=>wAt(z,a), min:1.5, max:15.5, ticks:[2,4,6,8,10,12,14], y:'Peso (kg)', v:m=>m.w, z:m=>zW(m.w,m.a), u:'kg', d:2, name:'Peso', t:'Peso para la edad'},
+  talla:{at:(z,a)=>lenAt(z,a), min:42, max:96, ticks:[45,55,65,75,85,95], y:'Longitud (cm)', v:m=>m.l, z:m=>zLen(m.l,m.a), u:'cm', d:1, name:'Estatura', t:'Longitud para la edad'},
+  pc:{at:(z,a)=>pcAt(z,a), min:29, max:52, ticks:[30,35,40,45,50], y:'Perímetro cefálico (cm)', v:m=>m.pc, z:m=>zPC(m.pc,m.a), u:'cm', d:1, name:'Tamaño de la cabeza', t:'Perímetro cefálico para la edad'}
+};
+function chart(variant, ind='peso') {
+  const doc = variant === 'medico', c = CF[ind];
+  const W=360,H=230,x0=38,x1=336,y0=192,y1=10;
+  const X = a => x0 + (x1-x0)*a/24, Y = v => y0 - (y0-y1)*(v-c.min)/(c.max-c.min);
+  const ages = Array.from({length:25},(_,i)=>i);
+  const line = z => ages.map((a,i)=>`${i?'L':'M'}${X(a).toFixed(1)},${Y(c.at(z,a)).toFixed(1)}`).join(' ');
+  const band = (za,zb) => line(za) + ' ' + ages.slice().reverse().map(a=>`L${X(a).toFixed(1)},${Y(c.at(zb,a)).toFixed(1)}`).join(' ') + 'Z';
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${c.t}, niña, 0 a 2 años${doc ? ', curvas de menos 3 a más 3 desviaciones' : ', rango esperado'} y mediciones de Valentina">`;
+  s += `<path d="${band(-2,2)}" style="fill:var(--c-band-ok)" fill-opacity="${doc?'.08':'.14'}"/>`;
+  c.ticks.forEach(t => { s += `<path d="M${x0},${Y(t).toFixed(1)}H${x1}" style="stroke:var(--c-grid)"/><text x="${x0-6}" y="${(Y(t)+3.5).toFixed(1)}" text-anchor="end" font-size="9" style="fill:var(--ink3)">${t}</text>`; });
+  for (let a=0; a<=24; a+=6) s += `<text x="${X(a).toFixed(1)}" y="${y0+14}" text-anchor="middle" font-size="9" style="fill:var(--ink3)">${a}</text>`;
+  s += `<text x="${(x0+x1)/2}" y="${H-6}" text-anchor="middle" font-size="9.5" font-weight="500" style="fill:var(--ink2)">Edad (meses)</text>`;
+  s += `<text x="9" y="${(y0+y1)/2}" text-anchor="middle" font-size="9" font-weight="500" transform="rotate(-90 9 ${(y0+y1)/2})" style="fill:var(--ink2)">${c.y}</text>`;
+  s += `<path d="M${x0},${y1}V${y0}H${x1}" fill="none" style="stroke:var(--c-axis)"/>`;
+  const labs = doc ? [[3,'+3','--c-sd3'],[2,'+2','--c-sd2'],[1,'+1','--c-sd1'],[0,'0','--c-med'],[-1,'−1','--c-sd1'],[-2,'−2','--c-sd2'],[-3,'−3','--c-sd3']] : [[2,'+2','--c-sd2'],[0,'0','--c-med'],[-2,'−2','--c-sd2']];
+  if (doc) {
+    const sty = {3:'stroke:var(--c-sd3);stroke-width:1.4',2:'stroke:var(--c-sd2);stroke-width:1.4',1:'stroke:var(--c-sd1);stroke-width:1;stroke-dasharray:4 3'};
+    [3,2,1].forEach(z => { s += `<path d="${line(z)}" fill="none" style="${sty[z]}"/><path d="${line(-z)}" fill="none" style="${sty[z]}"/>`; });
+  } else {
+    [2,-2].forEach(z => { s += `<path d="${line(z)}" fill="none" style="stroke:var(--c-sd2);stroke-width:1"/>`; });
+  }
+  labs.forEach(([z,t,col]) => { s += `<text x="${x1+3}" y="${(Y(c.at(z,24))+3).toFixed(1)}" font-size="8.5" font-weight="700" style="fill:var(${col})">${t}</text>`; });
+  s += `<path d="${line(0)}" fill="none" style="stroke:var(--c-med);stroke-width:${doc?1.8:1.4}${doc?'':';stroke-dasharray:5 4'}"/>`;
+  const pts = st.meas.map(m => [X(m.a), Y(c.v(m))]);
+  s += `<path d="${pts.map((p,i)=>`${i?'L':'M'}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ')}" fill="none" style="stroke:var(--c-pt)" stroke-width="2.5" stroke-linejoin="round"/>`;
+  pts.forEach((p,i) => {
+    const sel = st.sel === i;
+    if (sel) s += `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="9" style="fill:var(--c-pt)" fill-opacity=".2"/>`;
+    s += `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="${sel?5:3.5}" style="fill:${sel?'var(--c-pt)':'var(--surface)'};stroke:var(--c-pt)" stroke-width="2"/>`;
+    s += `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="13" fill="transparent" data-act="pt" data-arg="${i}" style="cursor:pointer"><title>${esc(st.meas[i].d)}</title></circle>`;
+  });
+  return s + '</svg>';
+}
+function tipFor(i, variant, ind='peso') {
+  if (i == null || !st.meas[i]) return `<p class="xs t3" style="padding:6px 8px 0">Toque un punto para ver la medición.</p>`;
+  const c = CF[ind], m = st.meas[i], z = c.z(m), v = `${f(c.v(m), c.d)} ${c.u}`;
+  const age = m.a < 12 ? `${Math.round(m.a)} m` : `${Math.floor(m.a/12)} a ${Math.round(m.a%12)} m`;
+  if (variant === 'medico') return `<div class="tip between" style="margin:8px 6px 0;flex-wrap:wrap"><span><b>${esc(m.d)}</b> · ${age} · <b>${v}</b></span>${zChip(z, ind)}</div>`;
+  return `<div class="tip" style="margin:8px 6px 0"><b>${esc(m.d)}</b> · ${v} · Z ${fz(z)}<br><span class="t2">${plain(c.name, z).t}</span></div>`;
+}
+
+/* ---------- screens ---------- */
+const bar = (title, back) => back
+  ? `<div class="bar back"><button class="ib" data-go="${back}" aria-label="Volver">${ic('back')}</button><h1>${title}</h1></div>`
+  : `<div class="bar"><svg class="mark" viewBox="0 0 64 64" width="26" height="26" aria-hidden="true"><rect width="64" height="64" rx="14" style="fill:var(--pri)"/><path d="M14 46C24 44 30 36 36 28S46 18 50 17" fill="none" style="stroke:var(--pri-ink)" stroke-width="5" stroke-linecap="round"/></svg><h1 style="margin-left:8px">${title}</h1></div>`;
+
+const R = {};
+
+R['medico-inicio'] = () => {
+  const vz = zW(last().w, last().a), v6 = zW(st.meas[4].w, st.meas[4].a);
+  const out = st.patients.filter(p => !p.vr && Math.abs(p.z) > 2).sort((a,b)=>Math.abs(b.z)-Math.abs(a.z));
+  const other = [
+    {i:'VR', n:'Valentina Ríos Cedeño', vr:true, why:`Peso/edad: Z bajó de ${fz(v6)} (6 m) a ${fz(vz)}`, chip:`<span class="badge na">${ic('down','s')}Tendencia</span>`},
+    ...st.patients.filter(p => !p.vr && Math.abs(p.z) <= 2 && clinName(p.k,p.z,p.y)).map(p => ({...p, why:`${p.ind}`, chip: zChip(p.z,p.k,p.y)}))
+  ];
+  return bar('Pediatría Demo') + `<div class="body">
+  <div><p class="sm t3">Martes 10 de noviembre</p><h2 class="big">Hola, Dra. Salazar</h2></div>
+  <section aria-label="Citas de hoy"><div class="between" style="margin-bottom:8px"><h3 class="h">Citas de hoy · ${todayAppts().length}</h3><button class="btn g sm2" data-go="medico-agenda">Agenda</button></div>
+  <div class="hscroll">${todayAppts().map(a => `<button class="chip" ${a.vr?'data-go="medico-paciente"':'data-act="soon"'} style="min-width:140px;${a.vr?'border-color:var(--pri);background:var(--pri-soft)':''}"><b style="font-size:16px">${a.t}</b><br><span class="sm" style="font-weight:600">${esc(a.p)}</span><br><span class="xs t3">${esc(a.m)}</span></button>`).join('')}</div></section>
+  ${st.requests.length ? `<button class="card pad row" data-go="medico-agenda" style="text-align:left;cursor:pointer"><span class="badge wa">${st.requests.length}</span><span class="sm" style="flex:1;font-weight:600">Solicitudes de reserva pendientes</span>${ic('next','s')}</button>` : ''}
+  <section class="card list half" aria-label="Fuera de ±2 DE"><div class="between pad" style="padding-bottom:4px"><div><h3 class="h">Fuera de ±2 DE</h3><p class="xs t3">Última medición</p></div><span class="badge na">${out.length}</span></div>
+  ${out.map(p => `<button class="li" data-act="soon"><span class="av">${p.i}</span><span class="grow"><span class="name">${esc(p.n)}</span><br><span class="xs t3">${esc(p.a)} · ${esc(p.ind)}</span></span>${zChip(p.z,p.k,p.y)}</button>`).join('')}</section>
+  <section class="card list half" aria-label="Otros para revisar"><div class="pad" style="padding-bottom:4px"><h3 class="h">Cómo vienen creciendo</h3><p class="xs t3">Cambios de carril y alertas dentro de ±2 DE (criterio de tendencia: propuesta)</p></div>
+  ${other.map(p => `<button class="li" ${p.vr?'data-go="medico-paciente"':'data-act="soon"'}><span class="av">${p.i}</span><span class="grow"><span class="name">${esc(p.n)}</span><br><span class="xs t3">${p.why}</span></span>${p.chip}</button>`).join('')}</section>
+  <section class="card list half" aria-label="Controles pendientes"><div class="pad" style="padding-bottom:4px"><h3 class="h">Controles pendientes</h3><p class="xs t3">Calendario AAP: 3–5 días, 1, 2, 4, 6, 9, 12, 15, 18, 24, 30 m, 3 años y anual</p></div>
+  <button class="li" data-act="soon"><span class="av">IP</span><span class="grow"><span class="name">Isabella Paredes</span><br><span class="xs t3">Control de 4 meses</span></span><span class="badge ou">${ic('clock','s')}Atrasado 12 días</span></button>
+  <button class="li" data-act="soon"><span class="av">TV</span><span class="grow"><span class="name">Tomás Villacís</span><br><span class="xs t3">Control de 12 meses</span></span><span class="badge ou">${ic('clock','s')}Atrasado 5 días</span></button>
+  </section></div>`;
+};
+
+R['medico-pacientes'] = () => bar('Pacientes') + `<div class="body">
+  <div class="field"><label for="q">Buscar por nombre o cédula</label><div class="inp">${ic('search','s')}<input id="q" data-bind="q" value="${esc(st.q)}" placeholder="Ej.: Valentina" autocomplete="off"></div></div>
+  <div id="plist">${patientList()}</div>
+  <button class="btn p full" data-go="medico-nuevo">${ic('plus')}Nuevo paciente</button></div>`;
+function patientList() {
+  const q = st.q.trim().toLowerCase();
+  const vz = zW(last().w, last().a);
+  const ps = st.patients.filter(p => !q || p.n.toLowerCase().includes(q));
+  const nps = st.newPts.filter(p => !q || p.n.toLowerCase().includes(q));
+  if (!ps.length && !nps.length) return `<div class="card empty">No hay pacientes que coincidan con «${esc(st.q)}».</div>`;
+  return `<section class="card list">${nps.map(p => `<button class="li" data-act="opennew" data-arg="${p.id}"><span class="av pr">${esc(p.i)}</span><span class="grow"><span class="name">${esc(p.n)}</span><br><span class="xs t3">Nac. ${esc(p.dob)} · sin mediciones</span></span><span class="badge ok">Nuevo</span></button>`).join('')}${ps.map(p => { const z = p.vr ? vz : p.z; return `<button class="li" ${p.vr?'data-go="medico-paciente"':'data-act="soon"'}><span class="av">${p.i}</span><span class="grow"><span class="name">${esc(p.n)}</span><br><span class="xs t3">${esc(p.a)} · ${esc(p.ind)}</span></span>${zChip(z, p.k, p.y)}</button>`; }).join('')}</section>`;
+}
+
+R['medico-paciente'] = () => {
+  const z = latestZ(), pz = prevZ(), m = last();
+  const tr = (a,b) => Math.abs(a-b) < 0.08 ? ['flat','Estable'] : (a < b ? ['down','Bajó'] : ['up','Subió']);
+  const cards = [
+    ['Peso/edad', `${f(m.w)} kg`, z.w, pz.w, 'peso'], ['Longitud/edad', `${f(m.l,1)} cm`, z.l, pz.l, 'talla'], ['Peso/longitud', `${f(m.w)} kg`, z.wl, pz.wl, 'pt'], ['IMC/edad', `${f(m.w/((m.l/100)**2),1)}`, z.bmi, pz.bmi, 'imc'], ['P. cefálico/edad', `${f(m.pc,1)} cm`, z.pc, pz.pc, 'pc']
+  ];
+  let tab = '';
+  if (st.dTab === 'crecimiento') {
+    tab = `<div class="row" style="gap:8px"><div class="inp" style="flex:1;min-height:44px"><select aria-label="Indicador" data-bind="dInd" data-rerender="1">${Object.keys(CF).map(k => `<option value="${k}" ${st.dInd===k?'selected':''}>${CF[k].t}</option>`).join('')}</select></div>
+      <div class="seg" style="flex:none"><button aria-pressed="${st.dView==='grafico'}" data-act="view" data-arg="grafico">Gráfico</button><button aria-pressed="${st.dView==='tabla'}" data-act="view" data-arg="tabla">Tabla</button></div></div>`;
+    tab += st.dView === 'grafico'
+      ? `<div class="chartbox"><div class="between" style="padding:0 8px 6px"><span class="xs" style="font-weight:600">${CF[st.dInd].t} · 0 a 2 años</span><span class="badge na">Niña</span></div>${chart('medico', st.dInd)}<div class="legend"><span><i style="background:var(--c-pt)"></i>Valentina</span><span><i style="background:var(--c-med)"></i>Mediana</span><span><i style="background:var(--c-sd2)"></i>±2</span><span><i style="background:var(--c-sd3)"></i>±3</span></div>${tipFor(st.sel,'medico',st.dInd)}</div>`
+      : `<div class="card" style="overflow-x:auto"><table><thead><tr><th>Fecha</th><th>Edad</th><th class="r">${CF[st.dInd].name} (${CF[st.dInd].u})</th><th class="r">Z</th><th>Clasificación OMS</th></tr></thead><tbody>${st.meas.slice().reverse().map(m => { const c = CF[st.dInd], zz = c.z(m); return `<tr><td>${esc(m.d)}</td><td>${Math.round(m.a)} m</td><td class="r"><b>${f(c.v(m), c.d)}</b></td><td class="r"><b>${fz(zz)}</b></td><td>${clinName(st.dInd, zz, m.a/12) ? zChip(zz, st.dInd) : '<span class="t3">—</span>'}</td></tr>`; }).join('')}</tbody></table></div>`;
+  } else if (st.dTab === 'visitas') {
+    const vs = st.meas.slice().reverse();
+    tab = `<section class="card list">${vs.map((m,i) => `<div class="li" style="cursor:default"><span class="grow"><span class="name">${esc(m.d)}</span><br><span class="xs t3">${f(m.w)} kg · ${f(m.l,1)} cm · PC ${f(m.pc,1)} cm${i===0 && st.savedToday ? ' · <b>nueva</b>' : ''}</span></span>${zBadge(zW(m.w,m.a))}</div>`).join('')}</section>`;
+  } else if (st.dTab === 'vacunas') {
+    let g = '';
+    tab = `<p class="xs t3">Esquema MSP precargado · nombres de <b>ejemplo</b></p><section class="card list">` + st.vac.map((v,i) => {
+      const head = v.g !== g ? `<div class="xs t2" style="padding:8px 14px;background:var(--surface2);font-weight:700;border-top:1px solid var(--line)">${esc(v.g)}</div>` : ''; g = v.g;
+      const b = v.s==='a' ? `<span class="badge ok">${ic('check','s')}Aplicada</span>` : v.s==='x' ? `<span class="badge ou">${ic('clock','s')}Atrasada</span>` : `<span class="badge na">Pendiente</span>`;
+      return head + `<div class="li" style="cursor:default;${v.s==='x'?'background:var(--ou-bg)':''}"><span class="grow"><span class="name">${esc(v.n)}</span><br><span class="xs t3">${esc(v.f)}</span></span>${v.s==='a' ? b : `<button class="btn o sm2" data-act="vac" data-arg="${i}">Registrar</button>`}</div>`;
+    }).join('') + `</section><div class="row" style="gap:8px"><button class="btn o sm2" style="flex:1" data-act="vacpriv">${ic('plus','s')}Vacuna privada</button><button class="btn o sm2" style="flex:1" data-act="catchup">Esquema de recuperación</button></div><p class="xs t3">El esquema MSP es editable por el admin cuando cambie.</p>`;
+  } else if (st.dTab === 'hitos') {
+    const doms = ['Todos','Motor grueso','Motor fino','Lenguaje','Social','Cognitivo'];
+    const hs = st.hitos.map((h,i) => ({...h, i})).filter(h => st.hDom === 'Todos' || h.d === st.hDom);
+    tab = `<div class="hscroll">${doms.map(d => `<button class="chip" style="padding:8px 12px" aria-pressed="${st.hDom===d}" data-act="hdom" data-arg="${d}">${d}</button>`).join('')}</div>
+    <section class="card list">${hs.map(h => `<div class="li" style="cursor:default"><span class="grow"><span class="name">${esc(h.n)}</span><br><span class="xs t3">${esc(h.d)} · ${esc(h.w)}</span></span>${h.a ? `<span class="badge ok">${ic('check','s')}${esc(h.a)}</span>` : `<button class="btn o sm2" data-act="hito" data-arg="${h.i}">Registrar</button>`}</div>`).join('')}</section>
+    <section class="card list"><div class="pad" style="padding-bottom:4px"><h3 class="h">Tamizajes del desarrollo y autismo</h3><p class="xs t3">Recordatorios automáticos según la edad</p></div>
+    ${st.screens.map(s => `<div class="li" style="cursor:default"><span class="grow"><span class="name">${esc(s.n)}</span><br><span class="xs t3">${esc(s.t)}</span></span><span class="badge ${s.s.startsWith('Hecho')?'ok':'na'}">${esc(s.s)}</span></div>`).join('')}</section>
+    <p class="xs t3">Hitos de motor fino, lenguaje, social y cognitivo marcados «ejemplo»: la lista final la define la doctora.</p>`;
+  } else {
+    tab = `<section class="card pad" style="display:flex;flex-direction:column;gap:2px"><div class="kv"><span class="t3">Edad gestacional</span><b>39+2 semanas</b></div><div class="kv"><span class="t3">Peso al nacer</span><b>3,10 kg</b></div><div class="kv"><span class="t3">Talla al nacer</span><b>49,0 cm</b></div><div class="kv"><span class="t3">PC al nacer</span><b>33,6 cm</b></div><div class="kv"><span class="t3">Notas perinatales</span><b>Parto normal</b></div><div class="kv"><span class="t3">Edad corregida</span><b>No aplica (a término)</b></div></section><p class="xs t3">En prematuros se grafica con edad corregida hasta los 24 meses. En prematuros extremos la doctora puede extenderla hasta los 36 meses en la ficha.</p>`;
+  }
+  return bar('Valentina Ríos Cedeño', 'medico-inicio') + `<div class="body">
+  <div class="row" style="gap:6px;flex-wrap:wrap"><span class="badge na">Niña</span><span class="badge na">${st.savedToday?'1 a 4 m':'1 a 4 m'}</span><span class="badge na">Nac. 6 jul 2025</span><span class="badge na">A término</span></div>
+  <p class="sm t2">Representantes: <b style="color:var(--ink)">María Cedeño</b> (madre) · <b style="color:var(--ink)">Jorge Ríos</b> (padre)</p>
+  <div class="row" style="gap:8px"><button class="btn p" style="flex:1" data-go="medico-visita">${ic('plus')}Nueva visita</button><button class="btn o" style="width:48px;padding:0" data-act="soon" aria-label="Agendar cita">${ic('cal')}</button><button class="btn o" style="padding:0 14px" data-go="medico-informe">${ic('file')}Informe PDF</button></div>
+  <p class="xs t3">${st.savedToday ? 'Última medición: hoy' : 'Última medición: 5 oct 2026 · hoy toca control'}</p>
+  <div class="hscroll">${cards.map(([n,v,zz,pp,k],i) => { const t = tr(zz,pp); return `<div class="mini ${i===0?'on':''}"><span class="xs t2">${n}</span><b style="font-size:19px">${v}</b><span>${zChip(zz,k)}</span><span class="xs t3 row" style="gap:4px">${ic(t[0],'s')}${t[1]} (antes ${fz(pp)})</span></div>`; }).join('')}</div>
+  <div class="tabs" role="tablist">${[['crecimiento','Crecimiento'],['visitas','Visitas'],['vacunas','Vacunas'],['hitos','Hitos'],['antecedentes','Antecedentes']].map(([k,l]) => `<button role="tab" aria-selected="${st.dTab===k}" data-act="dtab" data-arg="${k}">${l}${k==='vacunas' && st.vac.some(v=>v.s==='x') ? ' <span class="badge ou" style="height:18px;padding:0 6px">1</span>' : ''}</button>`).join('')}</div>
+  ${tab}</div>`;
+};
+
+R['medico-visita'] = () => {
+  const d = st.draft;
+  return bar('Nueva visita · Valentina', 'medico-paciente') + `<div class="body">
+  <div class="field"><label for="v-f">Fecha</label><div class="inp"><input id="v-f" value="10/11/2026" readonly></div></div>
+  <div class="g2"><div class="field"><label for="v-w">Peso</label><div class="inp"><input id="v-w" inputmode="decimal" data-bind="draft.w" value="${esc(d.w)}"><span class="unit">kg</span></div></div>
+  <div class="field"><label for="v-l">Longitud</label><div class="inp"><input id="v-l" inputmode="decimal" data-bind="draft.l" value="${esc(d.l)}"><span class="unit">cm</span></div></div></div>
+  <div><span class="lbl">Posición <span class="t3" style="font-weight:400">· esperada: acostado (menor de 2 años)</span></span>
+  <div class="radio" role="radiogroup" aria-label="Posición"><button role="radio" aria-checked="${d.pos==='acostado'}" data-act="pos" data-arg="acostado">Acostado</button><button role="radio" aria-checked="${d.pos==='pie'}" data-act="pos" data-arg="pie">De pie</button></div>
+  ${d.pos==='pie' ? `<div class="alert wa" role="alert" style="margin-top:8px">${ic('tri')}<span>Menor de 2 años: normalmente se mide acostado. Si confirma «De pie», se suma 0,7 cm para comparar con la OMS.</span></div>` : ''}</div>
+  <div class="field"><label for="v-pc">Perímetro cefálico</label><div class="inp"><input id="v-pc" inputmode="decimal" data-bind="draft.pc" value="${esc(d.pc)}"><span class="unit">cm</span></div></div>
+  <section class="card" style="overflow:hidden" aria-live="polite"><div class="between" style="padding:10px 14px;background:var(--surface2)"><h3 class="sm" style="font-weight:700">Vista previa Z (en vivo)</h3><span class="xs t3">cambie el peso</span></div><div id="zprev">${zPreview()}</div></section>
+  <div class="field"><label for="v-n" class="row" style="gap:6px">${ic('lock','s')}Nota clínica privada</label><textarea id="v-n" data-bind="draft.note" placeholder="Solo la ve el médico">${esc(d.note)}</textarea></div>
+  <div class="field"><label for="v-r" class="between"><span>Recomendaciones para los padres</span><span class="badge pr">${ic('eye','s')}Visible</span></label><textarea id="v-r" data-bind="draft.rec">${esc(d.rec)}</textarea></div>
+  <div class="field"><label for="v-i" class="between"><span>Indicaciones médicas</span><span class="badge pr">${ic('eye','s')}Visible · va al PDF</span></label><textarea id="v-i" data-bind="draft.ind">${esc(d.ind)}</textarea></div>
+  <button class="btn p full" data-act="save">Guardar visita</button></div>`;
+};
+function zPreview() {
+  const d = st.draft, a = 16.1, w = num(d.w), l = num(d.l) + (d.pos==='pie' ? 0.7 : 0), pc = num(d.pc);
+  if (!(w > 1 && w < 40) || !(l > 40 && l < 130) || !(pc > 25 && pc < 60)) return `<p class="empty">Escriba peso, longitud y perímetro para calcular.</p>`;
+  const rows = [['Peso/edad', zW(w,a), 'peso'], ['Longitud/edad', zLen(l,a), 'talla'], ['Peso/longitud', zWL(w,l), 'pt'], ['IMC/edad', zBMI(w,l,a), 'imc'], ['P. cefálico/edad', zPC(pc,a), 'pc']];
+  return rows.map(([n,z,k]) => `<div class="between" style="padding:8px 14px;border-top:1px solid var(--line)"><span class="sm" style="flex:1">${n}</span><span style="text-align:right">${zChip(z,k)}</span></div>`).join('');
+}
+
+/* ---------- informe PDF ---------- */
+const RC = {
+  peso:{t:'Peso para la edad', y:'Peso (kg)', at:(z,a)=>wAt(z,a), min:1.5, max:15.5, ticks:[2,4,6,8,10,12,14], v:m=>m.w},
+  talla:{t:'Longitud para la edad', y:'Longitud (cm)', at:(z,a)=>lenAt(z,a), min:42, max:96, ticks:[45,55,65,75,85,95], v:m=>m.l},
+  pc:{t:'Perímetro cefálico para la edad', y:'Perímetro cefálico (cm)', at:(z,a)=>pcAt(z,a), min:29, max:52, ticks:[30,35,40,45,50], v:m=>m.pc}
+};
+function reportChart(ind) {
+  const c = RC[ind], W=640, H=270, x0=46, x1=600, y0=228, y1=10;
+  const X = a => x0 + (x1-x0)*a/24, Y = v => y0 - (y0-y1)*(v-c.min)/(c.max-c.min);
+  const ages = Array.from({length:25},(_,i)=>i);
+  const line = z => ages.map((a,i)=>`${i?'L':'M'}${X(a).toFixed(1)},${Y(c.at(z,a)).toFixed(1)}`).join(' ');
+  const band = (za,zb) => line(za) + ' ' + ages.slice().reverse().map(a=>`L${X(a).toFixed(1)},${Y(c.at(zb,a)).toFixed(1)}`).join(' ') + 'Z';
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${c.t}, niña, 0 a 2 años" style="display:block;width:100%;height:auto">`;
+  s += `<path d="${band(-2,2)}" fill="#16a34a" fill-opacity=".08"/>`;
+  c.ticks.forEach(t => { s += `<path d="M${x0},${Y(t).toFixed(1)}H${x1}" stroke="#f1f5f9"/><text x="${x0-6}" y="${(Y(t)+3.5).toFixed(1)}" text-anchor="end" font-size="10" fill="#64748b">${t}</text>`; });
+  for (let a=0;a<=24;a+=3) s += `<text x="${X(a).toFixed(1)}" y="${y0+15}" text-anchor="middle" font-size="10" fill="#64748b">${a}</text>`;
+  s += `<text x="${(x0+x1)/2}" y="${H-4}" text-anchor="middle" font-size="10" font-weight="500" fill="#475569">Edad (meses)</text><text x="11" y="${(y0+y1)/2}" text-anchor="middle" font-size="10" font-weight="500" fill="#475569" transform="rotate(-90 11 ${(y0+y1)/2})">${c.y}</text>`;
+  s += `<path d="M${x0},${y1}V${y0}H${x1}" fill="none" stroke="#cbd5e1"/>`;
+  [[3,'#dc2626',1.3,''],[2,'#ea580c',1.3,''],[1,'#ca8a04',1,'4 3']].forEach(([z,col,w,da]) => { s += `<path d="${line(z)}" fill="none" stroke="${col}" stroke-width="${w}" stroke-dasharray="${da}"/><path d="${line(-z)}" fill="none" stroke="${col}" stroke-width="${w}" stroke-dasharray="${da}"/>`; });
+  s += `<path d="${line(0)}" fill="none" stroke="#334155" stroke-width="1.8"/>`;
+  [[3,'+3','#dc2626'],[2,'+2','#ea580c'],[1,'+1','#a16207'],[0,'0','#334155'],[-1,'−1','#a16207'],[-2,'−2','#ea580c'],[-3,'−3','#dc2626']].forEach(([z,t,col]) => { s += `<text x="${x1+4}" y="${(Y(c.at(z,24))+3.5).toFixed(1)}" font-size="9.5" font-weight="700" fill="${col}">${t}</text>`; });
+  const pts = st.meas.map(m => [X(m.a), Y(c.v(m))]);
+  s += `<path d="${pts.map((p,i)=>`${i?'L':'M'}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ')}" fill="none" stroke="#1d4ed8" stroke-width="2.4" stroke-linejoin="round"/>`;
+  pts.forEach(p => { s += `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="3.4" fill="#fff" stroke="#1d4ed8" stroke-width="2"/>`; });
+  return s + '</svg>';
+}
+function report(back) {
+  const m = last(), z = latestZ(), y = m.a/12;
+  const rows = [['Longitud para la edad', `${f(m.l,1)} cm`, z.l, 'talla'], ['Peso para la edad', `${f(m.w)} kg`, z.w, 'peso'], ['Peso para la longitud', `${f(m.w)} kg / ${f(m.l,1)} cm`, z.wl, 'pt'], ['IMC para la edad', `${f(m.w/((m.l/100)**2),1)} kg/m²`, z.bmi, 'imc'], ['Perímetro cefálico para la edad', `${f(m.pc,1)} cm`, z.pc, 'pc']];
+  const rec = st.recs[st.recs.length-1];
+  const head = (n) => `<div class="rh"><svg viewBox="0 0 64 64" width="40" height="40" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#0f766e"/><path d="M14 46C24 44 30 36 36 28S46 18 50 17" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round"/><circle cx="50" cy="17" r="5" fill="#fff"/></svg><div style="flex:1"><p style="font-size:15px;font-weight:700">Pediatría Demo</p><p class="k">Av. Ejemplo 123, Guayaquil · 04 000 0000</p></div><div style="text-align:right"><p style="font-size:16px;font-weight:700;color:#0f766e">Informe de crecimiento</p><p class="k">Valentina Ríos Cedeño · emitido el 10 nov 2026</p></div></div>`;
+  const foot = (n) => `<div class="rfoot"><div><p style="font-weight:600">Dra. Andrea Salazar</p><p class="k">Pediatra · Reg. EJ-0000</p></div><p class="k" style="text-align:right">No incluye notas clínicas privadas · Página ${n} de 3</p></div>`;
+  const vacTag = v => v.s==='a' ? '<span class="tag ok">Aplicada</span>' : v.s==='x' ? '<span class="tag x">Atrasada</span>' : '<span class="tag">Pendiente</span>';
+  const p1 = `<div class="a4">${head(1)}
+    <div class="rg"><div><p class="k">Paciente</p><b>Valentina Ríos Cedeño</b></div><div><p class="k">Sexo</p><b>Femenino</b></div><div><p class="k">Nacimiento</p><b>6 jul 2025 · 39+2 sem</b></div><div><p class="k">Edad</p><b>1 año 4 meses</b></div>
+    <div><p class="k">Representante</p><b>María Cedeño (madre)</b></div><div><p class="k">Última medición</p><b>${esc(m.d)}</b></div><div><p class="k">Edad corregida</p><b>No aplica</b></div><div><p class="k">Referencia</p><b>OMS 2006 (0–5 años)</b></div></div>
+    <div><h2>Resultados de la última medición</h2><table><thead><tr><th>Indicador</th><th class="r">Valor</th><th class="r">Puntuación Z</th><th>Clasificación OMS</th></tr></thead><tbody>${rows.map(([n,v,zz,k]) => { const cn = clinName(k, zz, y); return `<tr><td>${n}</td><td class="r">${v}</td><td class="r"><b>${fz(zz)}</b></td><td>${cn ? `<span class="tag f">${cn}</span>` : '<span class="k">Dentro de ±2 DE</span>'}</td></tr>`; }).join('')}</tbody></table>
+    <p class="k" style="margin-top:6px">La puntuación Z compara con niñas de la misma edad: 0 es el promedio; entre −2 y +2 es el rango esperado.</p></div>
+    <div class="rbox"><h2>${RC.peso.t} · Niña · 0 a 2 años</h2>${reportChart('peso')}</div>${foot(1)}</div>`;
+  const p2 = `<div class="a4">${head(2)}
+    <div class="rbox"><h2>${RC.talla.t} · Niña · 0 a 2 años</h2>${reportChart('talla')}</div>
+    <div class="rbox"><h2>${RC.pc.t} · Niña · 0 a 2 años</h2>${reportChart('pc')}</div>
+    <p class="k">Línea azul: mediciones de Valentina. Curvas: −3 a +3 desviaciones estándar (OMS). Área verde: rango esperado (−2 a +2).</p>${foot(2)}</div>`;
+  const p3 = `<div class="a4">${head(3)}
+    <div class="soft"><h2 style="color:#115e59">Recomendaciones · ${esc(rec.d)}</h2><p>${esc(rec.t) || '—'}</p></div>
+    ${rec.ind ? `<div class="rbox"><h2>Indicaciones médicas</h2><p>${esc(rec.ind)}</p></div>` : ''}
+    <div><h2>Vacunas <span class="k" style="font-weight:400">(nombres de ejemplo)</span></h2><table><thead><tr><th>Edad</th><th>Vacuna</th><th>Estado</th><th>Fecha</th></tr></thead><tbody>${st.vac.map(v => `<tr><td>${esc(v.g)}</td><td>${esc(v.n)}</td><td>${vacTag(v)}</td><td>${esc(v.f)}</td></tr>`).join('')}</tbody></table></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px"><div><h2>Desarrollo</h2><p>${st.hitos.filter(h=>h.a).length} de ${st.hitos.length} hitos logrados.</p><p class="k">Próximos: ${st.hitos.filter(h=>!h.a).slice(0,3).map(h=>esc(h.n.toLowerCase())).join(', ')}.</p></div>
+    <div><h2>Tamizajes</h2>${st.screens.map(s => `<p>${esc(s.n)} ${esc(s.t)}: <span class="k">${esc(s.s)}</span></p>`).join('')}</div></div>
+    <div><h2>Próximo control</h2><p>${st.book.confirmed ? `${esc(st.book.confirmed.day)} nov 2026, ${esc(st.book.confirmed.slot)}` : 'Jueves 10 de diciembre de 2026, 09:00'} · Control de 18 meses: 6 ene 2027</p></div>${foot(3)}</div>`;
+  return bar('Informe PDF', back) + `<div class="rtools"><button class="btn p sm2" data-act="pdfdl">${ic('dl','s')}Descargar PDF</button><button class="btn o sm2" data-act="pdfshare">${ic('send','s')}Compartir</button><span class="xs t3" style="align-self:center">Vista previa de lo que se exporta</span></div>
+    <div class="pages">${[p1,p2,p3].map(p => `<div class="a4wrap">${p}</div>`).join('')}</div>`;
+}
+R['medico-informe'] = () => report('medico-paciente');
+R['padres-informe'] = () => report('padres-hijo');
+function fitPages() {
+  document.querySelectorAll('.a4wrap').forEach(w => { const s = Math.min(1, w.clientWidth / 794); const p = w.firstElementChild; p.style.transform = `scale(${s})`; w.style.height = (1123 * s) + 'px'; });
+}
+window.addEventListener('resize', fitPages);
+
+/* ---------- agenda ---------- */
+function seedAgenda() {
+  const N = ['Sofía Cevallos','Lucas Guerrero','Tomás Villacís','Isabella Paredes','Mateo Andrade','Emilia Zambrano','Sebastián Moreira','Valeria Chiriboga','Nicolás Haro','Antonella Bravo','Gabriel Proaño','Luciana Mera'];
+  const Mo = ['Control de niño sano','Vacunas','Seguimiento de peso','Consulta por fiebre','Control de niño sano','Tamizaje del desarrollo'];
+  const T = ['08:00','08:30','09:00','09:30','10:00','10:30','11:00','11:30','12:00','14:00','14:30','15:00','15:30','16:00','16:30'];
+  const out = []; let id = 100;
+  for (let d = 1; d <= 30; d++) {
+    const dw = (new Date(2026, 10, d).getDay() + 6) % 7;
+    if (dw === 6 || d === 10) continue;
+    const n = dw === 5 ? 2 : 3 + (d * 7) % 4;
+    for (let k = 0; k < n; k++) {
+      const t = T[(d * 3 + k * 4) % (dw === 5 ? 7 : T.length)];
+      if (out.some(a => a.day === d && a.t === t)) continue;
+      out.push({id: id++, day: d, t, p: N[(d + k * 5) % N.length], m: Mo[(d + k) % Mo.length], s: d < 10 ? 'Atendida' : (k % 3 === 2 ? 'Por confirmar' : 'Confirmada')});
+    }
+  }
+  [['08:30','Camila Ordóñez','Control 2 meses','Atendida'],['09:15','Valentina Ríos','Control 16 meses','En consulta',true],['10:00','Daniel Pino','Primera consulta · web','Confirmada'],['11:30','Joaquín Mendoza','Seguimiento de peso','Confirmada'],['15:00','Martina Loor','Control anual','Por confirmar']]
+    .forEach(([t,p,m,s,vr]) => out.push({id: id++, day: 10, t, p, m, s, vr: !!vr}));
+  return out;
+}
+const WD = ['lun','mar','mié','jue','vie','sáb','dom'], WDL = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
+const dowMon = d => (new Date(2026, 10, d).getDay() + 6) % 7;
+const dayLabel = d => `${WD[dowMon(d)]} ${d}`;
+const dayLong = d => `${WDL[dowMon(d)]} ${d} de noviembre`;
+const dayAppts = d => st.ag.filter(a => a.day === d).sort((a,b) => a.t.localeCompare(b.t));
+const todayAppts = () => dayAppts(10);
+const sCls = s => ({'En consulta':'pr','Por confirmar':'wa','Nueva':'ok'}[s] || 'na');
+const isDesk = () => fmt === 'desk' && wideMQ.matches;
+const nextDays = from => { const out = []; for (let d = Math.max(11, from); d <= 30 && out.length < 8; d++) if (dowMon(d) !== 6) out.push(d); return out; };
+const freeSlots = d => {
+  const base = dowMon(d) === 5 ? ['08:00','08:30','09:00','09:30','10:00','10:30','11:00','11:30'] : ['08:00','08:30','09:00','09:30','10:00','10:30','11:00','11:30','12:00','12:30','14:00','14:30','15:00','15:30','16:00','16:30'];
+  return base.filter(t => !st.ag.some(a => a.day === d && a.t === t));
+};
+const apptBtn = a => `<button class="li" data-act="agsel" data-arg="${a.id}" style="min-height:56px${st.agSel===a.id?';background:var(--pri-soft)':''}"><b style="width:48px">${a.t}</b><span class="grow"><span class="name">${esc(a.p)}</span><br><span class="xs t3">${esc(a.m)}</span></span><span class="badge ${sCls(a.s)}">${esc(a.s)}</span></button>`;
+const slotPick = (d, cur) => `<div><span class="lbl">Hora libre · ${dayLong(d)}</span><div class="g4">${freeSlots(d).map(t => `<button class="chip" style="text-align:center;font-weight:600;min-width:0" aria-pressed="${cur===t}" data-act="agft" data-arg="${t}">${t}</button>`).join('')}</div></div>`;
+const dayPick = (from, cur) => `<div><span class="lbl">Día</span><div class="hscroll">${nextDays(from).map(d => `<button class="chip" style="min-width:72px;text-align:center" aria-pressed="${cur===d}" data-act="agfday" data-arg="${d}"><span class="xs" style="font-weight:600">${WD[dowMon(d)]}</span><br><b style="font-size:18px">${d}</b></button>`).join('')}</div></div>`;
+
+function apptSheet(asst) {
+  const a = st.ag.find(x => x.id === st.agSel); if (!a) return '';
+  let h = `<section class="card pad" style="border-color:var(--pri);display:flex;flex-direction:column;gap:10px" aria-label="Detalle de la cita"><div class="between"><h3 class="h">Detalle de la cita</h3><button class="ib" data-act="agclose" aria-label="Cerrar">${ic('x')}</button></div>
+  <div><div class="kv"><span class="t3">Paciente</span><b>${esc(a.p)}</b></div><div class="kv"><span class="t3">Fecha</span><b>${dayLong(a.day)}, ${a.t}</b></div><div class="kv"><span class="t3">Motivo</span><b>${esc(a.m)}</b></div><div class="kv"><span class="t3">Estado</span><span class="badge ${sCls(a.s)}">${esc(a.s)}</span></div></div>`;
+  if (st.agMode === 'resched') {
+    h += dayPick(a.day >= 11 ? a.day : 11, st.agForm.day) + (st.agForm.day ? slotPick(st.agForm.day, st.agForm.t) : '') +
+      `<div class="row" style="gap:8px"><button class="btn p sm2" style="flex:1" ${st.agForm.day && st.agForm.t ? '' : 'disabled'} data-act="agreschok">Guardar cambio</button><button class="btn o sm2" style="flex:1" data-act="agmode" data-arg="">Volver</button></div>`;
+  } else if (st.agMode === 'cancel') {
+    h += `<div class="alert ou">${ic('tri','s')}<span>¿Cancelar esta cita? Se avisa a la familia por sus canales de recordatorio y la hora queda libre.</span></div><div class="row" style="gap:8px"><button class="btn sm2" style="flex:1;background:var(--ou-ink);color:#fff" data-act="agcancelok">Sí, cancelar</button><button class="btn o sm2" style="flex:1" data-act="agmode" data-arg="">No</button></div>`;
+  } else {
+    h += `<div class="row" style="gap:8px;flex-wrap:wrap">${asst ? '' : `<button class="btn p sm2" style="flex:1" data-act="agopen" data-arg="${a.id}">Abrir ficha</button>`}<button class="btn o sm2" style="flex:1" data-act="agmode" data-arg="resched">Reprogramar</button><button class="btn o sm2 danger" style="flex:1" data-act="agmode" data-arg="cancel">Cancelar cita</button></div>${asst ? '<p class="xs t3">La asistente maneja la agenda y las solicitudes, pero no ve datos clínicos.</p>' : ''}`;
+  }
+  return h + '</section>';
+}
+function newApptForm() {
+  const f = st.agForm;
+  const names = ['Valentina Ríos', ...st.patients.filter(p => !p.vr).map(p => p.n), ...st.newPts.map(p => p.n)];
+  return `<section class="card pad" style="border-color:var(--pri);display:flex;flex-direction:column;gap:12px" aria-label="Nueva cita"><div class="between"><h3 class="h">Nueva cita</h3><button class="ib" data-act="agclose" aria-label="Cerrar">${ic('x')}</button></div>
+  <div class="g2"><div class="field"><label for="ag-p">Paciente</label><div class="inp"><select id="ag-p" data-bind="agForm.p">${names.map(n => `<option ${n===f.p?'selected':''}>${esc(n)}</option>`).join('')}</select></div></div>
+  <div class="field"><label for="ag-m">Motivo</label><div class="inp"><select id="ag-m" data-bind="agForm.m">${['Control de niño sano','Vacunas','Seguimiento','Consulta por enfermedad','Tamizaje del desarrollo'].map(n => `<option ${n===f.m?'selected':''}>${n}</option>`).join('')}</select></div></div></div>
+  ${dayPick(11, f.day)}${f.day ? slotPick(f.day, f.t) : ''}
+  <p class="xs t3">La familia recibe la confirmación por sus canales de recordatorio.</p>
+  <button class="btn p" ${f.day && f.t ? '' : 'disabled'} data-act="agnewok">Guardar cita</button></section>`;
+}
+function agenda(asst) {
+  let h = bar(asst ? 'Agenda · Adelita (asistente)' : 'Agenda') + '<div class="body">';
+  h += `<div class="row" style="gap:8px;flex-wrap:wrap"><div class="seg" style="flex:1;min-width:210px" role="group" aria-label="Vista">${[['dia','Día'],['semana','Semana'],['mes','Mes']].map(([k,l]) => `<button aria-pressed="${st.agView===k}" data-act="agview" data-arg="${k}">${l}</button>`).join('')}</div><button class="btn p sm2" data-act="agnew">${ic('plus','s')}Nueva cita</button>${asst ? '' : `<button class="btn o sm2" data-go="medico-disponibilidad">${ic('clock','s')}Horarios</button>`}</div>`;
+  if (st.agMode === 'new') h += newApptForm(); else if (st.agSel) h += apptSheet(asst);
+  if (st.requests.length) h += `<section class="card list ${st.agView==='dia'?'half':''}" aria-label="Solicitudes pendientes"><div class="between pad" style="padding-bottom:4px"><div><h3 class="h">Solicitudes de familias nuevas</h3><p class="xs t3">Las aprueba la doctora o la asistente (Adelita)</p></div><span class="badge wa">${st.requests.length}</span></div>
+    ${st.requests.map(r => `<div style="padding:12px 14px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:6px"><div class="between"><b>${esc(r.p)} · ${esc(r.a)}</b><span class="xs t3">${esc(r.ago)}</span></div><p class="sm t2">${esc(r.g)} · email verificado</p><p class="sm">Pide: <b>${esc(r.when)}</b></p><div class="row" style="gap:8px"><button class="btn p sm2" style="flex:1" data-act="accept" data-arg="${r.id}">Aceptar</button><button class="btn o sm2" style="flex:1" data-act="decline" data-arg="${r.id}">Rechazar</button></div></div>`).join('')}</section>`;
+  const d = st.agDay;
+  if (st.agView === 'dia') {
+    const list = dayAppts(d), closed = dowMon(d) === 6;
+    h += `<section class="card list ${st.requests.length?'half':''}" aria-label="Citas del día"><div class="between pad" style="padding-bottom:4px"><button class="ib" data-act="agprev" aria-label="Día anterior" ${d<=1?'disabled':''}>${ic('back')}</button><h3 class="h" style="text-align:center">${dayLong(d)}${d===10?' · hoy':''}</h3><button class="ib" data-act="agnext" aria-label="Día siguiente" ${d>=30?'disabled':''}>${ic('next')}</button></div>
+      ${closed ? '<p class="empty">Domingo: consultorio cerrado.</p>' : list.length ? list.map(apptBtn).join('') : '<p class="empty">No hay citas este día.</p>'}
+      ${!closed ? `<p class="xs t3" style="padding:10px 14px;border-top:1px solid var(--line)">${freeSlots(d).length} horas libres · almuerzo 13:00–14:00</p>` : ''}</section>`;
+  } else if (st.agView === 'semana') {
+    const mon = d - dowMon(d), days = [0,1,2,3,4,5].map(i => mon + i).filter(x => x >= 1 && x <= 30);
+    const head = `<div class="between pad" style="padding-bottom:6px"><button class="ib" data-act="agpw" aria-label="Semana anterior" ${mon<=1?'disabled':''}>${ic('back')}</button><h3 class="h">Semana del ${days[0]} al ${days[days.length-1]} de noviembre</h3><button class="ib" data-act="agnw" aria-label="Semana siguiente" ${mon+7>30?'disabled':''}>${ic('next')}</button></div>`;
+    if (isDesk()) {
+      h += `<section class="card" aria-label="Semana">${head}<div style="display:grid;grid-template-columns:repeat(${days.length},minmax(0,1fr));border-top:1px solid var(--line)">${days.map(x => `<div style="border-left:1px solid var(--line);min-height:380px;${x===10?'background:var(--pri-soft)':''}"><button class="btn g" style="width:100%;border-radius:0;flex-direction:column;gap:0;min-height:56px;color:var(--ink)" data-act="agpick" data-arg="${x}"><span class="xs t3">${WD[dowMon(x)]}</span><b style="font-size:18px">${x}</b></button><div style="display:flex;flex-direction:column;gap:6px;padding:6px">${dayAppts(x).map(a => `<button data-act="agsel" data-arg="${a.id}" style="text-align:left;border:1px solid ${a.s==='Por confirmar'?'var(--wa-ink)':'var(--pri)'};background:${st.agSel===a.id?'var(--pri)':'var(--surface)'};color:${st.agSel===a.id?'var(--pri-ink)':'var(--ink)'};border-radius:8px;padding:6px 8px;font-size:12px;cursor:pointer;${a.s==='Por confirmar'?'border-style:dashed':''}"><b>${a.t}</b> ${esc(a.p.split(' ')[0])}<br><span style="opacity:.8">${esc(a.m)}</span></button>`).join('')}</div></div>`).join('')}</div></section>`;
+    } else {
+      h += `<section class="card list" aria-label="Semana">${head}${days.map(x => { const l = dayAppts(x); return `<div style="border-top:1px solid var(--line)"><button class="li" data-act="agpick" data-arg="${x}" style="min-height:48px;background:${x===10?'var(--pri-soft)':'var(--surface2)'}"><b class="grow">${dayLong(x)}${x===10?' · hoy':''}</b><span class="badge na">${l.length} citas</span>${ic('next','s')}</button>${l.slice(0,3).map(apptBtn).join('')}${l.length>3?`<button class="btn g sm2" style="margin:0 14px 8px" data-act="agpick" data-arg="${x}">Ver ${l.length-3} más</button>`:''}</div>`; }).join('')}</section>`;
+    }
+  } else {
+    const lead = dowMon(1), cells = [];
+    for (let i = 0; i < lead; i++) cells.push('<span></span>');
+    for (let x = 1; x <= 30; x++) {
+      const n = dayAppts(x).length, sun = dowMon(x) === 6;
+      cells.push(`<button data-act="agpick" data-arg="${x}" ${sun?'disabled':''} aria-label="${dayLong(x)}, ${n} citas" style="min-height:${isDesk()?'84px':'52px'};border:1px solid ${x===d?'var(--pri)':'var(--line)'};border-radius:10px;background:${x===10?'var(--pri-soft)':'var(--surface)'};display:flex;flex-direction:column;align-items:${isDesk()?'flex-start':'center'};justify-content:${isDesk()?'space-between':'center'};gap:2px;padding:6px;cursor:${sun?'default':'pointer'};opacity:${sun?.45:1}"><b>${x}</b>${sun ? '<span class="xs t3">cerrado</span>' : n ? `<span class="xs" style="font-weight:600;color:var(--pri-soft-ink)">${n}${isDesk()?' citas':''}</span>` : '<span class="xs t3">—</span>'}</button>`);
+    }
+    h += `<section class="card pad" aria-label="Mes"><div class="between" style="margin-bottom:10px"><button class="ib" data-act="soonmes" aria-label="Mes anterior">${ic('back')}</button><h3 class="h">Noviembre 2026</h3><button class="ib" data-act="soonmes" aria-label="Mes siguiente">${ic('next')}</button></div>
+      <div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;text-align:center" class="xs t3"><b>L</b><b>M</b><b>X</b><b>J</b><b>V</b><b>S</b><b>D</b></div>
+      <div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;margin-top:4px">${cells.join('')}</div>
+      <p class="xs t3" style="margin-top:10px">Toque un día para ver sus citas.</p></section>`;
+  }
+  return h + '</div>';
+}
+function avail(asst) {
+  const v = st.avail, times = ['07:00','07:30','08:00','08:30','09:00','12:00','12:30','13:00','16:00','17:00','18:00','19:00'];
+  const sel = (i, k, label) => `<div class="inp" style="min-height:40px;padding:0 8px;flex:1"><select aria-label="${label}" data-avail="${i},${k}">${times.map(t => `<option ${t===v.days[i][k]?'selected':''}>${t}</option>`).join('')}</select></div>`;
+  return bar('Horarios de atención', asst ? null : 'medico-agenda') + `<div class="body">
+  <p class="sm t2">Estos horarios definen las horas libres que ven los padres y la página pública de reservas.</p>
+  <section class="card list half" aria-label="Días y horas"><div class="pad h" style="padding-bottom:4px">Días y horas</div>
+  ${v.days.map((d,i) => `<div class="li" style="cursor:default;gap:8px;min-height:60px"><b style="width:34px">${d[0]}</b>${d[1] ? `${sel(i,2,'Desde el '+d[0])}<span class="t3">a</span>${sel(i,3,'Hasta el '+d[0])}` : '<span class="grow t3 sm">Cerrado</span>'}<button class="sw" role="switch" aria-checked="${d[1]}" aria-label="Atender el ${d[0]}" data-act="avday" data-arg="${i}"></button></div>`).join('')}
+  <div class="li" style="cursor:default"><span class="grow">Pausa de almuerzo 13:00–14:00</span><button class="sw" role="switch" aria-checked="${v.lunch}" aria-label="Pausa de almuerzo" data-act="avlunch"></button></div></section>
+  <div class="half" style="display:flex;flex-direction:column;gap:14px">
+  <section class="card pad" style="display:flex;flex-direction:column;gap:10px"><p class="h">Duración de las citas</p>
+  <span class="lbl" style="margin:0">Control y consulta</span><div class="seg">${['15','20','30','45'].map(x => `<button aria-pressed="${v.slot===x}" data-act="avslot" data-arg="${x}">${x} min</button>`).join('')}</div>
+  <span class="lbl" style="margin:0">Primera consulta</span><div class="seg">${['30','45','60'].map(x => `<button aria-pressed="${v.first===x}" data-act="avfirst" data-arg="${x}">${x} min</button>`).join('')}</div></section>
+  <section class="card list"><div class="pad h" style="padding-bottom:4px">Días bloqueados</div>${v.blocked.map((b,i) => `<div class="li" style="cursor:default;min-height:52px"><span class="grow">${esc(b)}</span><button class="ib" data-act="avrm" data-arg="${i}" aria-label="Quitar ${esc(b)}">${ic('x','s')}</button></div>`).join('')}
+  <div style="padding:12px 14px;border-top:1px solid var(--line);display:flex;gap:8px"><div class="inp" style="flex:1"><input aria-label="Nuevo día bloqueado" placeholder="Ej.: 2 ene 2027" data-bind="avail.newBlock" value="${esc(v.newBlock)}"></div><button class="btn o sm2" data-act="avadd">Bloquear</button></div></section>
+  <button class="btn p" data-act="avsave">Guardar horarios</button></div></div>`;
+}
+R['medico-agenda'] = () => agenda(false);
+R['asistente-agenda'] = () => agenda(true);
+R['medico-disponibilidad'] = () => avail(false);
+R['asistente-disponibilidad'] = () => avail(true);
+
+/* ---------- nuevo paciente ---------- */
+function npPre() {
+  const w = num(st.np.gw);
+  if (!(w > 20 && w < 45)) return '<p class="xs t3">Si nació antes de las 37 semanas, los gráficos usan edad corregida.</p>';
+  if (w >= 37) return `<div class="alert ok">${ic('check','s')}<span>A término: se grafica con la edad real.</span></div>`;
+  return `<div class="alert pr">${ic('clock','s')}<span>Prematuro: los gráficos usarán <b>edad corregida hasta los 24 meses</b>.</span></div>
+    <button class="check" role="checkbox" aria-checked="${st.np.ext}" data-act="npext"><span class="box">${st.np.ext ? ic('check','s') : ''}</span><span class="sm">Prematuro extremo: extender la corrección hasta los 36 meses${w < 28 ? ' <span class="badge wa" style="height:20px">sugerido · &lt; 28 sem</span>' : ''}</span></button>`;
+}
+R['medico-nuevo'] = () => {
+  const p = st.np;
+  return bar('Nuevo paciente', 'medico-pacientes') + `<div class="body">
+  <p class="h">Datos del niño o niña</p>
+  <div class="g2"><div class="field"><label for="np-n">Nombres</label><div class="inp"><input id="np-n" data-bind="np.n" value="${esc(p.n)}" placeholder="Ej.: Renata"></div></div><div class="field"><label for="np-a">Apellidos</label><div class="inp"><input id="np-a" data-bind="np.a" value="${esc(p.a)}" placeholder="Ej.: Vélez Mora"></div></div></div>
+  <div><span class="lbl">Sexo</span><div class="radio" role="radiogroup" aria-label="Sexo"><button role="radio" aria-checked="${p.sex==='M'}" data-act="npsex" data-arg="M">Masculino</button><button role="radio" aria-checked="${p.sex==='F'}" data-act="npsex" data-arg="F">Femenino</button></div></div>
+  <div class="g2"><div class="field"><label for="np-d">Fecha de nacimiento</label><div class="inp"><input id="np-d" data-bind="np.dob" value="${esc(p.dob)}" placeholder="dd/mm/aaaa"></div></div><div class="field"><label for="np-ci">Cédula <span class="t3" style="font-weight:400">(opcional)</span></label><div class="inp"><input id="np-ci" inputmode="numeric" data-bind="np.ci" value="${esc(p.ci)}"></div></div></div>
+  <p class="h" style="margin-top:6px">Antecedentes al nacer</p>
+  <div class="g2"><div class="field"><label for="np-gw">Edad gestacional</label><div class="inp"><input id="np-gw" inputmode="numeric" data-bind="np.gw" value="${esc(p.gw)}" placeholder="39"><span class="unit">sem</span><input aria-label="Días" inputmode="numeric" data-bind="np.gd" value="${esc(p.gd)}" placeholder="0" style="width:28px"><span class="unit">d</span></div></div>
+  <div class="field"><label for="np-bw">Peso al nacer</label><div class="inp"><input id="np-bw" inputmode="decimal" data-bind="np.bw" value="${esc(p.bw)}" placeholder="3,20"><span class="unit">kg</span></div></div>
+  <div class="field"><label for="np-bl">Talla al nacer</label><div class="inp"><input id="np-bl" inputmode="decimal" data-bind="np.bl" value="${esc(p.bl)}" placeholder="49,5"><span class="unit">cm</span></div></div>
+  <div class="field"><label for="np-bpc">PC al nacer</label><div class="inp"><input id="np-bpc" inputmode="decimal" data-bind="np.bpc" value="${esc(p.bpc)}" placeholder="34,0"><span class="unit">cm</span></div></div></div>
+  <div id="npPre" style="display:flex;flex-direction:column;gap:8px">${npPre()}</div>
+  <div class="field"><label for="np-no">Notas perinatales</label><textarea id="np-no" data-bind="np.notes" placeholder="Tipo de parto, APGAR, hospitalización…">${esc(p.notes)}</textarea></div>
+  <p class="h" style="margin-top:6px">Representantes</p>
+  ${p.guards.map((g,i) => `<section class="card pad" style="display:flex;flex-direction:column;gap:10px"><div class="between"><b class="sm">Representante ${i+1}</b>${i ? `<button class="btn g sm2" data-act="nprmg" data-arg="${i}">Quitar</button>` : ''}</div>
+    <div class="g2"><div class="field"><label for="g-n${i}">Nombre</label><div class="inp"><input id="g-n${i}" data-guard="${i},n" value="${esc(g.n)}"></div></div><div class="field"><label for="g-r${i}">Parentesco</label><div class="inp"><select id="g-r${i}" data-guard="${i},rel">${['Madre','Padre','Abuela/o','Tutor/a','Otro'].map(o => `<option ${o===g.rel?'selected':''}>${o}</option>`).join('')}</select></div></div>
+    <div class="field"><label for="g-e${i}">Email</label><div class="inp"><input id="g-e${i}" type="email" data-guard="${i},em" value="${esc(g.em)}"></div></div><div class="field"><label for="g-t${i}">Teléfono / WhatsApp</label><div class="inp"><span class="unit">+593</span><input id="g-t${i}" data-guard="${i},tel" value="${esc(g.tel)}"></div></div></div>
+    <div class="row"><span class="grow sm" style="flex:1"><b>Invitar al portal</b><br><span class="t3">Recibe un enlace por email válido 7 días</span></span><button class="sw" role="switch" aria-checked="${g.inv}" aria-label="Invitar al portal" data-act="npinv" data-arg="${i}"></button></div></section>`).join('')}
+  <button class="btn o" data-act="npaddg">${ic('plus','s')}Agregar otro representante</button>
+  <button class="btn p" data-act="npsave">Crear paciente</button></div>`;
+};
+R['medico-ficha'] = () => {
+  const p = st.newPts.find(x => x.id === st.curNew) || st.newPts[0];
+  if (!p) return R['medico-pacientes']();
+  const w = num(p.gw), pre = w > 20 && w < 37;
+  return bar(esc(p.n), 'medico-pacientes') + `<div class="body">
+  <div class="row" style="gap:6px;flex-wrap:wrap"><span class="badge na">${p.sex==='M'?'Niño':'Niña'}</span><span class="badge na">Nac. ${esc(p.dob)}</span>${w > 20 ? `<span class="badge ${pre?'pr':'na'}">${pre?'Prematuro':'A término'} · ${esc(p.gw)}+${esc(p.gd||'0')} sem</span>` : ''}${pre ? `<span class="badge pr">Edad corregida hasta ${p.ext?'36':'24'} m</span>` : ''}</div>
+  <section class="card list half"><div class="pad h" style="padding-bottom:4px">Representantes</div>${p.guards.map(g => `<div class="li" style="cursor:default"><span class="av">${esc((g.n||'?').slice(0,1))}</span><span class="grow"><span class="name">${esc(g.n||'Sin nombre')}</span> <span class="xs t3">(${esc(g.rel.toLowerCase())})</span><br><span class="xs t3">${esc(g.em||'sin email')}</span></span>${g.inv && g.em ? '<span class="badge wa">Invitación enviada</span>' : '<span class="badge na">Sin acceso</span>'}</div>`).join('')}</section>
+  <section class="card pad half"><p class="h">Antecedentes</p><div class="kv"><span class="t3">Peso al nacer</span><b>${p.bw ? esc(p.bw)+' kg' : '—'}</b></div><div class="kv"><span class="t3">Talla al nacer</span><b>${p.bl ? esc(p.bl)+' cm' : '—'}</b></div><div class="kv"><span class="t3">PC al nacer</span><b>${p.bpc ? esc(p.bpc)+' cm' : '—'}</b></div><div class="kv"><span class="t3">Notas</span><b>${esc(p.notes||'—')}</b></div></section>
+  <section class="card pad center" style="padding:28px 16px"><span class="sic na" style="width:56px;height:56px">${ic('file')}</span><p class="h">Aún no hay mediciones</p><p class="sm t2">Registre la primera visita para ver sus curvas y puntuaciones Z.</p><div class="row" style="gap:8px;flex-wrap:wrap;justify-content:center"><button class="btn p sm2" data-act="firstvisit">${ic('plus','s')}Primera visita</button><button class="btn o sm2" data-act="schednew">${ic('cal','s')}Agendar cita</button></div></section></div>`;
+};
+R['medico-avisos'] = () => bar('Avisos') + `<div class="body"><section class="card list">${st.dNotifs.map(n => `<button class="li" style="align-items:flex-start;${n.new?'background:var(--pri-soft)':''}" ${n.k==='inbox'?'data-go="medico-agenda"':'data-act="noop"'}><span class="sic ${n.new?'pr':'na'}">${ic(n.k,'s')}</span><span class="grow"><span class="name sm">${esc(n.t)}</span><br><span class="sm t2">${esc(n.b)}</span><br><span class="xs t3">${esc(n.w)}</span></span></button>`).join('')}</section></div>`;
+R['medico-perfil'] = () => bar('Perfil') + `<div class="body">
+  <div class="card pad row half"><span class="av pr" style="width:48px;height:48px">AS</span><span style="flex:1"><b>Dra. Andrea Salazar</b><br><span class="sm t3">andrea.salazar@pediatria-demo.ec · Médico · Admin</span></span></div>
+  <section class="card list half"><button class="li" data-go="medico-disponibilidad"><span class="grow">Horarios de atención</span>${ic('next','s')}</button><button class="li" data-role-go="admin"><span class="grow">Administración de la clínica</span>${ic('next','s')}</button></section>
+  <section class="card pad half" style="display:flex;flex-direction:column;gap:8px"><p class="h">Apariencia</p><div class="seg"><button aria-pressed="true">Claro</button><button data-act="darknote">Oscuro</button><button data-act="darknote">Sistema</button></div></section>
+  <button class="btn o danger" data-go="acceso-login">Cerrar sesión</button></div>`;
+
+/* ---------- acceso y sistema ---------- */
+const logo = (s=56) => `<svg viewBox="0 0 64 64" width="${s}" height="${s}" aria-hidden="true"><rect width="64" height="64" rx="14" style="fill:var(--pri)"/><path d="M14 46C24 44 30 36 36 28S46 18 50 17" fill="none" style="stroke:var(--pri-ink)" stroke-width="5" stroke-linecap="round"/><circle cx="50" cy="17" r="5" style="fill:var(--pri-ink)"/></svg>`;
+R['acceso-inicio'] = () => bar('Acceso y sistema') + `<div class="body">
+  <p class="sm t2">Pantallas que todos comparten: entrar, aceptar invitaciones, instalar la app y las páginas de error.</p>
+  <section class="card list"><div class="pad h" style="padding-bottom:4px">Entrar</div>
+  <button class="li" data-go="acceso-login"><span class="sic pr">${ic('user','s')}</span><span class="grow"><span class="name">Ingresar con código por email</span><br><span class="xs t3">Sin contraseñas</span></span>${ic('next','s')}</button>
+  <button class="li" data-act="inv" data-arg="padres"><span class="sic pr">${ic('msg','s')}</span><span class="grow"><span class="name">Invitación para padres</span><br><span class="xs t3">Enlace que envía la doctora</span></span>${ic('next','s')}</button>
+  <button class="li" data-act="inv" data-arg="equipo"><span class="sic pr">${ic('users','s')}</span><span class="grow"><span class="name">Invitación para médico o asistente</span><br><span class="xs t3">Enlace que envía el admin</span></span>${ic('next','s')}</button>
+  <button class="li" data-go="acceso-privacidad"><span class="sic na">${ic('lock','s')}</span><span class="grow"><span class="name">Privacidad y tratamiento de datos</span></span>${ic('next','s')}</button></section>
+  <section class="card list"><div class="pad h" style="padding-bottom:4px">App y sistema</div>
+  <button class="li" data-go="acceso-instalar"><span class="sic na">${ic('dl','s')}</span><span class="grow name">Instalar la app (Android e iPhone)</span>${ic('next','s')}</button>
+  <button class="li" data-go="acceso-offline"><span class="sic na">${ic('x','s')}</span><span class="grow name">Sin conexión</span>${ic('next','s')}</button>
+  <button class="li" data-go="acceso-404"><span class="sic na">${ic('search','s')}</span><span class="grow name">Página no encontrada (404)</span>${ic('next','s')}</button>
+  <button class="li" data-go="acceso-403"><span class="sic na">${ic('lock','s')}</span><span class="grow name">Sin acceso (403)</span>${ic('next','s')}</button>
+  <button class="li" data-go="acceso-sesion"><span class="sic na">${ic('clock','s')}</span><span class="grow name">Sesión expirada</span>${ic('next','s')}</button></section></div>`;
+R['acceso-login'] = () => bar('Ingresar', 'acceso-inicio') + `<div class="body"><div class="center" style="padding-top:12px">${logo()}<b style="font-size:18px">Pediatría Demo</b></div>
+  <div><h2 class="big">Ingresar</h2><p class="t2" style="margin-top:4px">Le enviaremos un código de 6 dígitos a su email. Sin contraseñas.</p></div>
+  <div class="field"><label for="lg-e">Email</label><div class="inp"><input id="lg-e" type="email" data-bind="email" value="${esc(st.email)}" autocomplete="email"></div></div>
+  <div><span class="lbl">Solo para la demo: entrar como</span><div class="seg">${[['medico','Médico'],['asistente','Asistente'],['padres','Padre/madre'],['admin','Admin']].map(([k,l]) => `<button aria-pressed="${st.loginAs===k}" data-act="loginas" data-arg="${k}">${l}</button>`).join('')}</div></div>
+  <button class="btn p" data-act="sendcode">Enviar código</button>
+  <div class="center" style="gap:6px;margin-top:8px"><p class="sm t2">¿Su familia aún no tiene cuenta?</p><button class="btn o full" data-role-go="nueva">Reservar una primera cita</button><button class="btn g sm2" data-go="acceso-privacidad">Privacidad</button></div></div>`;
+R['acceso-codigo'] = () => bar('Código', 'acceso-login') + `<div class="body">
+  <div><h2 class="big">Revise su email</h2><p class="t2" style="margin-top:4px">Enviamos un código a <b style="color:var(--ink)">${esc(st.email)}</b>. Vence en 10 minutos y sirve una sola vez.</p></div>
+  <div class="inp" style="${st.codeErr?'border-color:var(--ou-ink)':''}"><input class="otp" inputmode="numeric" maxlength="6" aria-label="Código de 6 dígitos" data-bind="code" value="${esc(st.code)}" placeholder="······"></div>
+  ${st.codeErr ? `<p role="alert" class="sm row" style="color:var(--ou-ink);gap:6px">${ic('tri','s')}Código incorrecto. Le quedan 2 intentos.</p>` : '<p class="xs t3">Demo: cualquier número de 6 dígitos entra; 000000 muestra el error.</p>'}
+  <button class="btn p" data-act="codeok">Ingresar</button>
+  <div class="row" style="justify-content:space-between;flex-wrap:wrap"><button class="btn g sm2" data-act="resend">Reenviar código</button><button class="btn g sm2" data-go="acceso-vencido">¿El código venció?</button></div>
+  <p class="xs t3">Revise también la carpeta de spam.</p></div>`;
+R['acceso-vencido'] = () => bar('Código vencido', 'acceso-codigo') + `<div class="body"><div class="center" style="padding:32px 8px"><span class="sic wa" style="width:64px;height:64px">${ic('clock')}</span><h2 class="big">El código venció</h2><p class="t2">Por seguridad, cada código dura 10 minutos. Pida uno nuevo para continuar.</p></div>
+  <button class="btn p" data-act="newcode">Enviar un código nuevo</button><button class="btn g" data-go="acceso-login">Usar otro email</button></div>`;
+R['acceso-invitacion'] = () => { const fam = st.invType === 'padres'; return bar('Invitación', 'acceso-inicio') + `<div class="body"><div class="center" style="padding-top:12px">${logo()}<b style="font-size:18px">Pediatría Demo</b></div>
+  ${fam ? `<div class="center"><h2 class="big">Bienvenida, María</h2><p class="t2">La Dra. Andrea Salazar le invitó a ver la información de salud de:</p></div>
+  <section class="card list"><div class="li" style="cursor:default"><span class="av pr">V</span><span class="grow"><span class="name">Valentina Ríos Cedeño</span><br><span class="xs t3">Hija · 1 año 4 meses</span></span></div><div class="li" style="cursor:default"><span class="av">T</span><span class="grow"><span class="name">Tomás Ríos Cedeño</span><br><span class="xs t3">Hijo · 4 años 2 meses</span></span></div></section>
+  <p class="sm t2">Podrá ver su crecimiento, vacunas, recomendaciones e indicaciones, y agendar citas.</p>`
+  : `<div class="center"><h2 class="big">Bienvenida, Adelita</h2><p class="t2">El administrador de Pediatría Demo le invitó como <b style="color:var(--ink)">Asistente</b>.</p></div>
+  <div class="card pad sm t2">Podrá manejar la agenda, aprobar solicitudes de familias nuevas y editar horarios. No verá datos clínicos.</div>`}
+  <button class="btn p" data-go="acceso-consentimiento">Continuar</button><p class="xs t3" style="text-align:center">Invitación válida hasta el 17 nov 2026</p></div>`; };
+R['acceso-consentimiento'] = () => { const fam = st.invType === 'padres'; return bar('Antes de continuar', 'acceso-invitacion') + `<div class="body">
+  ${fam ? `<div class="card pad sm t2" style="display:flex;flex-direction:column;gap:6px"><p><b style="color:var(--ink)">Qué datos:</b> identificación, mediciones, vacunas, desarrollo e indicaciones.</p><p><b style="color:var(--ink)">Para qué:</b> atención pediátrica y recordatorios.</p><p><b style="color:var(--ink)">Sus derechos:</b> ver, corregir, exportar o pedir eliminación desde «Mis datos».</p></div>` : `<div class="card pad sm t2">Tratará datos de salud de menores. Debe mantener la confidencialidad y usar la app solo para la atención de la clínica.</div>`}
+  <button class="check" role="checkbox" aria-checked="${st.invConsent}" data-act="invconsent"><span class="box">${st.invConsent ? ic('check','s') : ''}</span><span class="sm">${fam ? 'Soy representante legal de los menores y autorizo el tratamiento de sus datos de salud.' : 'Acepto las condiciones de uso y confidencialidad.'} <button class="btn g" style="min-height:0;padding:0;font-size:13px" data-go="acceso-privacidad">Leer política</button></span></button>
+  ${fam ? `<button class="check" role="checkbox" aria-checked="${st.invWa}" data-act="invwa"><span class="box">${st.invWa ? ic('check','s') : ''}</span><span class="sm">Acepto recibir recordatorios por WhatsApp <span class="t3">(opcional)</span></span></button>` : ''}
+  <p class="pending">Texto pendiente de revisión legal (LOPDP).</p>
+  <button class="btn p" ${st.invConsent?'':'disabled'} data-act="invok">Aceptar y continuar</button></div>`; };
+R['acceso-privacidad'] = () => bar('Privacidad', 'acceso-inicio') + `<div class="body"><p class="pending">Borrador pendiente de revisión legal (LOPDP Ecuador).</p>
+  ${[['Quién trata sus datos','Pediatría Demo, Av. Ejemplo 123, Guayaquil. Contacto: privacidad@pediatria-demo.ec'],['Qué datos','Identificación del niño y sus representantes, mediciones, vacunas, desarrollo, visitas e indicaciones médicas.'],['Para qué','Atención pediátrica, seguimiento del crecimiento y recordatorios de citas, controles y vacunas.'],['Dónde se guardan','En servidores de la clínica. La app no guarda datos de salud en el teléfono.'],['Sus derechos','Acceder, corregir, exportar o pedir la eliminación desde «Perfil › Mis datos». Respondemos en máximo 15 días.']].map(([t,b]) => `<section class="card pad half"><p class="h">${t}</p><p class="sm t2" style="margin-top:4px">${b}</p></section>`).join('')}</div>`;
+R['acceso-instalar'] = () => `${bar('Instalar la app', 'acceso-inicio')}<div style="background:var(--pri);color:var(--pri-ink);padding:10px 12px 10px 16px;display:flex;align-items:center;gap:10px">${ic('dl')}<p class="sm" style="flex:1;font-weight:600">Instale la app en su teléfono</p><button class="btn sm2" style="background:var(--pri-ink);color:var(--pri);min-height:36px" data-act="install">Instalar</button></div>
+  <div class="body"><div class="card pad"><p class="h">Android y computadora</p><p class="sm t2" style="margin-top:4px">El botón «Instalar» abre el aviso del navegador. La app queda con el ícono y el nombre de la clínica.</p></div>
+  <div class="card pad"><p class="h">iPhone</p><p class="sm t2" style="margin-top:4px">Safari no muestra el botón. Mostramos los pasos.</p><button class="btn o sm2" style="margin-top:10px" data-act="ios">Ver pasos para iPhone</button></div>
+  ${st.iosHint ? `<section class="card pad" style="border-color:var(--pri);display:flex;flex-direction:column;gap:12px" aria-label="Pasos para iPhone"><div class="between"><p class="h">Agregar a la pantalla de inicio</p><button class="ib" data-act="ios" aria-label="Cerrar">${ic('x')}</button></div>${['Toque <b>Compartir</b> en la barra de Safari.','Elija <b>Agregar a inicio</b>.','Toque <b>Agregar</b>.'].map((t,i) => `<div class="row"><span class="sic pr" style="font-weight:700">${i+1}</span><span class="sm">${t}</span></div>`).join('')}</section>` : ''}
+  <div class="card pad center"><p class="xs t3">Pantalla de carga (splash)</p>${logo(64)}<b>Pediatría Demo</b><span class="xs t3">con Control Pediátrico</span></div></div>`;
+const sysPage = (icon, cls, title, body, actions) => `<div class="body" style="min-height:100%;justify-content:center"><div class="center" style="padding:40px 8px"><span class="sic ${cls}" style="width:72px;height:72px">${ic(icon)}</span><h2 class="big">${title}</h2><p class="t2">${body}</p></div>${actions}</div>`;
+R['acceso-offline'] = () => bar('Sin conexión', 'acceso-inicio') + sysPage('x','na','Sin conexión','Para proteger la información de los niños, la app no guarda datos de salud en el teléfono. Conéctese a internet para continuar.', `<button class="btn p" data-act="retry">Reintentar</button>`);
+R['acceso-404'] = () => bar('404', 'acceso-inicio') + sysPage('search','na','No encontramos esta página','Puede que el enlace esté mal escrito o ya no exista.', `<button class="btn p" data-role-go="medico">Ir al inicio</button>`);
+R['acceso-403'] = () => bar('403', 'acceso-inicio') + sysPage('lock','na','No tiene acceso','Esta ficha pertenece a otro representante o a otra área de la clínica.', `<button class="btn o" data-go="acceso-inicio">Volver</button>`);
+R['acceso-sesion'] = () => bar('Sesión expirada', 'acceso-inicio') + sysPage('clock','wa','Su sesión expiró','Por seguridad cerramos la sesión tras 12 horas sin uso (médicos) o 30 días (padres).', `<button class="btn p" data-go="acceso-login">Ingresar de nuevo</button>`);
+
+/* ---------- admin ---------- */
+const hx = h => [0,2,4].map(i => parseInt(h.slice(1).substr(i,2),16));
+const toHex = a => '#' + a.map(v => Math.max(0,Math.min(255,Math.round(v))).toString(16).padStart(2,'0')).join('');
+const mix = (a,b,t) => toHex(hx(a).map((v,i) => v + (hx(b)[i]-v)*t));
+const lum = h => { const c = hx(h).map(v => { v/=255; return v <= 0.03928 ? v/12.92 : Math.pow((v+0.055)/1.055,2.4); }); return 0.2126*c[0]+0.7152*c[1]+0.0722*c[2]; };
+const contrast = h => 1.05 / (lum(h) + 0.05);
+function applyBrand(hex) {
+  let c = hex; for (let i = 0; i < 12 && contrast(c) < 4.5; i++) c = mix(c, '#000000', 0.08);
+  const r = document.documentElement.style;
+  r.setProperty('--pri', c); r.setProperty('--pri-soft', mix(c,'#ffffff',0.92)); r.setProperty('--pri-soft-ink', mix(c,'#000000',0.3));
+  return c;
+}
+const BRANDS = [['Teal','#0f766e'],['Azul','#1d4ed8'],['Índigo','#4338ca'],['Violeta','#7c3aed'],['Granate','#be123c'],['Turquesa','#14b8a6']];
+const wzSteps = ['Clínica','Marca','Contacto','Primer médico','Recordatorios'];
+function brandBlock() {
+  const w = st.wz, cr = contrast(w.color);
+  return `<div class="field"><span class="lbl">Logo</span><button class="card pad row" style="width:100%;border-style:dashed;cursor:pointer;text-align:left" data-act="logo">${logo(48)}<span class="grow"><b class="sm">logo-pediatria-demo.svg</b><br><span class="xs t3">SVG o PNG cuadrado · toque para cambiar</span></span></button></div>
+  <div><span class="lbl">Color primario</span><div class="row" style="gap:8px;flex-wrap:wrap">${BRANDS.map(([n,c]) => `<button data-act="wzcolor" data-arg="${c}" aria-label="${n}" aria-pressed="${w.color===c}" style="width:44px;height:44px;border-radius:12px;background:${c};border:3px solid ${w.color===c?'var(--ink)':'transparent'};cursor:pointer"></button>`).join('')}</div></div>
+  <div class="alert ${cr >= 4.5 ? 'ok' : 'wa'}">${ic(cr >= 4.5 ? 'check' : 'tri','s')}<span>Contraste con texto blanco ${f(cr,1)}:1 · ${cr >= 4.5 ? 'cumple WCAG AA' : 'no cumple; la app usa un tono más oscuro en botones'}</span></div>
+  <p class="xs t3">Vista previa en vivo: toda la demo cambia al color elegido. Los colores de las curvas y de las alertas clínicas no cambian.</p>`;
+}
+function contactBlock() {
+  return `<div class="field"><label for="wz-ad">Dirección</label><div class="inp"><input id="wz-ad" data-bind="wz.addr" value="${esc(st.wz.addr)}"></div></div><div class="field"><label for="wz-tel">Teléfono</label><div class="inp"><input id="wz-tel" data-bind="wz.tel" value="${esc(st.wz.tel)}"></div></div>`;
+}
+R['admin-inicio'] = () => {
+  const w = st.wz;
+  if (w.done) return bar('Configuración inicial') + `<div class="body"><div class="center" style="padding:24px 8px">${logo(64)}<h2 class="big">${esc(w.name)} está lista</h2><p class="t2">Se envió la invitación a ${esc(w.doc)}. Ya puede invitar a su equipo y a las familias.</p></div><button class="btn p half" data-go="admin-usuarios">Invitar al equipo</button><button class="btn o half" data-act="wzreset">Ver el asistente otra vez</button></div>`;
+  let body = '';
+  if (w.step === 1) body = `<div class="field"><label for="wz-n">Nombre de la clínica</label><div class="inp"><input id="wz-n" data-bind="wz.name" value="${esc(w.name)}"></div></div><p class="xs t3">Aparece en la app, los emails, los mensajes y el informe PDF.</p>`;
+  if (w.step === 2) body = brandBlock();
+  if (w.step === 3) body = contactBlock();
+  if (w.step === 4) body = `<div class="field"><label for="wz-dn">Nombre del médico</label><div class="inp"><input id="wz-dn" data-bind="wz.doc" value="${esc(w.doc)}"></div></div><div class="field"><label for="wz-de">Email</label><div class="inp"><input id="wz-de" type="email" data-bind="wz.docEm" value="${esc(w.docEm)}"></div></div><p class="xs t3">Recibe un enlace de invitación válido 7 días.</p>`;
+  if (w.step === 5) body = [['rc','Recordatorios de citas'],['rv','Controles y vacunas pendientes'],['rr','Recomendaciones nuevas']].map(([k,l]) => `<div class="row" style="justify-content:space-between;padding:6px 0"><span>${l}</span><button class="sw" role="switch" aria-checked="${w[k]}" aria-label="${l}" data-act="wztog" data-arg="${k}"></button></div>`).join('') + '<p class="xs t3">Canales: email, WhatsApp y avisos en la app. Se ajustan en «Clínica › Recordatorios».</p>';
+  return bar('Configuración inicial') + `<div class="body"><div class="hscroll">${wzSteps.map((s,i) => `<span class="chip" style="cursor:default;${i+1===w.step?'border-color:var(--pri);background:var(--pri-soft);color:var(--pri-soft-ink)':''}"><b>${i+1 < w.step ? '✓' : i+1}</b> ${s}</span>`).join('')}</div>
+  <section class="card pad" style="display:flex;flex-direction:column;gap:12px"><p class="xs t3">Paso ${w.step} de 5</p><h2 class="big">${wzSteps[w.step-1]}</h2>${body}</section>
+  <div class="row" style="gap:8px">${w.step > 1 ? '<button class="btn o" style="flex:1" data-act="wzback">Atrás</button>' : ''}<button class="btn p" style="flex:2" data-act="wznext">${w.step === 5 ? 'Finalizar' : 'Continuar'}</button></div></div>`;
+};
+R['admin-usuarios'] = () => {
+  const team = st.uTab === 'equipo', f = st.uForm;
+  let form = '';
+  if (st.uInvite) form = `<section class="card pad" style="border-color:var(--pri);display:flex;flex-direction:column;gap:10px"><div class="between"><p class="h">${team ? 'Invitar al equipo' : 'Invitar a un padre o madre'}</p><button class="ib" data-act="uclose" aria-label="Cerrar">${ic('x')}</button></div>
+    <div class="g2"><div class="field"><label for="u-n">Nombre</label><div class="inp"><input id="u-n" data-bind="uForm.n" value="${esc(f.n)}"></div></div><div class="field"><label for="u-e">Email</label><div class="inp"><input id="u-e" type="email" data-bind="uForm.em" value="${esc(f.em)}"></div></div></div>
+    ${team ? `<div class="field"><label for="u-r">Rol</label><div class="inp"><select id="u-r" data-bind="uForm.rol">${['Médico','Asistente','Admin'].map(r => `<option ${r===f.rol?'selected':''}>${r}</option>`).join('')}</select></div><p class="xs t3" style="margin-top:6px">Asistente: agenda y solicitudes, sin datos clínicos.</p></div>` : `<div class="field"><label for="u-c">Vincular con</label><div class="inp"><select id="u-c" data-bind="uForm.child">${['Valentina','Tomás','Renata'].map(r => `<option ${r===f.child?'selected':''}>${r}</option>`).join('')}</select></div></div>`}
+    <button class="btn p" data-act="usend">Enviar invitación</button></section>`;
+  const rows = team
+    ? st.team.map(u => `<div style="padding:12px 14px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:8px;${u.on?'':'opacity:.6'}"><div class="between"><span><b>${esc(u.n)}</b><br><span class="xs t3">${esc(u.em)}</span></span><span class="badge ${u.s==='Activo'?'ok':u.on?'wa':'na'}">${esc(u.on ? u.s : 'Desactivado')}</span></div><div class="row" style="gap:8px;flex-wrap:wrap"><span class="badge na">${esc(u.r)}</span><span style="flex:1"></span>${u.r.includes('Admin') ? '' : `<button class="btn o sm2" data-act="urole" data-arg="${u.id}">Cambiar rol</button>`}<button class="btn o sm2 ${u.on?'danger':''}" data-act="uon" data-arg="${u.id}">${u.on?'Desactivar':'Activar'}</button></div></div>`).join('')
+    : st.parents.map(u => `<div style="padding:12px 14px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:8px;${u.on?'':'opacity:.6'}"><div class="between"><span><b>${esc(u.n)}</b><br><span class="xs t3">${esc(u.em)}</span></span><span class="badge ${u.on?(u.s==='Activo'?'ok':'wa'):'na'}">${esc(u.on ? u.s : 'Acceso revocado')}</span></div><div class="row" style="gap:6px;flex-wrap:wrap">${u.kids.map(k => `<span class="badge pr">${esc(k)}<button class="ib" style="width:24px;height:24px;color:inherit" data-act="ukid" data-arg="${u.id}|${esc(k)}" aria-label="Desvincular ${esc(k)}">${ic('x','s')}</button></span>`).join('')}<button class="btn g sm2" data-act="ulink" data-arg="${u.id}">${ic('plus','s')}Vincular hijo</button><span style="flex:1"></span><button class="btn o sm2 ${u.on?'danger':''}" data-act="pon" data-arg="${u.id}">${u.on?'Revocar acceso':'Restaurar'}</button></div></div>`).join('');
+  return bar('Usuarios') + `<div class="body"><div class="row" style="gap:8px;flex-wrap:wrap"><div class="seg" style="flex:1;min-width:220px"><button aria-pressed="${team}" data-act="utab" data-arg="equipo">Médicos y asistentes</button><button aria-pressed="${!team}" data-act="utab" data-arg="padres">Padres</button></div><button class="btn p sm2" data-act="uinv">${ic('plus','s')}Invitar</button></div>${form}<section class="card list">${rows}</section></div>`;
+};
+R['admin-clinica'] = () => {
+  const t = st.cTab;
+  let body = '';
+  if (t === 'marca') body = `<section class="card pad" style="display:flex;flex-direction:column;gap:12px">${brandBlock()}</section>`;
+  if (t === 'contacto') body = `<section class="card pad" style="display:flex;flex-direction:column;gap:12px"><div class="field"><label for="c-n">Nombre</label><div class="inp"><input id="c-n" data-bind="wz.name" value="${esc(st.wz.name)}"></div></div>${contactBlock()}</section>`;
+  if (t === 'recordatorios') {
+    const meta = st.prov === 'meta';
+    body = `<section class="card list half"><div class="pad h" style="padding-bottom:4px">Canales</div>
+      <div class="li" style="cursor:default"><span class="grow"><span class="name">Email</span><br><span class="xs t3">no-responder@pediatria-demo.ec</span></span><span class="badge ok">Activo</span></div>
+      <div style="padding:12px 14px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:10px"><div class="between"><span class="name">WhatsApp</span><span class="badge ok">Conectado</span></div>
+      <div class="seg"><button aria-pressed="${meta}" data-act="prov" data-arg="meta">Meta Cloud API</button><button aria-pressed="${!meta}" data-act="prov" data-arg="twilio">Twilio</button></div>
+      ${meta ? `<div class="g2"><div class="field"><label for="w1">Phone number ID</label><div class="inp"><input id="w1" value="100000000000001"></div></div><div class="field"><label for="w2">Business Account ID</label><div class="inp"><input id="w2" value="200000000000002"></div></div></div>` : `<div class="g2"><div class="field"><label for="w3">Account SID</label><div class="inp"><input id="w3" value="ACxxxxxxxxxxxx01"></div></div><div class="field"><label for="w4">Número remitente</label><div class="inp"><input id="w4" value="+593 4 000 0000"></div></div></div>`}
+      <div class="field"><label for="w5">${meta ? 'Token de acceso' : 'Auth token'}</label><div class="row" style="gap:8px"><div class="inp" style="flex:1;background:var(--surface2)"><input id="w5" value="•••••••••••• 4f2a" readonly></div><button class="btn o sm2" data-act="tokenrep">Reemplazar</button></div><p class="xs t3" style="margin-top:6px">Se guarda cifrado y no se vuelve a mostrar. Si el servidor define variables de entorno, esas mandan.</p></div>
+      <button class="btn o sm2" data-act="testmsg">Probar envío</button></div>
+      <div class="li" style="cursor:default"><span class="grow name">En la app</span><span class="badge ok">Siempre activo</span></div></section>
+      <div class="half" style="display:flex;flex-direction:column;gap:14px"><section class="card list"><div class="pad h" style="padding-bottom:4px">Qué se envía</div>${st.rules.map((r,i) => `<div class="li" style="cursor:default;min-height:52px"><span class="grow sm">${esc(r[0])}</span><button class="sw" role="switch" aria-checked="${r[1]}" aria-label="${esc(r[0])}" data-act="rule" data-arg="${i}"></button></div>`).join('')}</section>
+      <section class="card pad" style="display:flex;flex-direction:column;gap:8px"><p class="h">Vista previa · WhatsApp</p><div style="background:var(--surface2);border-radius:12px;padding:12px" class="sm"><b>${esc(st.wz.name)}</b><br>Hola <span class="hl">María</span>, le recordamos la cita de <span class="hl">Valentina</span> con la <span class="hl">Dra. Andrea Salazar</span> el <span class="hl">jue 10 dic, 09:00</span>.<div class="row" style="margin-top:8px;gap:8px"><span class="badge pr">Confirmar</span><span class="badge pr">Reprogramar</span></div></div><p class="xs t3">Plantilla recordatorio_cita_v1 · aprobada por Meta</p></section></div>`;
+  }
+  return bar('Ajustes de la clínica') + `<div class="body"><div class="tabs" role="tablist">${[['marca','Marca'],['contacto','Contacto'],['recordatorios','Recordatorios']].map(([k,l]) => `<button role="tab" aria-selected="${t===k}" data-act="ctab" data-arg="${k}">${l}</button>`).join('')}</div>${body}</div>`;
+};
+const LOG = [
+  ['10 nov 09:24','Dra. Salazar','Creó','Visita · Valentina Ríos','Peso, longitud, PC, indicaciones'],
+  ['10 nov 09:12','Dra. Salazar','Vio','Ficha · Valentina Ríos','Pestaña Crecimiento'],
+  ['10 nov 08:40','Adelita Mora','Aprobó','Solicitud · Daniel Pino','Primera consulta 10:00'],
+  ['10 nov 07:48','María Cedeño','Vio','Ficha · Valentina Ríos','Portal de padres'],
+  ['9 nov 18:30','María Cedeño','Descargó','Informe PDF · Valentina Ríos','Informe de crecimiento'],
+  ['5 nov 10:02','Dr. Arteaga','Vio','Ficha · Valentina Ríos','Reemplazo de turno'],
+  ['3 nov 15:41','Dra. Salazar','Editó','Antecedentes · Valentina Ríos','Peso al nacer 3,10 → 3,15 kg'],
+  ['1 nov 08:05','Sistema','Envió','Recordatorio · Valentina Ríos','WhatsApp · cita 5 nov']
+];
+R['admin-auditoria'] = () => {
+  const reg = st.auTab === 'registro';
+  let body = '';
+  if (reg) {
+    const users = ['Todos', ...new Set(LOG.map(l => l[1]))], acts = ['Todas', ...new Set(LOG.map(l => l[2]))];
+    const rows = LOG.filter(l => (st.auUser === 'Todos' || l[1] === st.auUser) && (st.auAct === 'Todas' || l[2] === st.auAct));
+    body = `<div class="g2"><div class="field"><label for="au-u">Usuario</label><div class="inp"><select id="au-u" data-bind="auUser" data-rerender="1">${users.map(u => `<option ${u===st.auUser?'selected':''}>${esc(u)}</option>`).join('')}</select></div></div><div class="field"><label for="au-a">Acción</label><div class="inp"><select id="au-a" data-bind="auAct" data-rerender="1">${acts.map(u => `<option ${u===st.auAct?'selected':''}>${esc(u)}</option>`).join('')}</select></div></div></div>
+    <section class="card list">${rows.length ? rows.map(l => `<div class="li" style="cursor:default;align-items:flex-start"><span class="xs t3" style="width:78px;flex:none">${esc(l[0])}</span><span class="grow"><span class="name sm">${esc(l[1])}</span> <span class="badge na" style="height:20px">${esc(l[2])}</span><br><span class="sm">${esc(l[3])}</span><br><span class="xs t3">${esc(l[4])}</span></span></div>`).join('') : '<p class="empty">No hay eventos con esos filtros.</p>'}</section>
+    <div class="row" style="justify-content:space-between"><span class="xs t3">${rows.length} eventos · se conservan 5 años</span><button class="btn o sm2" data-act="csv">${ic('dl','s')}Exportar CSV</button></div>`;
+  } else {
+    body = `<section class="card list">${st.dataReqs.map(r => `<div style="padding:12px 14px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:8px"><div class="between"><span class="badge ${r.type==='Eliminación'?'ou':'pr'}">${esc(r.type)}</span><span class="xs t3">${r.s==='Abierta' ? esc(r.due) : ''}</span></div><b>${esc(r.who)}</b><p class="sm t2">${esc(r.d)}</p>
+      ${r.s !== 'Abierta' ? `<span class="badge ok" style="align-self:flex-start">${ic('check','s')}${esc(r.s)}</span>` : st.dataAsk === r.id ? `<div class="alert ou">${ic('tri','s')}<span>Se elimina la cuenta y el acceso. La historia clínica se conserva el tiempo que exige la ley.</span></div><div class="row" style="gap:8px"><button class="btn sm2" style="flex:1;background:var(--ou-ink);color:#fff" data-act="dreqok" data-arg="${r.id}">Eliminar cuenta</button><button class="btn o sm2" style="flex:1" data-act="dreqno">Volver</button></div>` : `<div class="row" style="gap:8px"><button class="btn p sm2" style="flex:1" data-act="dreq" data-arg="${r.id}">${r.type==='Eliminación'?'Revisar':'Generar exportación'}</button><button class="btn o sm2" data-act="dreqrej" data-arg="${r.id}">Rechazar</button></div>`}</div>`).join('') || '<p class="empty">No hay solicitudes.</p>'}</section><p class="xs t3">Plazo legal de respuesta: 15 días (LOPDP).</p>`;
+  }
+  const open = st.dataReqs.filter(r => r.s === 'Abierta').length;
+  return bar('Auditoría') + `<div class="body"><div class="seg"><button aria-pressed="${reg}" data-act="autab" data-arg="registro">Registro de accesos</button><button aria-pressed="${!reg}" data-act="autab" data-arg="solicitudes">Solicitudes de datos${open ? ` (${open})` : ''}</button></div>${body}</div>`;
+};
+
+/* parents */
+R['padres-inicio'] = () => {
+  const z = latestZ();
+  const lines = [['Estatura', z.l], ['Peso', z.w], ['Cabeza', z.pc]].map(([t,zz]) => { const p = plain(t, zz); return {...p, t: `${p.t} <span class="t3">· Z ${fz(zz)}</span>`}; });
+  const next = st.book.confirmed ? `${st.book.confirmed.day}, ${st.book.confirmed.slot}` : 'jue 10 dic, 09:00';
+  const rec = st.recs[st.recs.length-1];
+  return bar('Pediatría Demo') + `<div class="body">
+  <h2 class="big">Hola, María</h2>
+  <button class="card pad cardbtn half" data-go="padres-hijo">
+    <span class="row"><span class="av pr" style="width:44px;height:44px">V</span><span style="flex:1"><b style="font-size:17px">Valentina</b><br><span class="sm t3">1 año 4 meses · ${st.savedToday?'visita de hoy':'última visita 5 oct'}</span></span>${ic('next')}</span>
+    <span>${lines.map(x => `<span class="status"><span class="sic ${x.k}">${ic(x.k==='ok'?'check':'tri','s')}</span><span class="sm" style="flex:1">${x.t}</span></span>`).join('')}</span>
+    <span style="display:block;border-radius:12px;background:var(--pri-soft);padding:10px 12px"><span class="xs" style="font-weight:700;color:var(--pri-soft-ink)">Recomendación de la doctora · ${esc(rec.d)}</span><br><span class="sm">${esc(rec.t)}</span></span>
+    <span class="sm row" style="gap:8px">${ic('cal','s')}Próximo control: <b>${esc(next)}</b></span>
+  </button>
+  <div class="card pad half" style="display:flex;flex-direction:column;gap:10px">
+    <span class="row"><span class="av" style="width:44px;height:44px">T</span><span style="flex:1"><b style="font-size:17px">Tomás</b><br><span class="sm t3">4 años 2 meses</span></span><span class="badge ok">${ic('check','s')}Todo bien</span></span>
+    <span class="sm row" style="gap:8px">${ic('clock','s')}<span>Control anual pendiente</span><button class="btn g sm2" data-go="padres-citas" style="margin-left:auto">Agendar</button></span>
+  </div></div>`;
+};
+R['padres-hijo'] = () => {
+  const z = latestZ(), m = last();
+  const allIn = [z.w, z.l, z.pc].every(v => Math.abs(v) <= 2);
+  const sum = allIn ? 'Las medidas de Valentina están dentro del rango esperado.' : 'Una medida de Valentina está fuera del rango esperado.';
+  const sub = `Peso Z ${fz(z.w)} · Estatura Z ${fz(z.l)} · Cabeza Z ${fz(z.pc)}. La Z compara con niñas de su misma edad: 0 es el promedio y entre −2 y +2 es el rango esperado.`;
+  let tab = '';
+  if (st.pTab === 'crecimiento') {
+    tab = `<div class="card pad"><p style="font-weight:600">${sum}</p><p class="sm t2" style="margin-top:4px">${sub}</p></div>
+    <div class="seg"><button aria-pressed="${st.pMeasure==='estatura'}" data-act="pm" data-arg="estatura">Estatura</button><button aria-pressed="${st.pMeasure==='peso'}" data-act="pm" data-arg="peso">Peso</button><button aria-pressed="${st.pMeasure==='cabeza'}" data-act="pm" data-arg="cabeza">Cabeza</button></div>`;
+    const pk = {estatura:'talla', peso:'peso', cabeza:'pc'}[st.pMeasure];
+    tab += `<div class="chartbox"><div class="between" style="padding:0 8px 6px"><span class="xs" style="font-weight:600">${CF[pk].name} · 0 a 2 años</span><span class="badge na">Niña</span></div>${chart('padres', pk)}<div class="legend"><span><i style="background:var(--c-band-ok);opacity:.4;height:10px"></i>Rango esperado (Z −2 a +2)</span><span><i style="background:var(--c-med)"></i>Promedio (Z 0)</span><span><i style="background:var(--c-pt)"></i>Valentina</span></div>${tipFor(st.sel,'padres',pk)}</div>`;
+    tab += `<button class="btn o full" style="justify-content:space-between" aria-expanded="${st.pDetails}" data-act="details">Ver detalles${ic(st.pDetails?'x':'next','s')}</button>`;
+    if (st.pDetails) tab += `<div class="card" style="overflow-x:auto"><table><thead><tr><th>Fecha</th><th class="r">${CF[pk].name}</th><th class="r">Puntaje Z</th></tr></thead><tbody>${st.meas.slice(-4).reverse().map(mm => `<tr><td>${esc(mm.d)}</td><td class="r">${f(CF[pk].v(mm), CF[pk].d)} ${CF[pk].u}</td><td class="r">${fz(CF[pk].z(mm))}</td></tr>`).join('')}</tbody></table><p class="xs t3" style="padding:10px">El puntaje Z compara con niñas de la misma edad (OMS). Entre −2 y +2 es la zona esperada.</p></div>`;
+  } else if (st.pTab === 'vacunas') {
+    const x = st.vac.filter(v => v.s==='x'), ap = st.vac.filter(v => v.s==='a'), pe = st.vac.filter(v => v.s==='p');
+    const grp = (title, list, cls, icon, sub) => list.length ? `<section class="card list"><div class="between" style="padding:10px 14px"><span class="xs t3" style="font-weight:700">${title}</span><span class="badge ${cls}">${list.length}</span></div>${list.map(v => `<div class="li" style="cursor:default;min-height:56px"><span class="sic ${cls}">${ic(icon,'s')}</span><span class="grow"><span class="name sm">${esc(v.n)}</span> <span class="xs t3">(ejemplo)</span><br><span class="xs t3">${esc(v.g)} · ${sub(v)}</span></span></div>`).join('')}</section>` : '';
+    tab = (x.length ? `<div class="alert ou">${ic('clock','s')}<span>Tiene ${x.length} vacuna atrasada. Pida que se la apliquen en la próxima cita.</span></div>` : `<div class="alert ok">${ic('check','s')}<span>Vacunas al día.</span></div>`)
+      + grp('ATRASADAS', x, 'ou', 'clock', v => esc(v.f))
+      + grp('PRÓXIMAS', pe, 'na', 'cal', v => esc(v.f))
+      + grp('APLICADAS', ap, 'ok', 'check', v => 'aplicada el ' + esc(v.f));
+  } else if (st.pTab === 'hitos') {
+    tab = `<section class="card list">${st.hitos.map(h => `<div class="li" style="cursor:default"><span class="sic ${h.a?'ok':'na'}">${ic(h.a?'check':'clock','s')}</span><span class="grow"><span class="name">${esc(h.n)}</span><br><span class="xs t3">${esc(h.d)} · ${h.a ? 'Lo logró a los ' + esc(h.a) : 'Esperado: ' + esc(h.w)}</span></span></div>`).join('')}</section>`;
+  } else {
+    tab = st.recs.slice().reverse().map((r,i) => `<div class="card pad" style="${i===0?'border-color:var(--pri)':''}"><p class="xs t3">${esc(r.d)} · Dra. Salazar</p><p class="sm" style="font-weight:700;margin-top:6px">Recomendaciones</p><p>${esc(r.t)}</p>${r.ind ? `<p class="sm" style="font-weight:700;margin-top:8px">Indicaciones médicas</p><p>${esc(r.ind)}</p>` : ''}</div>`).join('');
+  }
+  return bar('Valentina', 'padres-inicio') + `<div class="body">
+  <button class="btn o full" data-go="padres-informe">${ic('file')}Ver informe PDF</button>
+  <div class="tabs" role="tablist">${[['crecimiento','Crecimiento'],['vacunas','Vacunas'],['hitos','Hitos'],['consejos','Consejos']].map(([k,l]) => `<button role="tab" aria-selected="${st.pTab===k}" data-act="ptab" data-arg="${k}">${l}</button>`).join('')}</div>
+  ${tab}</div>`;
+};
+const DAYS = [['mié 11','11'],['jue 12','12'],['vie 13','13'],['lun 16','16'],['mar 17','17']];
+const SLOTS = ['08:30','09:00','09:30','10:30','14:00','14:30','15:30','16:00'];
+const BUSY = {'11':['09:00','14:00'],'12':['09:30'],'13':['08:30','09:00','09:30'],'16':[],'17':['16:00']};
+R['padres-citas'] = () => {
+  const b = st.book;
+  return bar('Agendar cita') + `<div class="body">
+  <div><span class="lbl">¿Para quién?</span><div class="radio" role="radiogroup" aria-label="Hijo o hija"><button role="radio" aria-checked="${b.child==='Valentina'}" data-act="child" data-arg="Valentina">Valentina</button><button role="radio" aria-checked="${b.child==='Tomás'}" data-act="child" data-arg="Tomás">Tomás</button></div></div>
+  <div><span class="lbl">Día · noviembre 2026</span><div class="hscroll">${DAYS.map(([l,k]) => `<button class="chip" style="min-width:68px;text-align:center" aria-pressed="${b.day===k}" data-act="day" data-arg="${k}"><span class="xs" style="font-weight:600">${l.split(' ')[0]}</span><br><b style="font-size:18px">${l.split(' ')[1]}</b></button>`).join('')}</div></div>
+  ${b.day ? `<div><span class="lbl">Horarios libres</span><div class="g4">${SLOTS.map(s => { const busy = BUSY[b.day].includes(s); return `<button class="chip" style="text-align:center;font-weight:600" ${busy?'disabled aria-label="'+s+' ocupado"':''} aria-pressed="${b.slot===s}" data-act="slot" data-arg="${s}">${s}</button>`; }).join('')}</div></div>` : `<p class="sm t3">Elija un día para ver los horarios libres.</p>`}
+  <div class="alert" style="background:var(--na-bg);color:var(--ink2)">${ic('bell','s')}<span>Le recordaremos ${[st.chan.email&&'por email', st.chan.wa&&'por WhatsApp', st.chan.app&&'en la app'].filter(Boolean).join(' y ') || '(sin canales activos)'} 24 h antes. <button class="btn g" style="min-height:0;padding:0;font-size:13px" data-go="padres-perfil">Cambiar</button></span></div>
+  <button class="btn p full" ${b.day && b.slot ? '' : 'disabled'} data-act="confirm">${b.day && b.slot ? `Confirmar · ${DAYS.find(d=>d[1]===b.day)[0]}, ${b.slot}` : 'Elija día y hora'}</button></div>`;
+};
+R['padres-cita-ok'] = () => {
+  const c = st.book.confirmed;
+  if (!c) return R['padres-citas']();
+  return bar('Citas') + `<div class="body">
+  <div class="center" style="padding:16px 8px 4px"><span class="sic ok" style="width:64px;height:64px">${ic('check')}</span><h2 class="big">Cita confirmada</h2><p class="t2">Le enviamos los detalles a su email.</p></div>
+  <div class="card pad"><div class="kv"><span class="t3">Paciente</span><b>${esc(c.child)}</b></div><div class="kv"><span class="t3">Fecha</span><b>${esc(c.day)} nov 2026</b></div><div class="kv"><span class="t3">Hora</span><b>${esc(c.slot)}</b></div><div class="kv"><span class="t3">Con</span><b>Dra. Andrea Salazar</b></div></div>
+  ${st.book.cancelAsk ? `<div class="card pad" style="border-color:var(--ou-ink)"><p style="font-weight:600">¿Cancelar la cita?</p><p class="sm t2">La hora quedará libre para otra familia.</p><div class="row" style="gap:8px;margin-top:10px"><button class="btn p sm2" style="flex:1;background:var(--ou-ink);color:var(--surface)" data-act="cancelyes">Sí, cancelar</button><button class="btn o sm2" style="flex:1" data-act="cancelno">No</button></div></div>`
+  : `<div class="row" style="gap:8px"><button class="btn o" style="flex:1" data-act="resched">Reprogramar</button><button class="btn o danger" style="flex:1" data-act="cancelask">Cancelar cita</button></div>`}
+  <button class="btn g full" data-go="padres-inicio">Volver al inicio</button></div>`;
+};
+R['padres-avisos'] = () => bar('Avisos') + `<div class="body"><section class="card list">${st.notifs.map(n => `<div class="li" style="cursor:default;align-items:flex-start;${n.new?'background:var(--pri-soft)':''}"><span class="sic ${n.x?'ou':n.new?'pr':'na'}">${ic(n.k,'s')}</span><span class="grow"><span class="name sm">${esc(n.t)}</span><br><span class="sm t2">${esc(n.b)}</span><br><span class="xs t3">${esc(n.w)}</span></span></div>`).join('')}</section></div>`;
+R['padres-perfil'] = () => bar('Perfil') + `<div class="body">
+  <div class="card pad row"><span class="av pr" style="width:44px;height:44px">MC</span><span style="flex:1"><b>María Cedeño</b><br><span class="sm t3">maria.cedeno@correo.ec</span></span></div>
+  <section class="card list half"><div class="pad h" style="padding-bottom:4px">Recordatorios</div>
+  ${[['email','Email'],['wa','WhatsApp'],['app','En la app']].map(([k,l]) => `<div class="li" style="cursor:default;min-height:56px"><span class="grow">${l}</span><button class="sw" role="switch" aria-checked="${st.chan[k]}" aria-label="${l}" data-act="chan" data-arg="${k}"></button></div>`).join('')}</section>
+  <section class="card list half"><div class="pad" style="padding-bottom:4px"><p class="h">Mis datos</p><p class="xs t3">Sus derechos según la LOPDP (texto pendiente de revisión legal).</p></div>
+  <button class="li" data-act="datareq" data-arg="ver">Ver mis datos</button><button class="li" data-act="datareq" data-arg="exportar">Exportar (PDF)</button><button class="li" style="color:var(--ou-ink);font-weight:600" data-act="datareq" data-arg="eliminar">Pedir eliminación</button></section></div>`;
+
+/* new family */
+R['nueva-clinica'] = () => `<div class="hero center"><svg viewBox="0 0 64 64" width="60" height="60" aria-hidden="true"><rect width="64" height="64" rx="14" style="fill:var(--pri)"/><path d="M14 46C24 44 30 36 36 28S46 18 50 17" fill="none" style="stroke:var(--pri-ink)" stroke-width="5" stroke-linecap="round"/><circle cx="50" cy="17" r="5" style="fill:var(--pri-ink)"/></svg><h2 class="big">Pediatría Demo</h2><p class="sm t2">Control de niño sano, vacunas y seguimiento del crecimiento</p></div>
+  <div class="body"><div class="row" style="align-items:flex-start">${ic('pin')}<span><b>Av. Ejemplo 123, Guayaquil</b><br><span class="sm t3">Lun–Vie 08:00–17:00 · Sáb 08:00–12:00</span></span></div>
+  <div class="card pad"><p style="font-weight:600">Primera cita para su hijo o hija</p><p class="sm t2" style="margin-top:4px">Elija un horario libre. La doctora revisa la solicitud y le llega un email cuando la confirme.</p></div>
+  <button class="btn p full" data-go="nueva-horario">Reservar primera cita</button><p class="sm t2" style="text-align:center">¿Ya es paciente? <button class="btn g" style="min-height:0;padding:0" data-role-go="padres">Ingresar</button></p></div>`;
+const step = (n, t) => `<div style="padding:12px 16px;background:var(--surface);border-bottom:1px solid var(--line)"><div class="between sm"><b>${t}</b><span class="t3">Paso ${n} de 3</span></div><div style="height:4px;border-radius:9px;background:var(--na-bg);margin-top:8px"><div style="height:100%;width:${n/3*100}%;background:var(--pri);border-radius:9px"></div></div></div>`;
+R['nueva-horario'] = () => { const b = st.nf; return bar('Reservar', 'nueva-clinica') + step(1, 'Fecha y horario') + `<div class="body">
+  <div><span class="lbl">Día · primera consulta 45 min</span><div class="hscroll">${DAYS.map(([l,k]) => `<button class="chip" style="min-width:68px;text-align:center" aria-pressed="${b.day===k}" data-act="nday" data-arg="${k}"><span class="xs" style="font-weight:600">${l.split(' ')[0]}</span><br><b style="font-size:18px">${l.split(' ')[1]}</b></button>`).join('')}</div></div>
+  ${b.day ? `<div class="g3">${['08:00','09:00','10:00','14:00','15:00','16:00'].map(s => `<button class="chip" style="text-align:center;font-weight:600" aria-pressed="${b.slot===s}" data-act="nslot" data-arg="${s}">${s}</button>`).join('')}</div>` : `<p class="sm t3">Elija un día.</p>`}
+  <button class="btn p full" ${b.day&&b.slot?'':'disabled'} data-go="nueva-datos">Continuar</button></div>`; };
+R['nueva-datos'] = () => { const b = st.nf; return bar('Reservar', 'nueva-horario') + step(2, 'Datos') + `<div class="body">
+  <p class="h">Niño o niña</p>
+  <div class="g2"><div class="field"><label for="n-cn">Nombres</label><div class="inp"><input id="n-cn" data-bind="nf.cn" value="${esc(b.cn)}"></div></div><div class="field"><label for="n-ca">Apellidos</label><div class="inp"><input id="n-ca" data-bind="nf.ca" value="${esc(b.ca)}"></div></div></div>
+  <div><span class="lbl">Sexo</span><div class="radio" role="radiogroup" aria-label="Sexo"><button role="radio" aria-checked="${b.sex==='M'}" data-act="sex" data-arg="M">Masculino</button><button role="radio" aria-checked="${b.sex==='F'}" data-act="sex" data-arg="F">Femenino</button></div></div>
+  <div class="field"><label for="n-dob">Fecha de nacimiento</label><div class="inp"><input id="n-dob" data-bind="nf.dob" value="${esc(b.dob)}"></div></div>
+  <p class="h" style="margin-top:4px">Representante</p>
+  <div class="field"><label for="n-gn">Nombre</label><div class="inp"><input id="n-gn" data-bind="nf.gn" value="${esc(b.gn)}"></div></div>
+  <div class="field"><label for="n-rel">Parentesco</label><div class="inp"><select id="n-rel" data-bind="nf.rel">${['Madre','Padre','Abuela/o','Otro'].map(o=>`<option ${o===b.rel?'selected':''}>${o}</option>`).join('')}</select></div></div>
+  <div class="field"><label for="n-em">Email</label><div class="inp"><input id="n-em" type="email" data-bind="nf.em" value="${esc(b.em)}"></div></div>
+  <div class="field"><label for="n-tel">Teléfono / WhatsApp</label><div class="inp"><span class="unit">+593</span><input id="n-tel" data-bind="nf.tel" value="${esc(b.tel)}"></div></div>
+  <button class="btn p full" data-go="nueva-verificar">Continuar</button></div>`; };
+R['nueva-verificar'] = () => { const b = st.nf; const ok = b.consent && /^\d{6}$/.test(b.otp); return bar('Reservar', 'nueva-datos') + step(3, 'Confirmar y verificar') + `<div class="body">
+  <button class="check" role="checkbox" aria-checked="${b.consent}" data-act="consent"><span class="box">${b.consent ? ic('check','s') : ''}</span><span class="sm">Autorizo el tratamiento de los datos de salud de ${esc(b.cn)} según la LOPDP. <span class="t3">(Texto pendiente de revisión legal)</span></span></button>
+  <div><h3 class="h">Código de verificación</h3><p class="sm t2" style="margin-top:2px">Enviamos 6 dígitos a <b style="color:var(--ink)">${esc(b.em)}</b>. En la demo sirve cualquier número.</p></div>
+  <div class="inp"><input class="otp" id="n-otp" inputmode="numeric" maxlength="6" aria-label="Código de 6 dígitos" data-bind="nf.otp" value="${esc(b.otp)}" placeholder="······"></div>
+  <div class="card pad sm"><b>Resumen</b><br><span class="t2">${esc(b.cn)} ${esc(b.ca)} · ${esc(DAYS.find(d=>d[1]===b.day)?.[0] || '')} nov, ${esc(b.slot || '')} · Primera consulta</span></div>
+  <button class="btn p full" id="sendReq" ${ok?'':'disabled'} data-act="sendreq">Enviar solicitud</button></div>`; };
+R['nueva-enviada'] = () => `<div class="body" style="min-height:100%;justify-content:center"><div class="center" style="padding:32px 8px"><span class="sic ok" style="width:72px;height:72px">${ic('send')}</span><h2 class="big">Solicitud enviada</h2><p class="t2">La Dra. Salazar revisará su solicitud. Aún no está confirmada; le escribiremos a su email cuando responda.</p></div>
+  <button class="btn o full" data-act="restartnf">Volver a la página de la clínica</button></div>`;
+
+/* ---------- guide text ---------- */
+const G = {
+  'medico-inicio': ['Médico · Inicio','Lo primero que ve la doctora: citas de hoy, solicitudes de reserva, pacientes fuera de ±2 DE (con el nombre OMS) y pacientes cuya curva viene cambiando.',['Toque «Valentina Ríos» en «Cómo vienen creciendo».','Toque la tarjeta de solicitudes para ir a la agenda.']],
+  'medico-pacientes': ['Médico · Pacientes','Buscador rápido por nombre o cédula.',['Escriba «val» en el buscador.','En la demo solo la ficha de Valentina está completa.']],
+  'medico-paciente': ['Médico · Ficha del paciente','Resumen por indicador con la puntuación Z y su cambio desde la visita anterior. Solo se marca con nombre OMS lo que lo tiene (por ejemplo «Talla baja»). Abajo, las curvas de la OMS.',['Toque los puntos azules del gráfico.','Cambie a «Tabla».','Abra Hitos: filtre por área y vea los tamizajes.','Toque «Nueva visita».']],
+  'medico-visita': ['Médico · Nueva visita','La Z se calcula mientras escribe. La nota clínica es privada; recomendaciones e indicaciones médicas las ven los padres y van al PDF.',['Cambie el peso a 6,80 o 11,20 y mire la vista previa.','Elija «De pie» para ver la advertencia.','Guarde la visita y luego cambie a «Padres» → Consejos.']],
+  'medico-informe': ['Médico · Informe PDF','Vista previa del PDF que se exporta: 3 hojas A4 con la marca de la clínica. Incluye resultados con su Z y clasificación OMS, las curvas, recomendaciones, indicaciones médicas, vacunas, desarrollo y próximo control. Nunca las notas privadas.',['Baje para ver las 3 hojas.','Guarde una visita nueva y vuelva: el informe se actualiza.']],
+  'padres-informe': ['Padres · Informe PDF','Es el mismo informe que entrega la doctora: los padres lo descargan desde la ficha de su hijo.',['Baje para ver las 3 hojas.']],
+  'medico-agenda': ['Médico · Agenda','Vista de día, semana y mes. Toque una cita para ver el detalle, reprogramarla o cancelarla. Las solicitudes de familias nuevas se aprueban aquí.',['Cambie entre Día, Semana y Mes.','En Mes, toque un día.','Toque una cita y pruebe «Reprogramar».','Cree una cita con «Nueva cita».','Abra «Horarios» para editar la disponibilidad.']],
+  'medico-disponibilidad': ['Médico · Horarios de atención','Define qué horas ven libres los padres y la página pública: días, horas, almuerzo, duración de las citas y días bloqueados.',['Apague el sábado.','Agregue un día bloqueado.']],
+  'asistente-agenda': ['Asistente · Agenda','Adelita maneja la agenda y aprueba solicitudes, pero no ve datos clínicos: no tiene «Abrir ficha».',['Acepte una solicitud.','Toque una cita: no aparece «Abrir ficha».']],
+  'asistente-disponibilidad': ['Asistente · Horarios','La asistente también puede ajustar los horarios de atención.',['Cambie la duración de las citas.']],
+  'medico-nuevo': ['Médico · Nuevo paciente','Datos del niño, antecedentes al nacer y representantes con invitación al portal.',['Escriba 33 semanas en edad gestacional: aparece la edad corregida.','Escriba 26: se sugiere extender hasta 36 meses.','Agregue un segundo representante.','Toque «Crear paciente».']],
+  'medico-ficha': ['Médico · Ficha nueva','Así se ve un paciente recién creado: sin mediciones todavía, con sus representantes invitados.',['Toque «Agendar cita»: la cita se crea en la agenda.']],
+  'medico-avisos': ['Médico · Avisos','Solicitudes nuevas, confirmaciones de familias y controles atrasados.',['Toque la solicitud para ir a la agenda.']],
+  'medico-perfil': ['Médico · Perfil','Datos del médico, horarios, acceso a la administración y cierre de sesión.',['Toque «Cerrar sesión» para ver el acceso con código.']],
+  'acceso-inicio': ['Acceso y sistema · Índice','Pantallas que comparten todos los usuarios: entrar, invitaciones, privacidad, instalar la app y páginas de error.',['Elija un flujo de la lista.']],
+  'acceso-login': ['Acceso · Ingresar','Se entra solo con un código por email. Las cuentas se crean por invitación o desde la reserva pública.',['Elija con qué rol entrar (solo demo) y toque «Enviar código».']],
+  'acceso-codigo': ['Acceso · Código','Código de 6 dígitos: vence en 10 minutos y sirve una sola vez.',['Escriba 000000 para ver el error.','Escriba cualquier otro número de 6 dígitos para entrar.']],
+  'acceso-vencido': ['Acceso · Código vencido','Qué pasa cuando el código ya no sirve.',['Pida un código nuevo.']],
+  'acceso-invitacion': ['Acceso · Invitación','La persona invitada ve quién la invitó y a qué tendrá acceso.',['Toque «Continuar».']],
+  'acceso-consentimiento': ['Acceso · Consentimiento','Consentimiento obligatorio para tratar datos de salud de menores; WhatsApp es opcional.',['Marque el consentimiento y continúe.']],
+  'acceso-privacidad': ['Acceso · Privacidad','Borrador de la política de privacidad. La revisará un abogado.',[]],
+  'acceso-instalar': ['Sistema · Instalar la app','Banner de instalación, pasos para iPhone y pantalla de carga.',['Toque «Ver pasos para iPhone».']],
+  'acceso-offline': ['Sistema · Sin conexión','La app no guarda datos de salud en el teléfono: sin internet no muestra datos.',[]],
+  'acceso-404': ['Sistema · 404','Enlace roto o inexistente.',[]],
+  'acceso-403': ['Sistema · 403','Intento de abrir una ficha sin permiso.',[]],
+  'acceso-sesion': ['Sistema · Sesión expirada','La sesión se cierra tras 12 horas sin uso (médicos) o 30 días (padres).',[]],
+  'admin-inicio': ['Admin · Configuración inicial','Asistente de 5 pasos: nombre, marca, contacto, primer médico y recordatorios.',['En «Marca», elija otro color: toda la demo cambia.','Llegue a «Finalizar».']],
+  'admin-usuarios': ['Admin · Usuarios','Médicos, asistentes y padres. Invitar, cambiar rol, desactivar, vincular o desvincular hijos y revocar accesos.',['Invite a una asistente.','En Padres, desvincule y vuelva a vincular un hijo.']],
+  'admin-clinica': ['Admin · Ajustes de la clínica','Marca, contacto y recordatorios: canales, proveedor de WhatsApp (Meta o Twilio), qué se envía y vista previa del mensaje.',['Cambie de Meta a Twilio.','Apague un recordatorio.']],
+  'admin-auditoria': ['Admin · Auditoría','Quién vio o cambió cada ficha, con filtros, y la cola de solicitudes de datos de los padres (LOPDP).',['Filtre por «María Cedeño».','En Solicitudes, revise la eliminación.','Pida una exportación desde Padres › Perfil y vuelva aquí.']],
+  'padres-inicio': ['Padres · Inicio','Una tarjeta por hijo: cada medida con su Z y si está dentro del rango esperado (−2 a +2), sin palabras que alarmen. Además, la última recomendación y la próxima cita.',['Toque la tarjeta de Valentina.','Si guardó una visita como médico, la recomendación nueva aparece aquí.']],
+  'padres-hijo': ['Padres · Hijo','Curva con el rango esperado (−2 a +2), el promedio y la línea de su hija, con una explicación corta de qué es la Z.',['Toque un punto del gráfico.','Abra «Ver detalles».','Revise Vacunas, Hitos y Consejos.']],
+  'padres-citas': ['Padres · Agendar cita','Elige hijo, día y hora libre. Se confirma al momento (son pacientes ya registrados).',['Elija un día y una hora.','Confirme la cita.']],
+  'padres-cita-ok': ['Padres · Cita confirmada','Confirmación con opción de reprogramar o cancelar.',['Pruebe «Cancelar cita»: pide confirmación antes de cancelar.']],
+  'padres-avisos': ['Padres · Avisos','Recordatorios, citas confirmadas y recomendaciones nuevas.',['Los avisos nuevos aparecen arriba.']],
+  'padres-perfil': ['Padres · Perfil','Canales de recordatorio y los derechos sobre sus datos.',['Apague WhatsApp y vuelva a «Citas»: el texto del recordatorio cambia.']],
+  'nueva-clinica': ['Familia nueva · Página de la clínica','Lo que ve una familia sin cuenta que llega por un enlace o un código QR.',['Toque «Reservar primera cita».']],
+  'nueva-horario': ['Familia nueva · Horario','Solo se muestran horarios libres según la disponibilidad de la doctora.',['Elija día y hora.']],
+  'nueva-datos': ['Familia nueva · Datos','Datos mínimos del niño y del representante. Ya vienen llenos de ejemplo.',['Cambie el nombre si quiere y continúe.']],
+  'nueva-verificar': ['Familia nueva · Verificar','Consentimiento y código por email para comprobar que el correo es real.',['Marque el consentimiento y escriba 6 números cualquiera.']],
+  'nueva-enviada': ['Familia nueva · Enviada','La solicitud queda pendiente hasta que la doctora la acepte.',['Cambie a «Médico» y abra la Agenda: ahí está la solicitud.']]
+};
+
+/* ---------- tab bars ---------- */
+const ROLE_START = {medico:'medico-inicio', asistente:'asistente-agenda', padres:'padres-inicio', nueva:'nueva-clinica', admin:'admin-inicio', acceso:'acceso-inicio'};
+const TABS = {
+  medico: [['medico-inicio','Inicio','home'],['medico-pacientes','Pacientes','users'],['medico-agenda','Agenda','cal'],['medico-avisos','Avisos','bell'],['medico-perfil','Perfil','user']],
+  asistente: [['asistente-agenda','Agenda','cal'],['asistente-disponibilidad','Horarios','clock']],
+  admin: [['admin-inicio','Configuración','home'],['admin-usuarios','Usuarios','users'],['admin-clinica','Clínica','bell'],['admin-auditoria','Auditoría','lock']],
+  acceso: [],
+  padres: [['padres-inicio','Inicio','home'],['padres-citas','Citas','cal'],['padres-avisos','Avisos','bell'],['padres-perfil','Perfil','user']],
+  nueva: []
+};
+const tabOf = r => ({'medico-nuevo':'medico-pacientes','medico-ficha':'medico-pacientes','medico-disponibilidad':'medico-agenda','medico-paciente':'medico-inicio','medico-visita':'medico-inicio','medico-informe':'medico-inicio','padres-hijo':'padres-inicio','padres-informe':'padres-inicio','padres-cita-ok':'padres-citas'}[r] || r);
+const roleOf = r => r.split('-')[0];
+
+/* ---------- render ---------- */
+const $screen = document.getElementById('screen'), $tab = document.getElementById('tabbar'), $guide = document.getElementById('guide');
+const $device = document.getElementById('device'), $stage = document.getElementById('stage'), $wrap = document.querySelector('.wrap');
+const wideMQ = window.matchMedia('(min-width: 761px)');
+let fmt = 'phone';
+try { fmt = localStorage.getItem('cp-demo-fmt') || 'phone'; } catch (e) {}
+wideMQ.addEventListener ? wideMQ.addEventListener('change', () => render(true)) : null;
+function render(keepScroll) {
+  const r = R[st.route] ? st.route : 'medico-inicio';
+  const role = roleOf(r);
+  const y = $screen.scrollTop;
+  $screen.innerHTML = R[r]();
+  if (!keepScroll) $screen.scrollTop = 0; else $screen.scrollTop = y;
+  const tabs = TABS[role];
+  const desk = fmt === 'desk' && wideMQ.matches;
+  $device.className = 'device' + (desk ? ' desk ' + (['medico','asistente','admin'].includes(role) ? 'sidenav' : 'topnav') + (role === 'nueva' || role === 'acceso' || r === 'medico-visita' || r === 'medico-nuevo' ? ' narrow' : '') : '');
+  $stage.className = 'stage' + (desk ? ' desk' : '');
+  $wrap.className = 'wrap' + (desk ? ' desk' : '');
+  document.querySelectorAll('[data-fmt]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.fmt === (desk ? 'desk' : 'phone'))));
+  $tab.hidden = !tabs.length;
+  const unread = st.notifs.filter(n => n.new).length;
+  $tab.innerHTML = (tabs.length ? `<div class="side-brand"><svg viewBox="0 0 64 64" width="30" height="30" aria-hidden="true"><rect width="64" height="64" rx="14" style="fill:var(--pri)"/><path d="M14 46C24 44 30 36 36 28S46 18 50 17" fill="none" style="stroke:var(--pri-ink)" stroke-width="5" stroke-linecap="round"/></svg><span>Pediatría Demo<small>${({medico:'Dra. Andrea Salazar', asistente:'Adelita Mora · asistente', admin:'Administración'})[role] || 'María Cedeño'}</small></span></div>` : '') + tabs.map(([k,l,i]) => `<button type="button" data-go="${k}" ${tabOf(r)===k?'aria-current="page"':''}>${ic(i)}${l}${k==='medico-agenda' && st.requests.length ? `<span class="dot">${st.requests.length}</span>` : ''}${k==='padres-avisos' && unread ? `<span class="dot">${unread}</span>` : ''}</button>`).join('');
+  document.querySelectorAll('[data-role]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.role === role)));
+  const g = G[r] || ['Demo · Pantalla', '', []]; fitPages(); requestAnimationFrame(fitPages);
+  $guide.innerHTML = `<span class="eyebrow">${esc(g[0])}</span><h2>${esc(g[0].split(' · ')[1])}</h2><p>${esc(g[1])}</p>
+    <div class="try"><b>Pruebe esto</b><ul>${g[2].map(t => `<li>${esc(t)}</li>`).join('')}</ul></div>
+    <p class="pending">Los valores del gráfico y de la Z son ilustrativos, no las tablas OMS reales. Las vacunas y los hitos que no son motores son ejemplos.</p>
+    <p class="note">${commentsReady ? 'Si algo no le convence, toque «Comentar esta pantalla» arriba y escriba qué cambiaría.' : 'Si algo no le convence, anótelo y compártalo con Raul.'} La demo no guarda nada: al recargar vuelve al inicio. <button class="btn g" style="min-height:0;padding:0;font-size:13px" data-act="reset">Reiniciar demo</button></p>`;
+}
+function go(route) {
+  st.route = route; st.sel = (route === 'medico-paciente' || route === 'padres-hijo') ? st.sel : null;
+  if (location.hash !== '#' + route) { try { history.replaceState(null, '', '#' + route); } catch (e) { location.hash = route; } }
+  render();
+}
+let toastT;
+function toast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => { t.hidden = true; }, 2800); }
+
+/* ---------- actions ---------- */
+const A = {
+  soon: () => toast('En esta demo solo está completa la ficha de Valentina.'),
+  pt: i => { st.sel = st.sel === +i ? null : +i; render(true); },
+  view: v => { st.dView = v; render(true); },
+  dtab: k => { st.dTab = k; st.sel = null; render(true); },
+  ind: () => {},
+  vac: i => { st.vac[i].s = 'a'; st.vac[i].f = '10 nov 2026'; st.notifs = st.notifs.filter(n => !n.x); render(true); toast('Dosis registrada (lote, fecha y observaciones van en el formulario real).'); },
+  hito: i => { st.hitos[i].a = '16 m'; render(true); toast('Hito registrado a los 16 meses.'); },
+  hdom: d => { st.hDom = d; render(true); },
+  vacpriv: () => toast('Aquí se registra una vacuna privada: nombre, laboratorio, dosis, fecha y lote.'),
+  catchup: () => toast('Aquí se arma un esquema de recuperación con las dosis faltantes y sus nuevas fechas.'),
+  pos: p => { st.draft.pos = p; render(true); },
+  save: () => {
+    const d = st.draft, w = num(d.w), l = num(d.l) + (d.pos==='pie'?0.7:0), pc = num(d.pc);
+    if (!(w > 1 && w < 40) || !(l > 40 && l < 130) || !(pc > 25 && pc < 60)) { toast('Revise peso, longitud y perímetro: hay un valor fuera de rango.'); return; }
+    if (st.savedToday) st.meas.pop();
+    st.meas.push({d:'10 nov 2026', a:16.1, w, l, pc});
+    st.savedToday = true;
+    if (d.rec.trim() || d.ind.trim()) {
+      st.recs = st.recs.filter(r => r.d !== '10 nov 2026'); st.recs.push({d:'10 nov 2026', t:d.rec.trim(), ind:d.ind.trim()});
+      st.notifs = st.notifs.filter(n => !n.rec); st.notifs.unshift({t:'Nueva recomendación', b:'La Dra. Salazar dejó indicaciones para Valentina.', w:'Ahora', k:'msg', new:true, rec:true});
+    }
+    st.dTab = 'crecimiento'; st.dView = 'grafico'; st.sel = st.meas.length - 1;
+    go('medico-paciente'); toast('Visita guardada. Cambie a «Padres» para ver lo que les llega.');
+  },
+  accept: id => { const r = st.requests.find(x => x.id == id); if (!r) return; st.requests = st.requests.filter(x => x.id != id); st.ag.push({id: st.nextId++ + 1000, day: r.day, t: r.t, p: r.p, m: 'Primera consulta', s: 'Nueva'}); st.agDay = r.day; render(true); toast(`Solicitud aceptada: cita el ${dayLabel(r.day)} a las ${r.t}. Se creó la ficha de ${r.p} y se invitó al representante.`); },
+  decline: id => { st.requests = st.requests.filter(x => x.id != id); render(true); toast('Solicitud rechazada. Se avisa a la familia por email.'); },
+  ptab: k => { st.pTab = k; st.sel = null; render(true); },
+  pm: k => { st.pMeasure = k; st.sel = null; render(true); },
+  details: () => { st.pDetails = !st.pDetails; render(true); },
+  report: () => go('padres-informe'),
+  pdfdl: () => toast('En la app real se descarga este mismo informe en PDF (A4).'),
+  pdfshare: () => toast('En la app real se comparte por WhatsApp o email desde el teléfono.'),
+  child: c => { st.book.child = c; render(true); },
+  day: d => { st.book.day = d; st.book.slot = null; render(true); },
+  slot: s => { st.book.slot = s; render(true); },
+  confirm: () => { const b = st.book; b.confirmed = {child:b.child, day:DAYS.find(d=>d[1]===b.day)[0], slot:b.slot}; b.cancelAsk = false; st.notifs.unshift({t:'Cita confirmada', b:`${b.child} · ${b.confirmed.day} nov, ${b.slot}.`, w:'Ahora', k:'check', new:true}); go('padres-cita-ok'); },
+  resched: () => { st.book.slot = null; go('padres-citas'); },
+  cancelask: () => { st.book.cancelAsk = true; render(true); },
+  cancelno: () => { st.book.cancelAsk = false; render(true); },
+  cancelyes: () => { st.book.confirmed = null; st.book.cancelAsk = false; st.book.day = null; st.book.slot = null; go('padres-citas'); toast('Cita cancelada. La hora quedó libre.'); },
+  chan: k => { st.chan[k] = !st.chan[k]; render(true); },
+  datareq: k => { if (k !== 'ver') st.dataReqs.unshift({id: st.nextId++ + 2000, who:'María Cedeño', type: k === 'eliminar' ? 'Eliminación' : 'Exportación', d: k === 'eliminar' ? 'Pide eliminar su cuenta.' : 'Pide exportar sus datos y los de sus hijos.', s:'Abierta', due:'Vence en 15 días'}); toast(k === 'ver' ? 'Aquí se muestran todos sus datos (demo).' : 'Solicitud enviada a la clínica. La verá el admin en Auditoría › Solicitudes de datos.'); },
+  datareqOld: k => toast(k === 'eliminar' ? 'Solicitud de eliminación enviada a la clínica (demo).' : k === 'exportar' ? 'Exportación solicitada: le llegará por email (demo).' : 'Aquí se muestran todos sus datos (demo).'),
+  nday: d => { st.nf.day = d; st.nf.slot = null; render(true); },
+  nslot: s => { st.nf.slot = s; render(true); },
+  sex: s => { st.nf.sex = s; render(true); },
+  consent: () => { st.nf.consent = !st.nf.consent; render(true); },
+  sendreq: () => {
+    const b = st.nf, day = DAYS.find(d=>d[1]===b.day)[0];
+    st.requests.unshift({id: st.nextId++, p: `${b.cn} ${b.ca}`.trim(), a: 'nueva ficha', g: `${b.gn} (${b.rel.toLowerCase()})`, when: `${day} nov, ${b.slot}`, day: +b.day, t: b.slot, ago: 'hace un momento'});
+    go('nueva-enviada');
+  },
+  restartnf: () => { st.nf = {...S0().nf}; go('nueva-clinica'); },
+  reset: () => { st = S0(); ['--pri','--pri-soft','--pri-soft-ink'].forEach(v => document.documentElement.style.removeProperty(v)); go('medico-inicio'); toast('Demo reiniciada.'); },
+  noop: () => {},
+  agview: v => { st.agView = v; render(true); },
+  agpick: d => { st.agDay = +d; st.agView = 'dia'; render(true); },
+  agprev: () => { if (st.agDay > 1) st.agDay--; render(true); },
+  agnext: () => { if (st.agDay < 30) st.agDay++; render(true); },
+  agpw: () => { st.agDay = Math.max(1, st.agDay - 7); render(true); },
+  agnw: () => { st.agDay = Math.min(30, st.agDay + 7); render(true); },
+  soonmes: () => toast('En la demo solo está noviembre 2026.'),
+  agsel: id => { st.agSel = +id; st.agMode = null; st.agForm = {...st.agForm, day:null, t:null}; render(); },
+  agclose: () => { st.agSel = null; st.agMode = null; render(true); },
+  agmode: m => { st.agMode = m || null; st.agForm = {...st.agForm, day:null, t:null}; render(true); },
+  agfday: d => { st.agForm.day = +d; st.agForm.t = null; render(true); },
+  agft: t => { st.agForm.t = t; render(true); },
+  agreschok: () => { const a = st.ag.find(x => x.id === st.agSel); a.day = st.agForm.day; a.t = st.agForm.t; a.s = 'Confirmada'; st.agMode = null; st.agDay = a.day; render(true); toast(`Cita movida al ${dayLabel(a.day)} a las ${a.t}. Se avisó a la familia.`); },
+  agcancelok: () => { const a = st.ag.find(x => x.id === st.agSel); st.ag = st.ag.filter(x => x.id !== st.agSel); st.agSel = null; st.agMode = null; render(true); toast(`Cita de ${a.p} cancelada. Se avisó a la familia y la hora quedó libre.`); },
+  agopen: id => { const a = st.ag.find(x => x.id === +id); if (a && a.vr) go('medico-paciente'); else toast('En la demo, la ficha completa es la de Valentina.'); },
+  agnew: () => { st.agSel = null; st.agMode = 'new'; st.agForm = {p:'Valentina Ríos', m:'Control de niño sano', day:null, t:null}; render(); },
+  agnewok: () => { const f = st.agForm; st.ag.push({id: st.nextId++ + 3000, day: f.day, t: f.t, p: f.p, m: f.m, s: 'Confirmada', vr: f.p === 'Valentina Ríos'}); st.agMode = null; st.agDay = f.day; st.agView = 'dia'; render(true); toast(`Cita creada: ${f.p}, ${dayLabel(f.day)} a las ${f.t}.`); },
+  avday: i => { st.avail.days[i][1] = !st.avail.days[i][1]; render(true); },
+  avlunch: () => { st.avail.lunch = !st.avail.lunch; render(true); },
+  avslot: v => { st.avail.slot = v; render(true); },
+  avfirst: v => { st.avail.first = v; render(true); },
+  avrm: i => { st.avail.blocked.splice(+i, 1); render(true); },
+  avadd: () => { const v = st.avail.newBlock.trim(); if (!v) { toast('Escriba la fecha a bloquear.'); return; } st.avail.blocked.push(v); st.avail.newBlock = ''; render(true); },
+  avsave: () => toast('Horarios guardados. Los padres y la página pública ya ven estas horas libres.'),
+  npsex: v => { st.np.sex = v; render(true); },
+  npext: () => { st.np.ext = !st.np.ext; const n = document.getElementById('npPre'); if (n) n.innerHTML = npPre(); },
+  npinv: i => { st.np.guards[i].inv = !st.np.guards[i].inv; render(true); },
+  npaddg: () => { st.np.guards.push({n:'', rel:'Padre', em:'', tel:'', inv:true}); render(true); },
+  nprmg: i => { st.np.guards.splice(+i, 1); render(true); },
+  npsave: () => {
+    const p = st.np;
+    if (!p.n.trim() || !p.a.trim() || !p.dob.trim()) { toast('Complete nombres, apellidos y fecha de nacimiento.'); return; }
+    const id = st.nextId++ + 4000, nm = `${p.n.trim()} ${p.a.trim()}`;
+    st.newPts.unshift({id, n: nm, i: (p.n.trim()[0] + p.a.trim()[0]).toUpperCase(), sex: p.sex, dob: p.dob, gw: p.gw, gd: p.gd, bw: p.bw, bl: p.bl, bpc: p.bpc, notes: p.notes, ext: p.ext, guards: p.guards.map(g => ({...g}))});
+    st.curNew = id; const inv = p.guards.filter(g => g.inv && g.em.trim());
+    st.np = S0().np; go('medico-ficha');
+    toast(inv.length ? `Paciente creado. Invitación enviada a ${inv.map(g => g.em).join(', ')}.` : 'Paciente creado.');
+  },
+  opennew: id => { st.curNew = +id; go('medico-ficha'); },
+  firstvisit: () => toast('La visita completa con curvas y Z en vivo se muestra con la ficha de Valentina.'),
+  schednew: () => { const p = st.newPts.find(x => x.id === st.curNew); st.agForm = {p: p ? p.n : 'Valentina Ríos', m:'Control de niño sano', day:null, t:null}; st.agMode = 'new'; st.agSel = null; go('medico-agenda'); },
+  darknote: () => toast('La app tiene modo oscuro; esta demo se muestra en claro.'),
+  inv: t => { st.invType = t; st.invConsent = false; st.invWa = false; go('acceso-invitacion'); },
+  invconsent: () => { st.invConsent = !st.invConsent; render(true); },
+  invwa: () => { st.invWa = !st.invWa; render(true); },
+  invok: () => { st.loginAs = st.invType === 'padres' ? 'padres' : 'asistente'; st.email = st.invType === 'padres' ? 'maria.cedeno@correo.ec' : 'adelita@pediatria-demo.ec'; st.code = ''; st.codeErr = false; go('acceso-codigo'); },
+  loginas: v => { st.loginAs = v; st.email = {medico:'andrea.salazar@pediatria-demo.ec', asistente:'adelita@pediatria-demo.ec', padres:'maria.cedeno@correo.ec', admin:'admin@pediatria-demo.ec'}[v]; render(true); },
+  sendcode: () => { if (!/^\S+@\S+\.\S+$/.test(st.email)) { toast('Escriba un email válido.'); return; } st.code = ''; st.codeErr = false; go('acceso-codigo'); },
+  codeok: () => { if (st.code === '000000') { st.codeErr = true; render(true); return; } if (!/^\d{6}$/.test(st.code)) { toast('El código tiene 6 dígitos.'); return; } st.codeErr = false; go(ROLE_START[st.loginAs]); toast('Sesión iniciada.'); },
+  resend: () => toast('Código reenviado. Podrá pedir otro en 60 segundos.'),
+  newcode: () => { st.code = ''; st.codeErr = false; go('acceso-codigo'); toast('Le enviamos un código nuevo.'); },
+  install: () => toast('Android y computadora: aparece el aviso del navegador para instalar.'),
+  ios: () => { st.iosHint = !st.iosHint; render(true); },
+  retry: () => toast('Sigue sin conexión. La app vuelve sola cuando haya internet.'),
+  logo: () => toast('En la app real se sube un SVG o PNG cuadrado.'),
+  wzcolor: c => { st.wz.color = c; applyBrand(c); render(true); },
+  wztog: k => { st.wz[k] = !st.wz[k]; render(true); },
+  wzback: () => { st.wz.step = Math.max(1, st.wz.step - 1); render(); },
+  wznext: () => { if (st.wz.step === 1 && !st.wz.name.trim()) { toast('Escriba el nombre de la clínica.'); return; } if (st.wz.step < 5) { st.wz.step++; render(); } else { st.wz.done = true; render(); toast(`Configuración lista. Invitación enviada a ${st.wz.docEm}.`); } },
+  wzreset: () => { st.wz.done = false; st.wz.step = 1; render(); },
+  utab: t => { st.uTab = t; st.uInvite = null; render(true); },
+  uinv: () => { st.uInvite = st.uTab; st.uForm = {n:'', em:'', rol:'Asistente', child:'Valentina'}; render(true); },
+  uclose: () => { st.uInvite = null; render(true); },
+  usend: () => { const f = st.uForm; if (!f.n.trim() || !/^\S+@\S+\.\S+$/.test(f.em)) { toast('Escriba nombre y un email válido.'); return; } if (st.uTab === 'equipo') st.team.push({id: st.nextId++, n: f.n, em: f.em, r: f.rol, on: true, s: 'Invitación enviada'}); else st.parents.push({id: st.nextId++, n: f.n, em: f.em, kids: [f.child], on: true, s: 'Invitación enviada'}); st.uInvite = null; render(true); toast(`Invitación enviada a ${f.em}. Vale 7 días.`); },
+  urole: id => { const u = st.team.find(x => x.id == id); u.r = u.r === 'Médico' ? 'Asistente' : 'Médico'; render(true); toast(`${u.n} ahora es ${u.r}.`); },
+  uon: id => { const u = st.team.find(x => x.id == id); u.on = !u.on; render(true); },
+  pon: id => { const u = st.parents.find(x => x.id == id); u.on = !u.on; render(true); toast(u.on ? 'Acceso restaurado.' : `Acceso revocado para ${u.n}.`); },
+  ukid: a => { const [id, k] = a.split('|'); const u = st.parents.find(x => x.id == id); u.kids = u.kids.filter(x => x !== k); render(true); toast(`${k} desvinculado de ${u.n}.`); },
+  ulink: id => { const u = st.parents.find(x => x.id == id); const k = ['Valentina','Tomás','Renata'].find(x => !u.kids.includes(x)); if (!k) { toast('Ya tiene vinculados a todos los niños de la demo.'); return; } u.kids.push(k); render(true); toast(`${k} vinculado a ${u.n}.`); },
+  ctab: t => { st.cTab = t; render(true); },
+  prov: v => { st.prov = v; render(true); },
+  tokenrep: () => toast('Pegue el token nuevo; el anterior deja de funcionar al guardar.'),
+  testmsg: () => toast('Mensaje de prueba enviado al número de la clínica.'),
+  rule: i => { st.rules[i][1] = !st.rules[i][1]; render(true); },
+  autab: t => { st.auTab = t; st.dataAsk = null; render(true); },
+  csv: () => toast('En la app real se descarga el registro en CSV.'),
+  dreq: id => { const r = st.dataReqs.find(x => x.id == id); if (r.type === 'Eliminación') { st.dataAsk = r.id; render(true); } else { r.s = 'Completada · enviada por email'; render(true); toast('Exportación generada y enviada al email de la familia.'); } },
+  dreqok: id => { const r = st.dataReqs.find(x => x.id == id); r.s = 'Completada · cuenta eliminada'; st.dataAsk = null; render(true); toast('Cuenta eliminada. La historia clínica se conserva según la ley.'); },
+  dreqno: () => { st.dataAsk = null; render(true); },
+  dreqrej: id => { const r = st.dataReqs.find(x => x.id == id); r.s = 'Rechazada · se informó el motivo'; render(true); }
+};
+
+document.addEventListener('click', e => {
+  const fb = e.target.closest('[data-fmt]');
+  if (fb) { fmt = fb.dataset.fmt; try { localStorage.setItem('cp-demo-fmt', fmt); } catch (err) {} render(); return; }
+  const roleBtn = e.target.closest('[data-role]');
+  if (roleBtn) { st.agSel = null; st.agMode = null; go(ROLE_START[roleBtn.dataset.role]); return; }
+  const rg = e.target.closest('[data-role-go]');
+  if (rg) { go(ROLE_START[rg.dataset.roleGo] || 'padres-inicio'); return; }
+  const g = e.target.closest('[data-go]');
+  if (g) { go(g.dataset.go); return; }
+  const a = e.target.closest('[data-act]');
+  if (a && A[a.dataset.act] && a.tagName !== 'SELECT') { if (a.disabled) return; A[a.dataset.act](a.dataset.arg); }
+});
+document.addEventListener('input', e => {
+  const ds = e.target.dataset || {};
+  if (ds.avail) { const [i,j] = ds.avail.split(','); st.avail.days[+i][+j] = e.target.value; return; }
+  if (ds.guard) { const [i,j] = ds.guard.split(','); st.np.guards[+i][j] = e.target.value; return; }
+  const k = ds.bind; if (!k) return;
+  const [o, p] = k.includes('.') ? k.split('.') : [null, k];
+  if (o) st[o][p] = e.target.value; else st[p] = e.target.value;
+  if (k.startsWith('draft.')) { const z = document.getElementById('zprev'); if (z) z.innerHTML = zPreview(); }
+  if (k === 'q') { const l = document.getElementById('plist'); if (l) l.innerHTML = patientList(); }
+  if (k === 'np.gw' || k === 'np.gd') { const n = document.getElementById('npPre'); if (n) n.innerHTML = npPre(); }
+  if (ds.rerender) { render(true); return; }
+  if (k === 'nf.otp') { const b = document.getElementById('sendReq'); if (b) b.disabled = !(st.nf.consent && /^\d{6}$/.test(st.nf.otp)); }
+});
+document.addEventListener('change', e => { const ds = e.target.dataset || {}; if (e.target.tagName === 'SELECT' && (ds.bind || ds.avail || ds.guard)) e.target.dispatchEvent(new Event('input', {bubbles:true})); });
+
+/* ---------- comments (opens claude.ai's own composer) ---------- */
+let commentsReady = false;
+const $cb = document.getElementById('commentBtn');
+(async () => {
+  try {
+    const c = window.claude && window.claude.use ? await window.claude.use('comments') : null;
+    if (!c) return;
+    commentsReady = true; $cb.hidden = false; render(true);
+    $cb.addEventListener('click', async () => {
+      try { await c.openComposer({ element: $screen }); }
+      catch (err) { $cb.hidden = true; commentsReady = false; render(true); toast('Los comentarios no están disponibles en esta vista.'); }
+    });
+  } catch (e) {}
+})();
+
+/* ---------- boot ---------- */
+const fromHash = () => { const h = (location.hash || '').slice(1); return R[h] ? h : null; };
+window.addEventListener('hashchange', () => { const h = fromHash(); if (h && h !== st.route) { st.route = h; render(); } });
+st.route = fromHash() || 'medico-inicio';
+render();
+})();
+</script>

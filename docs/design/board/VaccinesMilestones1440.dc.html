@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Vacunas e hitos</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:inherit}
+.cp{--bg:#fff;--bg2:#f8fafc;--bg3:#f1f5f9;--bd:#e2e8f0;--bd2:#cbd5e1;--tx:#0f172a;--tx2:#475569;--tx3:#64748b;--pr:#0f766e;--prt:#0f766e;--pro:#fff;--prs:#f0fdfa;--prst:#115e59;--okb:#dcfce7;--okt:#166534;--wab:#fef9c3;--wat:#713f12;--oub:#fee2e2;--out:#991b1b;--nab:#f1f5f9;--nat:#475569;font-family:Inter,system-ui,sans-serif;color:var(--tx);background:var(--bg2);font-size:14px;line-height:1.45;font-variant-numeric:tabular-nums}
+.cp.dark{--bg:#0f172a;--bg2:#020617;--bg3:#1e293b;--bd:#1e293b;--bd2:#334155;--tx:#f1f5f9;--tx2:#cbd5e1;--tx3:#94a3b8;--pr:#2dd4bf;--prt:#5eead4;--pro:#042f2e;--prs:rgba(45,212,191,.12);--prst:#99f6e4;--okb:rgba(34,197,94,.16);--okt:#86efac;--wab:rgba(234,179,8,.18);--wat:#fde047;--oub:rgba(239,68,68,.2);--out:#fca5a5;--nab:#1e293b;--nat:#cbd5e1}
+.cp *{box-sizing:border-box}.cp h1,.cp h2,.cp h3,.cp p{margin:0}
+.t2{color:var(--tx2)}.t3{color:var(--tx3)}.sm{font-size:13px}.xs{font-size:12px}
+.card{background:var(--bg);border:1px solid var(--bd);border-radius:12px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:0 16px;border-radius:8px;font:600 14px/1 Inter,sans-serif;border:1px solid transparent;cursor:pointer;text-decoration:none;white-space:nowrap}
+.bp{background:var(--pr);color:var(--pro)}.bo{background:var(--bg);color:var(--tx);border-color:var(--bd2)}.bg{background:transparent;color:var(--tx2)}.bs{min-height:36px;padding:0 12px;font-size:13px}
+.bd{display:inline-flex;align-items:center;gap:4px;height:24px;padding:0 8px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap}
+.zok{background:var(--okb);color:var(--okt)}.zwa{background:var(--wab);color:var(--wat)}.zou{background:var(--oub);color:var(--out)}.zna{background:var(--nab);color:var(--nat)}.zpr{background:var(--prs);color:var(--prst)}
+.in{display:flex;align-items:center;gap:8px;height:44px;border:1px solid var(--bd2);border-radius:8px;background:var(--bg);color:var(--tx);padding:0 12px;font:400 15px Inter,sans-serif;width:100%}
+.in input{border:0;outline:0;background:transparent;color:inherit;font:inherit;width:100%}
+.lb{display:block;font-size:13px;font-weight:500;color:var(--tx2);margin-bottom:6px}
+.ic{width:20px;height:20px;flex:none;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}.ic4{width:16px;height:16px}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--bd);overflow-x:auto}.tabs a{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 14px;font-weight:500;color:var(--tx2);text-decoration:none;border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap}.tabs a.on{color:var(--prt);border-color:var(--pr);font-weight:600}
+.tb{width:100%;border-collapse:collapse}.tb th{text-align:left;font-size:12px;font-weight:500;color:var(--tx3);padding:9px 14px;border-bottom:1px solid var(--bd)}.tb td{padding:10px 14px;border-bottom:1px solid var(--bd);font-size:13px}
+.grp td{background:var(--bg3);font-size:12px;font-weight:600;color:var(--tx2);padding:7px 14px}
+.trk{position:relative;height:28px;border-radius:6px;background:var(--bg3)}
+.cp :focus-visible{outline:2px solid var(--pr);outline-offset:2px}
+</style>
+</helmet>
+<div class="{{theme}}" style="width: 100%; min-height: 1120px; padding: 24px;">
+<div style="max-width: 1360px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px;">
+<div class="card" style="padding: 16px 20px 0;">
+<div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px;"><h1 style="font-size: 20px; font-weight: 700;">Valentina Ríos Cedeño</h1><span class="bd zna">Niña · 1 a 4 m</span><span class="xs t3" style="margin-left: auto;">Vista de pestañas Vacunas e Hitos dentro del detalle del paciente</span></div>
+<nav class="tabs" aria-label="Secciones"><a href="#">Crecimiento</a><a href="#">Visitas</a><a href="#" class="on">Vacunas <span class="bd zou" style="height: 20px;">1 atrasada</span></a><a href="#" class="on">Hitos</a><a href="#">Antecedentes</a></nav>
+</div>
+
+<div style="display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 16px; align-items: start;">
+<section class="card" aria-labelledby="vac">
+<div style="padding: 16px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+<div style="flex: 1;"><h2 id="vac" style="font-size: 17px; font-weight: 600;">Vacunas</h2><p class="xs t3">Esquema MSP Ecuador precargado · nombres de <b>ejemplo</b> hasta cargar el esquema verificado</p></div>
+<span class="bd zok"><svg class="ic ic4" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM9 12l2 2 4-4"></path></svg>11 aplicadas</span><span class="bd zou"><svg class="ic ic4" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 6v6l4 2"></path></svg>1 atrasada</span><span class="bd zna">3 pendientes</span>
+</div>
+<div style="overflow-x: auto;">
+<table class="tb">
+<thead><tr><th>Vacuna (ejemplo)</th><th>Dosis</th><th>Estado</th><th>Fecha</th><th>Lote</th><th></th></tr></thead>
+<tbody>
+<sc-for list="{{vac}}" as="v" hint-placeholder-count="12">
+<sc-if value="{{v.g}}" hint-placeholder-val="{{ false }}"><tr class="grp"><td colspan="6">{{v.g}}</td></tr></sc-if>
+<sc-if value="{{v.n}}" hint-placeholder-val="{{ true }}"><tr style="background: {{v.rbg}};"><td style="font-weight: 600;">{{v.n}}</td><td class="t2">{{v.d}}</td><td><span class="bd {{v.cls}}"><svg class="ic ic4" viewBox="0 0 24 24" aria-hidden="true"><path d="{{v.ic}}"></path></svg>{{v.s}}</span></td><td>{{v.f}}</td><td class="t2">{{v.l}}</td><td style="text-align: right;"><sc-if value="{{v.act}}" hint-placeholder-val="{{ false }}"><a href="#" class="btn bo bs">Registrar</a></sc-if></td></tr></sc-if>
+</sc-for>
+</tbody>
+</table>
+</div>
+<div style="padding: 14px 16px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center;"><a href="#" class="btn bo bs">+ Vacuna privada</a><a href="#" class="btn bo bs">Esquema de recuperación</a><span class="xs t3" style="margin-left: auto;">El admin puede editar el esquema MSP cuando cambie</span></div>
+</section>
+
+<div style="display: flex; flex-direction: column; gap: 16px;">
+<section class="card" aria-labelledby="reg" style="padding: 16px; display: flex; flex-direction: column; gap: 12px; border-color: var(--pr);">
+<div style="display: flex; align-items: center; justify-content: space-between;"><h2 id="reg" style="font-size: 16px; font-weight: 600;">Registrar dosis · SRP 1 (ejemplo)</h2><span class="xs t3">UModal</span></div>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px;">
+<div><label class="lb" for="v-f">Fecha de aplicación</label><div class="in"><input id="v-f" value="10/11/2026"></div></div>
+<div><label class="lb" for="v-l">Lote</label><div class="in"><input id="v-l" value="EJ-2026-0412"></div></div>
+</div>
+<div><label class="lb" for="v-o">Observaciones</label><div class="in"><input id="v-o" placeholder="Reacciones, lugar de aplicación…"></div></div>
+<div style="display: flex; gap: 8px; justify-content: flex-end;"><button class="btn bo">Cancelar</button><button class="btn bp">Guardar dosis</button></div>
+</section>
+
+<section class="card" aria-labelledby="hit" style="padding: 16px; display: flex; flex-direction: column; gap: 14px;">
+<div><h2 id="hit" style="font-size: 17px; font-weight: 600;">Desarrollo</h2><p class="xs t3">Motor grueso (ventanas OMS): barra = ventana esperada · punto = edad en que lo logró · línea = hoy (16 m)</p></div>
+<div style="display: flex; gap: 6px; flex-wrap: wrap;"><span class="bd zpr">Motor grueso</span><span class="bd zna">Motor fino</span><span class="bd zna">Lenguaje</span><span class="bd zna">Social</span><span class="bd zna">Cognitivo</span></div>
+<div style="display: flex; justify-content: space-between; padding-left: 168px;" class="xs t3"><span>0</span><span>4</span><span>8</span><span>12</span><span>16</span><span>20 m</span></div>
+<sc-for list="{{ms}}" as="m" hint-placeholder-count="6"><div style="display: flex; align-items: center; gap: 12px;">
+<div style="width: 156px; flex: none;"><p class="sm" style="font-weight: 600;">{{m.n}}</p><p class="xs t3">{{m.w}}</p></div>
+<div class="trk" style="flex: 1;">
+<div style="position: absolute; top: 6px; bottom: 6px; left: {{m.l}}; width: {{m.ww}}; border-radius: 4px; background: var(--prs); border: 1px solid var(--pr);"></div>
+<div style="position: absolute; top: 0; bottom: 0; left: 80%; border-left: 2px dashed var(--tx3);"></div>
+<sc-if value="{{m.done}}" hint-placeholder-val="{{ true }}"><div style="position: absolute; top: 7px; left: {{m.a}}; width: 14px; height: 14px; margin-left: -7px; border-radius: 99px; background: var(--pr); border: 2px solid var(--bg);"></div></sc-if>
+</div>
+<span class="bd {{m.cls}}" style="width: 128px; justify-content: center;">{{m.s}}</span>
+</div></sc-for>
+<div style="display: flex; justify-content: flex-end;"><a href="#" class="btn bo bs">Registrar hito</a></div>
+</section>
+<section class="card" aria-labelledby="oth">
+<div style="padding: 14px 16px 6px;"><h2 id="oth" style="font-size: 16px; font-weight: 600;">Otras áreas <span class="xs t3" style="font-weight: 400;">(ejemplos; lista final de la pediatra)</span></h2></div>
+<table class="tb"><tbody>
+<tr><td><span class="bd zna">Motor fino</span></td><td>Pinza con índice y pulgar</td><td><span class="bd zok">10 m</span></td></tr>
+<tr><td><span class="bd zna">Lenguaje</span></td><td>Dice 3 o más palabras</td><td><span class="bd zna">Esperado 15–18 m</span></td></tr>
+<tr><td><span class="bd zna">Social</span></td><td>Señala para mostrar algo</td><td><span class="bd zok">14 m</span></td></tr>
+<tr><td><span class="bd zna">Cognitivo</span></td><td>Usa objetos como se debe</td><td><span class="bd zna">Esperado 15–18 m</span></td></tr>
+</tbody></table>
+</section>
+<section class="card" aria-labelledby="scr">
+<div style="padding: 14px 16px 6px;"><h2 id="scr" style="font-size: 16px; font-weight: 600;">Tamizajes del desarrollo y autismo</h2><p class="xs t3">Recordatorio automático según la edad</p></div>
+<table class="tb"><tbody>
+<tr><td>Tamizaje del desarrollo · 9 m</td><td><span class="bd zok">Hecho 6 abr 2026</span></td></tr>
+<tr><td>Tamizaje del desarrollo · 18 m</td><td><span class="bd zna">Pendiente · 6 ene 2027</span></td></tr>
+<tr><td>Tamizaje de autismo (M-CHAT) · 18 m</td><td><span class="bd zna">Pendiente · 6 ene 2027</span></td></tr>
+<tr><td>Tamizaje de autismo (M-CHAT) · 24 m</td><td><span class="bd zna">Pendiente · 6 jul 2027</span></td></tr>
+</tbody></table>
+</section>
+</div>
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"dark":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":1120}}'>
+class Component extends DCLogic {
+renderVals() {
+const OK = 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM9 12l2 2 4-4', CL = 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 6v6l4 2', PD = 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z';
+const G = g => ({g});
+const V = (n,d,st,f,l) => {
+const m = {a:['Aplicada','zok',OK],p:['Pendiente','zna',PD],x:['Atrasada','zou',CL]}[st];
+return {n,d,s:m[0],cls:m[1],ic:m[2],f,l,act: st !== 'a',rbg: st === 'x' ? 'var(--oub)' : 'transparent'};
+};
+const vac = [
+G('Recién nacido'), V('BCG','Única','a','7 jul 2025','EJ-1183'), V('Hepatitis B','RN','a','7 jul 2025','EJ-0991'),
+G('2 meses'), V('Pentavalente','1.ª','a','8 sep 2025','EJ-2207'), V('Rotavirus','1.ª','a','8 sep 2025','EJ-3310'), V('Neumococo','1.ª','a','8 sep 2025','EJ-4471'),
+G('4 meses'), V('Pentavalente','2.ª','a','6 nov 2025','EJ-2251'), V('Neumococo','2.ª','a','6 nov 2025','EJ-4490'),
+G('6 meses'), V('Pentavalente','3.ª','a','7 ene 2026','EJ-2290'), V('Influenza','1.ª','a','7 ene 2026','EJ-5102'),
+G('12 meses'), V('SRP','1.ª','x','Prevista 6 jul 2026','—'), V('Varicela','Única','a','7 jul 2026','EJ-6620'), V('Fiebre amarilla','Única','a','7 jul 2026','EJ-7004'),
+G('18 meses'), V('SRP','2.ª','p','Prevista 6 ene 2027','—'), V('DPT refuerzo','1.º','p','Prevista 6 ene 2027','—'), V('OPV refuerzo','1.º','p','Prevista 6 ene 2027','—')
+];
+const pct = m => (m/20*100) + '%';
+const M = (n,w0,w1,a) => ({n,w: String(w0).replace('.',',')+'–'+String(w1).replace('.',',')+' m',l:pct(w0),ww:((w1-w0)/20*100)+'%',a: a ? pct(a) : '0%',done: !!a,s: a ? 'Logrado ' + String(a).replace('.',',') + ' m' : 'En ventana',cls: a ? 'zok' : 'zna'});
+const ms = [M('Sentarse sin apoyo',3.8,9.2,6.5),M('Gatear',5.2,13.5,8),M('Pararse con ayuda',4.8,11.4,9),M('Caminar con ayuda',5.9,13.7,11),M('Pararse solo',6.9,16.9,13),M('Caminar solo',8.2,17.6,0)];
+return { theme: this.props.dark ? 'cp dark' : 'cp', vac, ms };
+}
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Mapa de navegación</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+.cp{--bg:#fff;--bg2:#f8fafc;--bg3:#f1f5f9;--bd:#e2e8f0;--bd2:#cbd5e1;--tx:#0f172a;--tx2:#475569;--tx3:#64748b;--pr:#0f766e;--prs:#f0fdfa;--prst:#115e59;font-family:Inter,system-ui,sans-serif;color:var(--tx);background:var(--bg2);font-size:14px;line-height:1.45}
+.cp.dark{--bg:#0f172a;--bg2:#020617;--bg3:#1e293b;--bd:#1e293b;--bd2:#334155;--tx:#f1f5f9;--tx2:#cbd5e1;--tx3:#94a3b8;--pr:#2dd4bf;--prs:rgba(45,212,191,.12);--prst:#99f6e4}
+.cp *{box-sizing:border-box}.cp h1,.cp h2,.cp p{margin:0}
+.card{background:var(--bg);border:1px solid var(--bd);border-radius:12px}
+.cap{font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--tx3)}
+.nv{display:flex;align-items:center;justify-content:space-between;gap:8px;height:36px;padding:0 10px;border-radius:8px;background:var(--prs);color:var(--prst);font-weight:600;font-size:13px}
+.rt{font:12px/1.5 ui-monospace,Menlo,monospace;color:var(--tx3)}
+.sub{display:flex;justify-content:space-between;gap:8px;padding:6px 0 6px 12px;border-left:2px solid var(--bd);font-size:13px;color:var(--tx2)}
+</style>
+</helmet>
+<div class="{{theme}}" style="width: 100%; min-height: 1000px; padding: 48px 40px;">
+<div style="max-width: 1360px; margin: 0 auto; display: flex; flex-direction: column; gap: 24px;">
+<div>
+<p class="cap">Navegación por rol</p>
+<h1 style="font-size: 30px; font-weight: 700; margin-top: 6px;">Mapa de navegación</h1>
+<p style="color: var(--tx2); margin-top: 6px; max-width: 900px;">Médico y asistente: UDashboardSidebar en ≥1024 px (colapsable a íconos en 1024), barra inferior en teléfono. La asistente maneja agenda, solicitudes y horarios, sin datos clínicos. Padres: barra inferior en todos los tamaños de teléfono; en escritorio, UHeader con la misma navegación horizontal. Admin: sidebar. Un ADMIN que también atiende ve «Administración» al final del sidebar del médico.</p>
+</div>
+<div style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 16px; align-items: start;">
+<sc-for list="{{roles}}" as="r" hint-placeholder-count="4">
+<div class="card" style="padding: 20px; display: flex; flex-direction: column; gap: 14px;">
+<div><h2 style="font-size: 18px; font-weight: 600;">{{r.name}}</h2><p style="font-size: 13px; color: var(--tx2); margin-top: 2px;">{{r.nav}}</p></div>
+<sc-for list="{{r.items}}" as="it" hint-placeholder-count="4">
+<div style="display: flex; flex-direction: column; gap: 4px;">
+<div class="nv"><span>{{it.label}}</span><span class="rt" style="color: var(--prst);">{{it.route}}</span></div>
+<sc-for list="{{it.subs}}" as="s" hint-placeholder-count="2"><div class="sub"><span>{{s.l}}</span><span class="rt">{{s.r}}</span></div></sc-for>
+</div>
+</sc-for>
+</div>
+</sc-for>
+</div>
+<div class="card" style="padding: 16px 20px; display: flex; gap: 24px; flex-wrap: wrap; font-size: 13px; color: var(--tx2);">
+<span><b style="color: var(--tx);">Redirección tras OTP:</b> médico → /, padre → /, admin sin clínica → /admin/configuracion-inicial</span>
+<span><b style="color: var(--tx);">Sin sesión:</b> todo /pacientes, /hijos, /admin → /acceso?volver=…</span>
+<span><b style="color: var(--tx);">Sin red:</b> cualquier ruta con datos → /sin-conexion (nunca datos en caché)</span>
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"dark":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+renderVals() {
+const S = (l, r) => ({ l, r });
+const roles = [
+{ name: 'Médico', nav: 'Sidebar ≥1024 · pestañas inferiores <1024', items: [
+{ label: 'Inicio', route: '/', subs: [S('Requieren atención', '#atencion'), S('Controles pendientes', '#controles'), S('Citas de hoy', '/agenda?dia=hoy')] },
+{ label: 'Pacientes', route: '/pacientes', subs: [S('Nuevo paciente', '/pacientes/nuevo'), S('Detalle (5 pestañas)', '/pacientes/:id'), S('Nueva visita', '…/:id/visitas/nueva'), S('Editar / antecedentes', '…/:id/editar'), S('Informe PDF', '…/:id/informe')] },
+{ label: 'Agenda', route: '/agenda', subs: [S('Día · Semana · Mes', '?vista=dia|semana|mes'), S('Detalle de cita', '?cita=:id'), S('Solicitudes', '/agenda/solicitudes'), S('Horarios', '/agenda/horarios')] },
+{ label: 'Avisos', route: '/avisos', subs: [] },
+{ label: 'Perfil', route: '/perfil', subs: [S('Tema, contacto', '/perfil')] }
+]},
+{ name: 'Asistente', nav: 'Sidebar ≥1024 · pestañas <1024 · sin datos clínicos', items: [
+{ label: 'Agenda', route: '/agenda', subs: [S('Día · Semana · Mes', '?vista='), S('Solicitudes', '/agenda/solicitudes')] },
+{ label: 'Horarios', route: '/agenda/horarios', subs: [] },
+{ label: 'Perfil', route: '/perfil', subs: [] }
+]},
+{ name: 'Padres', nav: 'Pestañas inferiores (PWA) · UHeader en escritorio', items: [
+{ label: 'Inicio', route: '/', subs: [S('Hijo/a', '/hijos/:id'), S('Crecimiento · Vacunas · Hitos', '?tab='), S('Recomendaciones', '?tab=recomendaciones'), S('Descargar informe', '/hijos/:id/informe')] },
+{ label: 'Citas', route: '/citas', subs: [S('Agendar', '/citas/nueva'), S('Reprogramar / cancelar', '/citas/:id')] },
+{ label: 'Avisos', route: '/avisos', subs: [] },
+{ label: 'Perfil', route: '/perfil', subs: [S('Recordatorios', '/perfil/recordatorios'), S('Mis datos (LOPDP)', '/perfil/mis-datos')] }
+]},
+{ name: 'Admin', nav: 'Sidebar (escritorio)', items: [
+{ label: 'Configuración inicial', route: '/admin/inicio', subs: [S('Asistente 5 pasos', '?paso=1…5')] },
+{ label: 'Usuarios', route: '/admin/usuarios', subs: [S('Médicos y asistentes', '?tab=equipo'), S('Padres', '?tab=padres')] },
+{ label: 'Clínica', route: '/admin/clinica', subs: [S('Marca', '#marca'), S('Recordatorios', '#recordatorios')] },
+{ label: 'Auditoría', route: '/admin/auditoria', subs: [S('Solicitudes de datos', '?tab=solicitudes')] }
+]},
+{ name: 'Público', nav: 'Sin cuenta · sin navegación global', items: [
+{ label: 'Acceso', route: '/acceso', subs: [S('Código', '/acceso/codigo')] },
+{ label: 'Invitación', route: '/invitacion/:token', subs: [S('Consentimiento', '…/consentimiento'), S('Código', '…/codigo')] },
+{ label: 'Reservar', route: '/reservar', subs: [S('Horario', '/reservar/horario'), S('Datos', '/reservar/datos'), S('Consentimiento', '/reservar/consentimiento'), S('Verificar', '/reservar/verificar'), S('Enviada', '/reservar/enviada')] },
+{ label: 'Sistema', route: '', subs: [S('Privacidad', '/privacidad'), S('Sin conexión', '/sin-conexion'), S('403 · 404', '/403'), S('Sesión expirada', '/sesion-expirada')] }
+]}
+];
+return { theme: this.props.dark ? 'cp dark' : 'cp', roles };
+}
+}
+</script>
+</body>
+</html>

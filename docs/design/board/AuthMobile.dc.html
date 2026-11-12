@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Acceso e invitación</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:var(--prt)}
+.cp{--bg:#fff;--bg2:#f8fafc;--bg3:#f1f5f9;--bd:#e2e8f0;--bd2:#cbd5e1;--tx:#0f172a;--tx2:#475569;--tx3:#64748b;--pr:#0f766e;--prt:#0f766e;--pro:#fff;--prs:#f0fdfa;--prst:#115e59;--wab:#fef9c3;--wat:#713f12;--oub:#fee2e2;--out:#991b1b;--erb:#dc2626;font-family:Inter,system-ui,sans-serif;color:var(--tx);background:var(--bg2);font-size:15px;line-height:1.5}
+.cp.dark{--bg:#0f172a;--bg2:#020617;--bg3:#1e293b;--bd:#1e293b;--bd2:#334155;--tx:#f1f5f9;--tx2:#cbd5e1;--tx3:#94a3b8;--pr:#2dd4bf;--prt:#5eead4;--pro:#042f2e;--prs:rgba(45,212,191,.12);--prst:#99f6e4;--wab:rgba(234,179,8,.18);--wat:#fde047;--oub:rgba(239,68,68,.2);--out:#fca5a5;--erb:#f87171}
+.cp *{box-sizing:border-box}.cp h1,.cp h2,.cp p{margin:0}
+.t2{color:var(--tx2)}.t3{color:var(--tx3)}.sm{font-size:13px}.xs{font-size:12px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:48px;padding:0 16px;border-radius:10px;font:600 15px/1 Inter,sans-serif;border:1px solid transparent;cursor:pointer;text-decoration:none;white-space:nowrap;width:100%}
+.bp{background:var(--pr);color:var(--pro)}.bo{background:var(--bg);color:var(--tx);border-color:var(--bd2)}.bg{background:transparent;color:var(--prt)}
+.in{display:flex;align-items:center;gap:8px;height:48px;border:1px solid var(--bd2);border-radius:10px;background:var(--bg);color:var(--tx);padding:0 14px;font:400 16px Inter,sans-serif;width:100%}
+.in input{border:0;outline:0;background:transparent;color:inherit;font:inherit;width:100%}
+.lb{display:block;font-size:13px;font-weight:500;color:var(--tx2);margin-bottom:6px}
+.ic{width:20px;height:20px;flex:none;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.ph{width:375px;height:812px;flex:none;background:var(--bg);border:1px solid var(--bd2);border-radius:32px;overflow:hidden;display:flex;flex-direction:column;padding:56px 24px 28px;gap:20px}
+.cpt{font-size:13px;font-weight:600;color:var(--tx2);margin-bottom:10px}
+.otp{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
+.otp span{height:56px;border:1px solid var(--bd2);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;font-variant-numeric:tabular-nums;background:var(--bg)}
+.brand{display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center}
+.chk{display:flex;gap:12px;align-items:flex-start;padding:12px;border:1px solid var(--bd);border-radius:10px}
+.box{width:22px;height:22px;border-radius:6px;border:2px solid var(--bd2);flex:none;margin-top:1px;display:flex;align-items:center;justify-content:center}
+.box.on{background:var(--pr);border-color:var(--pr);color:var(--pro)}
+.cp :focus-visible{outline:2px solid var(--pr);outline-offset:2px}
+</style>
+</helmet>
+<div class="{{theme}}" style="width: 2115px; height: 940px; padding: 40px; display: flex; gap: 40px;">
+
+<div><p class="cpt">1 · Acceso (email)</p>
+<div class="ph">
+<div class="brand"><svg viewBox="0 0 64 64" width="56" height="56" aria-hidden="true"><rect width="64" height="64" rx="14" fill="var(--pr)"></rect><path d="M14 46C24 44 30 36 36 28S46 18 50 17" fill="none" stroke="var(--pro)" stroke-width="5" stroke-linecap="round"></path><circle cx="50" cy="17" r="5" fill="var(--pro)"></circle></svg><p style="font-weight: 700; font-size: 18px;">Pediatría Demo</p></div>
+<div style="margin-top: 20px;"><h1 style="font-size: 24px; font-weight: 700;">Ingresar</h1><p class="t2" style="margin-top: 4px;">Le enviaremos un código de 6 dígitos a su email. Sin contraseñas.</p></div>
+<div><label class="lb" for="a-e">Email</label><div class="in" style="border-color: var(--pr); box-shadow: 0 0 0 3px var(--prs);"><input id="a-e" type="email" value="maria.cedeno@correo.ec" autocomplete="email"></div></div>
+<a href="#" class="btn bp">Enviar código</a>
+<div style="margin-top: auto; text-align: center; display: flex; flex-direction: column; gap: 8px;">
+<p class="sm t2">¿Su familia aún no tiene cuenta?</p>
+<a href="#" class="btn bo">Reservar una primera cita</a>
+<a href="#" class="xs t3" style="margin-top: 6px;">Privacidad y tratamiento de datos</a>
+</div>
+</div></div>
+
+<div><p class="cpt">2 · Código · error</p>
+<div class="ph">
+<a href="#" class="sm" style="display: inline-flex; align-items: center; gap: 4px; min-height: 44px; text-decoration: none; font-weight: 600; margin-top: -24px;"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg>Cambiar email</a>
+<div><h1 style="font-size: 24px; font-weight: 700;">Revise su email</h1><p class="t2" style="margin-top: 4px;">Enviamos un código a <b style="color: var(--tx);">maria.cedeno@correo.ec</b></p></div>
+<div>
+<p class="lb" id="otp-l">Código de 6 dígitos</p>
+<div class="otp" role="group" aria-labelledby="otp-l"><span style="border-color: var(--erb);">4</span><span style="border-color: var(--erb);">8</span><span style="border-color: var(--erb);">1</span><span style="border-color: var(--erb);">9</span><span style="border-color: var(--erb);">0</span><span style="border-color: var(--erb);">2</span></div>
+<p role="alert" class="sm" style="color: var(--out); margin-top: 8px; display: flex; gap: 6px; align-items: center;"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width: 16px; height: 16px;"><path d="M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 8v4M12 16h.01"></path></svg>Código incorrecto. Le quedan 2 intentos.</p>
+</div>
+<a href="#" class="btn bp">Ingresar</a>
+<p class="sm t2" style="text-align: center;">¿No llegó? <span class="t3">Reenviar en 0:42</span></p>
+<p class="xs t3" style="text-align: center; margin-top: auto;">Revise también la carpeta de spam. El código vence en 10 minutos.</p>
+</div></div>
+
+<div><p class="cpt">3 · Código vencido</p>
+<div class="ph">
+<div style="margin-top: 40px; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 12px;">
+<span style="width: 64px; height: 64px; border-radius: 99px; background: var(--wab); color: var(--wat); display: flex; align-items: center; justify-content: center;"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width: 30px; height: 30px;"><path d="M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 6v6l4 2"></path></svg></span>
+<h1 style="font-size: 22px; font-weight: 700;">El código venció</h1>
+<p class="t2">Por seguridad, cada código dura 10 minutos. Pida uno nuevo para continuar.</p>
+</div>
+<a href="#" class="btn bp">Enviar un código nuevo</a>
+<a href="#" class="btn bg">Usar otro email</a>
+</div></div>
+
+<div><p class="cpt">4 · Invitación al portal</p>
+<div class="ph">
+<div class="brand"><svg viewBox="0 0 64 64" width="56" height="56" aria-hidden="true"><rect width="64" height="64" rx="14" fill="var(--pr)"></rect><path d="M14 46C24 44 30 36 36 28S46 18 50 17" fill="none" stroke="var(--pro)" stroke-width="5" stroke-linecap="round"></path><circle cx="50" cy="17" r="5" fill="var(--pro)"></circle></svg><p style="font-weight: 700; font-size: 18px;">Pediatría Demo</p></div>
+<div style="text-align: center; margin-top: 12px;"><h1 style="font-size: 22px; font-weight: 700;">Bienvenida, María</h1><p class="t2" style="margin-top: 6px;">La Dra. Andrea Salazar le invitó a ver la información de salud de:</p></div>
+<div style="border: 1px solid var(--bd); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 10px;">
+<div style="display: flex; align-items: center; gap: 12px;"><span style="width: 40px; height: 40px; border-radius: 99px; background: var(--prs); color: var(--prst); display: flex; align-items: center; justify-content: center; font-weight: 700;">V</span><div><p style="font-weight: 600;">Valentina Ríos Cedeño</p><p class="xs t3">Hija · 1 año 4 meses</p></div></div>
+<div style="display: flex; align-items: center; gap: 12px;"><span style="width: 40px; height: 40px; border-radius: 99px; background: var(--bg3); color: var(--tx2); display: flex; align-items: center; justify-content: center; font-weight: 700;">T</span><div><p style="font-weight: 600;">Tomás Ríos Cedeño</p><p class="xs t3">Hijo · 4 años 2 meses</p></div></div>
+</div>
+<p class="sm t2">Podrá ver su crecimiento, vacunas y recomendaciones, y agendar citas.</p>
+<a href="#" class="btn bp" style="margin-top: auto;">Continuar</a>
+<p class="xs t3" style="text-align: center;">Invitación válida hasta el 17 nov 2026</p>
+</div></div>
+
+<div><p class="cpt">5 · Consentimiento (borrador legal)</p>
+<div class="ph" style="gap: 14px;">
+<div><h1 style="font-size: 22px; font-weight: 700;">Antes de continuar</h1><p class="t2 sm" style="margin-top: 4px;">Pediatría Demo tratará datos de salud de sus hijos según la Ley Orgánica de Protección de Datos Personales.</p></div>
+<div style="background: var(--bg3); border-radius: 10px; padding: 12px; font-size: 13px; color: var(--tx2); display: flex; flex-direction: column; gap: 6px;">
+<p><b style="color: var(--tx);">Qué datos:</b> identificación, mediciones, vacunas, hitos y notas de consulta.</p>
+<p><b style="color: var(--tx);">Para qué:</b> atención pediátrica y recordatorios de citas.</p>
+<p><b style="color: var(--tx);">Sus derechos:</b> acceder, corregir, exportar o pedir eliminación desde «Mis datos».</p>
+</div>
+<label class="chk"><span class="box on"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" style="width: 14px; height: 14px; stroke-width: 3;"><path d="M20 6 9 17l-5-5"></path></svg></span><span class="sm">Soy representante legal de los menores y autorizo el tratamiento de sus datos de salud. <a href="#">Leer política completa</a></span></label>
+<label class="chk"><span class="box"></span><span class="sm">Acepto recibir recordatorios por WhatsApp <span class="t3">(opcional)</span></span></label>
+<a href="#" class="btn bp" style="margin-top: auto;">Aceptar y continuar</a>
+<p class="xs" style="text-align: center; color: var(--wat); background: var(--wab); padding: 6px; border-radius: 6px;">Texto pendiente de revisión legal (LOPDP)</p>
+</div></div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"dark":{"editor":"boolean","default":false},"$preview":{"width":2115,"height":940}}'>
+class Component extends DCLogic {
+renderVals() { return { theme: this.props.dark ? 'cp dark' : 'cp' }; }
+}
+</script>
+</body>
+</html>

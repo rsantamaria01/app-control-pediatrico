@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Nuevo paciente</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:inherit}
+.cp{--bg:#fff;--bg2:#f8fafc;--bg3:#f1f5f9;--bd:#e2e8f0;--bd2:#cbd5e1;--tx:#0f172a;--tx2:#475569;--tx3:#64748b;--pr:#0f766e;--pro:#fff;--prs:#f0fdfa;--prst:#115e59;--wab:#fef9c3;--wat:#713f12;font-family:Inter,system-ui,sans-serif;color:var(--tx);background:var(--bg2);font-size:14px;line-height:1.45;font-variant-numeric:tabular-nums}
+.cp.dark{--bg:#0f172a;--bg2:#020617;--bg3:#1e293b;--bd:#1e293b;--bd2:#334155;--tx:#f1f5f9;--tx2:#cbd5e1;--tx3:#94a3b8;--pr:#2dd4bf;--pro:#042f2e;--prs:rgba(45,212,191,.12);--prst:#99f6e4;--wab:rgba(234,179,8,.18);--wat:#fde047}
+.cp *{box-sizing:border-box}.cp h1,.cp h2,.cp p{margin:0}
+.t2{color:var(--tx2)}.t3{color:var(--tx3)}.sm{font-size:13px}.xs{font-size:12px}
+.card{background:var(--bg);border:1px solid var(--bd);border-radius:12px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:0 16px;border-radius:8px;font:600 14px/1 Inter,sans-serif;border:1px solid transparent;cursor:pointer;text-decoration:none;white-space:nowrap}
+.bp{background:var(--pr);color:var(--pro)}.bo{background:var(--bg);color:var(--tx);border-color:var(--bd2)}.bg{background:transparent;color:var(--prst)}
+.nav{display:flex;align-items:center;gap:10px;min-height:40px;padding:0 12px;border-radius:8px;color:var(--tx2);font-weight:500;text-decoration:none}.nav.on{background:var(--prs);color:var(--prst)}
+.in{display:flex;align-items:center;gap:8px;height:44px;border:1px solid var(--bd2);border-radius:8px;background:var(--bg);color:var(--tx);padding:0 12px;font:400 15px Inter,sans-serif;width:100%}
+.in input,.ta{border:0;outline:0;background:transparent;color:inherit;font:inherit;width:100%;min-width:0}
+.ta{display:block;min-height:72px;border:1px solid var(--bd2);border-radius:8px;background:var(--bg);padding:10px 12px;resize:none;font-size:14px}
+.lb{display:block;font-size:13px;font-weight:500;color:var(--tx2);margin-bottom:6px}
+.u{color:var(--tx3);font-size:13px}
+.rd{display:flex;align-items:center;gap:10px;min-height:44px;padding:0 12px;border:1px solid var(--bd2);border-radius:8px;flex:1;font-weight:500}.rd.on{border-color:var(--pr);background:var(--prs);color:var(--prst)}
+.dot{width:16px;height:16px;border-radius:99px;border:2px solid var(--bd2);flex:none}.rd.on .dot{border:5px solid var(--pr)}
+.sw{width:44px;height:26px;border-radius:99px;background:var(--pr);position:relative;flex:none;display:inline-block}.sw::after{content:"";position:absolute;right:3px;top:3px;width:20px;height:20px;border-radius:99px;background:var(--pro)}
+.box{width:22px;height:22px;border-radius:6px;border:2px solid var(--pr);background:var(--pr);color:var(--pro);flex:none;display:flex;align-items:center;justify-content:center}
+.g2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.g4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.cp :focus-visible{outline:2px solid var(--pr);outline-offset:2px}
+</style>
+</helmet>
+<div class="{{theme}}" style="width: 100%; min-height: 1360px; display: flex; flex-wrap: wrap;">
+<aside style="flex: 1 1 240px; max-width: 256px; background: var(--bg); border-right: 1px solid var(--bd); padding: 16px 12px; display: flex; flex-direction: column; gap: 2px;">
+<div style="display: flex; align-items: center; gap: 10px; padding: 4px 8px 16px;"><svg viewBox="0 0 64 64" width="32" height="32" aria-hidden="true"><rect width="64" height="64" rx="14" fill="var(--pr)"></rect><path d="M14 46C24 44 30 36 36 28S46 18 50 17" fill="none" stroke="var(--pro)" stroke-width="5" stroke-linecap="round"></path><circle cx="50" cy="17" r="5" fill="var(--pro)"></circle></svg><div><p style="font-weight: 600;">Pediatría Demo</p><p class="xs t3">Dra. Andrea Salazar</p></div></div>
+<a href="#" class="nav">Inicio</a><a href="#" class="nav on">Pacientes</a><a href="#" class="nav">Agenda</a><a href="#" class="nav">Avisos</a><a href="#" class="nav">Perfil</a>
+</aside>
+<main style="flex: 999 1 640px; min-width: 0; display: flex; flex-direction: column;">
+<div style="min-height: 64px; border-bottom: 1px solid var(--bd); background: var(--bg); display: flex; align-items: center; gap: 12px; padding: 10px 24px;"><p class="sm t2" style="flex: 1;">Pacientes › <b style="color: var(--tx);">Nuevo paciente</b></p><a href="#" class="btn bo">Cancelar</a><a href="#" class="btn bp">Crear paciente</a></div>
+<div style="padding: 24px; display: flex; flex-direction: column; gap: 20px; max-width: 920px; width: 100%; margin: 0 auto;">
+<section class="card" style="padding: 20px; display: flex; flex-direction: column; gap: 14px;">
+<h2 style="font-size: 17px; font-weight: 600;">Datos del niño o niña</h2>
+<div class="g2"><div><label class="lb" for="n1">Nombres</label><div class="in"><input id="n1" value="Ana Lucía"></div></div><div><label class="lb" for="n2">Apellidos</label><div class="in"><input id="n2" value="Pérez Mora"></div></div></div>
+<div class="g2"><fieldset style="border: 0; margin: 0; padding: 0;"><legend class="lb">Sexo</legend><div style="display: flex; gap: 8px;"><label class="rd"><span class="dot"></span>Masculino</label><label class="rd on"><span class="dot"></span>Femenino</label></div></fieldset>
+<div class="g2"><div><label class="lb" for="n3">Nacimiento</label><div class="in"><input id="n3" value="01/09/2026"></div></div><div><label class="lb" for="n4">Cédula <span class="t3" style="font-weight: 400;">(opcional)</span></label><div class="in"><input id="n4"></div></div></div></div>
+</section>
+<section class="card" style="padding: 20px; display: flex; flex-direction: column; gap: 14px;">
+<h2 style="font-size: 17px; font-weight: 600;">Antecedentes al nacer</h2>
+<div class="g4">
+<div><label class="lb" for="a1">Edad gestacional</label><div class="in"><input id="a1" value="26" style="width: 32px;"><span class="u">sem</span><input aria-label="Días" value="3" style="width: 20px;"><span class="u">d</span></div></div>
+<div><label class="lb" for="a2">Peso al nacer</label><div class="in"><input id="a2" value="0,82"><span class="u">kg</span></div></div>
+<div><label class="lb" for="a3">Talla al nacer</label><div class="in"><input id="a3" value="33,5"><span class="u">cm</span></div></div>
+<div><label class="lb" for="a4">PC al nacer</label><div class="in"><input id="a4" value="23,8"><span class="u">cm</span></div></div>
+</div>
+<div style="display: flex; gap: 10px; padding: 12px; border-radius: 8px; background: var(--prs); color: var(--prst);"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><path d="M12 6v6l4 2"></path></svg><p class="sm">Prematura: los gráficos usarán <b>edad corregida hasta los 24 meses</b>.</p></div>
+<label style="display: flex; gap: 12px; align-items: flex-start; padding: 12px; border: 1px solid var(--bd); border-radius: 8px;"><span class="box"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg></span><span class="sm">Prematuro extremo: extender la corrección hasta los 36 meses <span style="display: inline-block; padding: 1px 8px; border-radius: 99px; background: var(--wab); color: var(--wat); font-size: 12px; font-weight: 600;">sugerido · &lt; 28 sem</span></span></label>
+<div><label class="lb" for="a5">Notas perinatales</label><textarea id="a5" class="ta">Cesárea. UCIN 6 semanas. APGAR 5/8.</textarea></div>
+</section>
+<section class="card" style="padding: 20px; display: flex; flex-direction: column; gap: 14px;">
+<div style="display: flex; justify-content: space-between; align-items: center;"><h2 style="font-size: 17px; font-weight: 600;">Representantes</h2><a href="#" class="btn bg">+ Agregar otro representante</a></div>
+<sc-for list="{{guards}}" as="g" hint-placeholder-count="2"><div style="border: 1px solid var(--bd); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 12px;">
+<div class="g4"><div><label class="lb">Nombre</label><div class="in">{{g.n}}</div></div><div><label class="lb">Parentesco</label><div class="in" style="justify-content: space-between;">{{g.r}}<span class="u">▾</span></div></div><div><label class="lb">Email</label><div class="in" style="overflow: hidden; white-space: nowrap;">{{g.e}}</div></div><div><label class="lb">Teléfono / WhatsApp</label><div class="in"><span class="u">+593</span>{{g.t}}</div></div></div>
+<div style="display: flex; align-items: center; gap: 12px;"><span style="flex: 1;" class="sm"><b>Invitar al portal</b> <span class="t3">· enlace por email válido 7 días</span></span><span class="sw" role="switch" aria-checked="true" aria-label="Invitar al portal"></span></div>
+</div></sc-for>
+</section>
+<p class="xs t3">Al crear, se abre la ficha vacía («Aún no hay mediciones») con «Primera visita» y «Agendar cita».</p>
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"dark":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":1360}}'>
+class Component extends DCLogic {
+renderVals() {
+const guards = [{n:'Paula Mora',r:'Madre',e:'paula.mora@correo.ec',t:'99 000 0000'},{n:'Andrés Pérez',r:'Padre',e:'andres.perez@correo.ec',t:'98 000 0000'}];
+return { theme: this.props.dark ? 'cp dark' : 'cp', guards };
+}
+}
+</script>
+</body>
+</html>

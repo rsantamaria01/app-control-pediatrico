@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Padres en escritorio</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:inherit}
+.cp{--bg:#fff;--bg2:#f8fafc;--bg3:#f1f5f9;--bd:#e2e8f0;--bd2:#cbd5e1;--tx:#0f172a;--tx2:#475569;--tx3:#64748b;--pr:#0f766e;--prt:#0f766e;--pro:#fff;--prs:#f0fdfa;--prst:#115e59;--okb:#dcfce7;--okt:#166534;--wab:#fef9c3;--wat:#713f12;--oub:#fee2e2;--out:#991b1b;--nab:#f1f5f9;--nat:#475569;font-family:Inter,system-ui,sans-serif;color:var(--tx);background:var(--bg2);font-size:15px;line-height:1.5;font-variant-numeric:tabular-nums}
+.cp.dark{--bg:#0f172a;--bg2:#020617;--bg3:#1e293b;--bd:#1e293b;--bd2:#334155;--tx:#f1f5f9;--tx2:#cbd5e1;--tx3:#94a3b8;--pr:#2dd4bf;--prt:#5eead4;--pro:#042f2e;--prs:rgba(45,212,191,.12);--prst:#99f6e4;--okb:rgba(34,197,94,.16);--okt:#86efac;--wab:rgba(234,179,8,.18);--wat:#fde047;--oub:rgba(239,68,68,.2);--out:#fca5a5;--nab:#1e293b;--nat:#cbd5e1}
+.cp *{box-sizing:border-box}.cp h1,.cp h2,.cp h3,.cp p{margin:0}
+.t2{color:var(--tx2)}.t3{color:var(--tx3)}.sm{font-size:13px}.xs{font-size:12px}
+.card{background:var(--bg);border:1px solid var(--bd);border-radius:14px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:0 16px;border-radius:8px;font:600 14px/1 Inter,sans-serif;border:1px solid transparent;cursor:pointer;text-decoration:none;white-space:nowrap}
+.bp{background:var(--pr);color:var(--pro)}.bo{background:var(--bg);color:var(--tx);border-color:var(--bd2)}.bg{background:transparent;color:var(--tx2)}
+.bd{display:inline-flex;align-items:center;gap:4px;height:24px;padding:0 8px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap}
+.zok{background:var(--okb);color:var(--okt)}.zwa{background:var(--wab);color:var(--wat)}.zou{background:var(--oub);color:var(--out)}.zna{background:var(--nab);color:var(--nat)}.zpr{background:var(--prs);color:var(--prst)}
+.ic{width:20px;height:20px;flex:none;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}.ic4{width:16px;height:16px}
+.hn{display:inline-flex;align-items:center;min-height:44px;padding:0 14px;border-radius:8px;font-weight:500;color:var(--tx2);text-decoration:none}.hn.on{color:var(--prst);background:var(--prs);font-weight:600}
+.seg{display:inline-flex;padding:3px;border-radius:10px;background:var(--bg3);gap:2px}.seg a{display:inline-flex;align-items:center;min-height:38px;padding:0 16px;border-radius:8px;font-size:14px;font-weight:500;color:var(--tx2);text-decoration:none}.seg a.on{background:var(--bg);color:var(--tx);font-weight:600;box-shadow:0 1px 2px rgba(15,23,42,.08)}
+.st{display:flex;align-items:center;gap:12px;padding:12px 0;border-top:1px solid var(--bd)}
+.sti{width:32px;height:32px;border-radius:99px;display:flex;align-items:center;justify-content:center;flex:none}
+.tb{width:100%;border-collapse:collapse}.tb th{text-align:left;font-size:12px;font-weight:500;color:var(--tx3);padding:8px 12px;border-bottom:1px solid var(--bd)}.tb td{padding:9px 12px;border-bottom:1px solid var(--bd);font-size:13px}
+.cp :focus-visible{outline:2px solid var(--pr);outline-offset:2px}
+</style>
+</helmet>
+<div class="{{theme}}" style="width: 100%; min-height: 1000px;">
+<header style="background: var(--bg); border-bottom: 1px solid var(--bd);">
+<div style="max-width: 1200px; margin: 0 auto; padding: 0 24px; min-height: 64px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
+<div style="display: flex; align-items: center; gap: 10px; margin-right: auto;"><svg viewBox="0 0 64 64" width="32" height="32" aria-hidden="true"><rect width="64" height="64" rx="14" fill="var(--pr)"></rect><path d="M14 46C24 44 30 36 36 28S46 18 50 17" fill="none" stroke="var(--pro)" stroke-width="5" stroke-linecap="round"></path><circle cx="50" cy="17" r="5" fill="var(--pro)"></circle></svg><p style="font-weight: 600;">Pediatría Demo</p></div>
+<nav aria-label="Principal" style="display: flex; gap: 4px; flex-wrap: wrap;"><a href="#" class="hn on">Inicio</a><a href="#" class="hn">Citas</a><a href="#" class="hn">Avisos</a><a href="#" class="hn">Perfil</a></nav>
+<span style="width: 36px; height: 36px; border-radius: 99px; background: var(--bg3); display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 13px;" aria-label="María Cedeño">MC</span>
+</div>
+</header>
+<main style="max-width: 1200px; margin: 0 auto; padding: 28px 24px; display: flex; flex-direction: column; gap: 20px;">
+<div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
+<nav class="seg" aria-label="Hijos"><a href="#" class="on">Valentina · 1 a 4 m</a><a href="#">Tomás · 4 a 2 m</a></nav>
+<div style="margin-left: auto; display: flex; gap: 8px;"><a href="#" class="btn bo"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"></path></svg>Ver informe PDF</a><a href="#" class="btn bp"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"></path></svg>Agendar cita</a></div>
+</div>
+<div style="display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 20px; align-items: start;">
+<div style="display: flex; flex-direction: column; gap: 20px;">
+<section class="card" style="padding: 20px;">
+<h1 style="font-size: 22px; font-weight: 700;">Las medidas de Valentina están dentro del rango esperado</h1>
+<p class="t2" style="margin-top: 6px;">La puntuación Z compara con niñas de su misma edad: 0 es el promedio y entre −2 y +2 es el rango esperado.</p>
+<div style="margin-top: 12px;">
+<div class="st"><span class="sti zok"><svg class="ic ic4" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg></span><p style="flex: 1;"><b>Estatura:</b> dentro del rango esperado</p><span class="t3 sm">76,4 cm · Z −0,62</span></div>
+<div class="st"><span class="sti zok"><svg class="ic ic4" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg></span><p style="flex: 1;"><b>Peso:</b> dentro del rango esperado</p><span class="t3 sm">8,20 kg · Z −1,39</span></div>
+<div class="st"><span class="sti zok"><svg class="ic ic4" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg></span><p style="flex: 1;"><b>Peso para su estatura:</b> dentro del rango esperado</p><span class="t3 sm">Z −1,52</span></div>
+<div class="st"><span class="sti zok"><svg class="ic ic4" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg></span><p style="flex: 1;"><b>Tamaño de la cabeza:</b> dentro del rango esperado</p><span class="t3 sm">44,8 cm · Z −0,31</span></div>
+</div>
+</section>
+<section class="card" style="padding: 20px; display: flex; flex-direction: column; gap: 12px;">
+<div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap;"><h2 style="font-size: 17px; font-weight: 600;">Cómo ha crecido</h2><div class="seg" aria-label="Medida"><a href="#">Estatura</a><a href="#" class="on">Peso</a><a href="#">Cabeza</a></div></div>
+<dc-import name="GrowthChart" dark="{{dark}}" variant="padres" tooltip="{{ true }}" hint-size="100%,330px"></dc-import>
+<details open style="border-top: 1px solid var(--bd); padding-top: 10px;">
+<summary class="sm" style="font-weight: 600; cursor: pointer; min-height: 32px; color: var(--prt);">Ver detalles</summary>
+<table class="tb" style="margin-top: 8px;">
+<thead><tr><th>Fecha</th><th>Edad</th><th style="text-align: right;">Peso</th><th style="text-align: right;">Puntaje Z</th></tr></thead>
+<tbody><tr><td>10 nov 2026</td><td>16 m</td><td style="text-align: right;">8,20 kg</td><td style="text-align: right;">−1,39</td></tr><tr><td>5 oct 2026</td><td>15 m</td><td style="text-align: right;">8,10 kg</td><td style="text-align: right;">−1,33</td></tr><tr><td>7 jul 2026</td><td>12 m</td><td style="text-align: right;">7,70 kg</td><td style="text-align: right;">−1,18</td></tr></tbody>
+</table>
+<p class="xs t3" style="margin-top: 8px;">El puntaje Z compara con niñas de la misma edad (OMS). Entre −2 y +2 es la zona esperada.</p>
+</details>
+</section>
+</div>
+<div style="display: flex; flex-direction: column; gap: 20px;">
+<section class="card" style="padding: 18px; display: flex; flex-direction: column; gap: 8px;">
+<p class="xs t3" style="font-weight: 600;">PRÓXIMA CITA</p>
+<p style="font-size: 18px; font-weight: 700;">Jueves 10 de diciembre, 09:00</p>
+<p class="sm t2">Control con la Dra. Andrea Salazar</p>
+<div style="display: flex; gap: 8px; margin-top: 4px;"><a href="#" class="btn bo" style="flex: 1;">Reprogramar</a><a href="#" class="btn bg" style="flex: 1;">Cancelar</a></div>
+</section>
+<section class="card" style="padding: 18px; display: flex; flex-direction: column; gap: 12px;">
+<h2 style="font-size: 16px; font-weight: 600;">Recomendaciones</h2>
+<div style="border-left: 3px solid var(--pr); padding-left: 12px;"><p class="xs t3">10 nov 2026 · Dra. Salazar</p><p class="sm">Ofrecer 3 comidas y 2 refrigerios al día; agregar una cucharadita de aceite a la sopa. Control de peso en 4 semanas.</p></div>
+<div style="border-left: 3px solid var(--bd2); padding-left: 12px;"><p class="xs t3">5 oct 2026 · Dra. Salazar</p><p class="sm t2">Iniciar leche entera; mantener lactancia si la desea.</p></div>
+<a href="#" class="sm" style="color: var(--prt); font-weight: 600;">Ver historial</a>
+</section>
+<section class="card" style="padding: 18px; display: flex; flex-direction: column; gap: 10px;">
+<h2 style="font-size: 16px; font-weight: 600;">Vacunas</h2>
+<div style="display: flex; gap: 10px; align-items: flex-start;"><span class="bd zou"><svg class="ic ic4" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 6v6l4 2"></path></svg>Atrasada</span><p class="sm">SRP 1.ª dosis <span class="t3">(ejemplo)</span> · desde 6 jul 2026</p></div>
+<div style="display: flex; gap: 10px; align-items: flex-start;"><span class="bd zna">Próximas</span><p class="sm">18 meses · 6 ene 2027 (3 dosis)</p></div>
+<div style="display: flex; gap: 10px; align-items: flex-start;"><span class="bd zok">Aplicadas</span><p class="sm">11 dosis · última: varicela, 7 jul 2026</p></div>
+</section>
+<section class="card" style="padding: 18px; display: flex; flex-direction: column; gap: 10px;">
+<h2 style="font-size: 16px; font-weight: 600;">Hitos</h2>
+<p class="sm"><span class="bd zok" style="margin-right: 6px;">8 de 12 logrados</span>Motor, lenguaje, social y cognitivo</p>
+<p class="sm t2">Siguiente: <b style="color: var(--tx);">caminar sola</b> · suele lograrse entre los 8 y 18 meses</p>
+</section>
+</div>
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"dark":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+renderVals() {
+const dark = !!this.props.dark;
+return { theme: dark ? 'cp dark' : 'cp', dark };
+}
+}
+</script>
+</body>
+</html>

@@ -33,6 +33,9 @@ Before calling work done: `pnpm lint && pnpm typecheck && pnpm test` must pass.
   (standing) tables and the 0.7 cm adjustment.
 - The service worker must never cache clinical data: `/api/**` stays NetworkOnly.
 - Roles: ADMIN, DOCTOR, PATIENT. A parent/patient only ever sees their own children.
+- Pending update: `docs/decisions/2026-11-10-ui-and-clinical.md` adds the ASSISTANT role,
+  head circumference, WHO 2007 (5–19 years) and new Z display rules. Those decisions win over
+  this list; rewrite the list once they are verified (see `docs/handoff/planning.md`).
 
 ## Secrets
 - Never commit secrets. Dev keys come from the host file
@@ -44,6 +47,12 @@ Before calling work done: `pnpm lint && pnpm typecheck && pnpm test` must pass.
   Never read or write any other bank.
 - Recall before starting a task; retain decisions, fixes and what was learned after it.
 
+## Design reference
+- The approved UI v1 lives in `docs/design/` (board sources, screenshots, prototype).
+  Start at `docs/design/README.md`. Sample data and curves there are fictional.
+- Decisions: `docs/decisions/`. Build planning: `docs/handoff/planning.md`.
+
 ## Skills
 Project skills live in `.agents/skills/`. Prefer them for: workflow and TDD (superpowers),
-UI/UX design (ui-ux-pro-max), Nuxt UI components (nuxt-ui), browser testing (webapp-testing).
+UI/UX design (ui-ux-pro-max), Nuxt UI components (nuxt-ui), browser testing (webapp-testing),
+this app's screens, charts, Z labels and copy (control-pediatrico-ui, draft until verified).

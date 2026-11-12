@@ -4,8 +4,8 @@ import betterTailwindcss from 'eslint-plugin-better-tailwindcss'
 import { getDefaultAttributes } from 'eslint-plugin-better-tailwindcss/api/defaults'
 
 export default withNuxt(
-  // Vendored agent skills (third-party code) are not linted.
-  { ignores: ['.agents/**'] },
+  // Vendored agent skills (third-party code) and design reference files are not linted.
+  { ignores: ['.agents/**', 'docs/design/**'] },
   betterTailwindcss.configs['correctness-error'],
   {
     settings: {

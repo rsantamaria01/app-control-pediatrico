@@ -1,4 +1,3 @@
-// https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
   modules: [
     '@nuxt/eslint',
@@ -12,11 +11,17 @@ export default defineNuxtConfig({
 
   css: ['~/assets/css/main.css'],
 
-  routeRules: {
-    '/': { prerender: true }
+  runtimeConfig: {
+    public: {
+      siteUrl: ''
+    }
   },
 
-  // Opt into Nuxt 5 behaviour now (Nitro 3 / h3 v2) to avoid a second migration.
+  routeRules: {
+    '/**': { prerender: false, headers: { 'cache-control': 'private, no-store, max-age=0' } },
+    '/api/**': { prerender: false, headers: { 'cache-control': 'private, no-store, max-age=0' } }
+  },
+
   future: {
     compatibilityVersion: 5
   },
@@ -48,9 +53,9 @@ export default defineNuxtConfig({
       start_url: '/'
     },
     workbox: {
-      navigateFallback: '/',
-      globPatterns: ['**/*.{js,css,html,png,svg,ico,woff2}'],
-      // Clinical data must never be cached on the device: API calls are network-only.
+      navigateFallback: null,
+      navigateFallbackDenylist: [/^\/(?:pacientes|hijos|agenda|admin|acceso|invitacion|api)(?:\/|$)/],
+      globPatterns: ['**/*.{js,css,png,svg,ico,woff2}'],
       runtimeCaching: [
         {
           urlPattern: ({ url }) => url.pathname.startsWith('/api/'),

@@ -1,24 +1,24 @@
 # Tokens
 
 Source: board artboard `Main` (`docs/design/board/Main.dc.html`, `docs/design/screens/Main.png`).
-Proposed values; the current `app/app.config.ts` / `app/assets/css/main.css` still hold the
-scaffold defaults (`primary: 'green'`, Public Sans). Replacing them is an implementation task.
+The default brand scale and fixed clinical palette are in `app/app.config.ts` and
+`app/assets/css/main.css`. Runtime per-clinic branding awaits clinic settings; never recolor
+neutral, WHO curves or patient lines from the primary palette.
 
-## app/app.config.ts (proposed)
+## app/app.config.ts (default)
 
 ```ts
 export default defineAppConfig({
   ui: {
     colors: {
-      primary: 'brand', // per-clinic scale, default teal
+      primary: 'brand',
       neutral: 'slate'
-    },
-    button: { defaultVariants: { size: 'lg' } } // 44 px touch target
+    }
   }
 })
 ```
 
-## app/assets/css/main.css (proposed)
+## app/assets/css/main.css (excerpt; see actual stylesheet)
 
 ```css
 @import "tailwindcss";
@@ -32,10 +32,8 @@ export default defineAppConfig({
   --color-brand-600: #0d9488; --color-brand-700: #0f766e;
   --color-brand-800: #115e59; --color-brand-900: #134e4a;
   --color-brand-950: #042f2e;
-  /* Z (fixed) */
   --color-z-flag: #ea580c;    --color-z-watch: #eab308;
-  --color-z-band: #16a34a;    /* area −2…+2 */
-  /* WHO curves + patient (fixed) */
+  --color-z-band: #16a34a;
   --color-curve-median: #334155; --color-curve-sd1: #ca8a04;
   --color-curve-sd2: #ea580c;    --color-curve-sd3: #dc2626;
   --color-patient: #1d4ed8;
@@ -44,8 +42,9 @@ export default defineAppConfig({
 .dark { --ui-primary: var(--ui-color-primary-400); }
 ```
 
-Verify the Nuxt UI v4 API for custom color names (`brand`) and `--ui-*` variables before using
-this verbatim.
+Nuxt UI v4 custom colors use `@theme static --color-brand-50…950` plus `ui.colors.primary`;
+`--ui-primary` derives from the registered primary scale. This excerpt illustrates the default;
+use the actual stylesheet for both light and dark fixed palettes.
 
 ## White-label rule
 

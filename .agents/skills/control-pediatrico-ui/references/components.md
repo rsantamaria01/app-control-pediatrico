@@ -1,7 +1,7 @@
 # Components, routes and states
 
-Source: board artboards `Handoff` and `NavMap`. Component names are Nuxt UI v4; verify each one
-exists in the installed version (use the `nuxt-ui` skill) before building.
+Source: board artboards `Handoff` and `NavMap`. Names were cross-checked against the Nuxt UI v4
+component catalog; check detailed props/slots against the installed version before each slice.
 
 ## Component per screen
 
@@ -17,7 +17,7 @@ exists in the installed version (use the `nuxt-ui` skill) before building.
 | 8 | 404 · 403 · session expired | UError · UButton | PwaSystemMobile |
 | 9 | Doctor home | UDashboardGroup · UDashboardSidebar · UDashboardPanel · UDashboardNavbar · UDashboardSearch · UCard · UTable · UBadge | Dashboard1440 · DoctorMobile |
 | 10 | Patients | UInput (search) · UTable (clickable rows) · UAvatar · UPagination · UButton | DoctorMobile |
-| 11 | Patient detail | UDashboardPanel · UCard · UBadge · UTabs · VChart · USwitch (Gráfico/Tabla) · UTable · UDropdownMenu | PatientDetail1440 · Tablet1024 · DoctorMobile |
+| 11 | Patient detail | UDashboardPanel · UCard · UBadge · UTabs · VChart · UFieldGroup (Gráfico/Tabla) · UTable · UDropdownMenu | PatientDetail1440 · Tablet1024 · DoctorMobile |
 | 12 | New visit | USlideover (≥ 1024) / page (< 1024) · UForm · UInputDate · UInputNumber · URadioGroup · UTextarea · UAlert | Tablet1024 · DoctorMobile |
 | 13 | New / edit patient | UForm · UInput · URadioGroup · UInputDate · UInputNumber · UTextarea · USwitch (invite to portal) · UCheckbox (extend correction) · UButton | NewPatient1440 · DoctorMobile |
 | 14 | Vaccines tab | UTable grouped by age · UBadge · UModal (record dose) · UInputDate · UInput (lot) | VaccinesMilestones1440 |
@@ -25,7 +25,7 @@ exists in the installed version (use the `nuxt-ui` skill) before building.
 | 16 | Agenda (day, week, month) | UTabs (Día/Semana/Mes) · custom grid · UCalendar (month) · USlideover (detail, reschedule, cancel) · UModal (new appointment) | Agenda1440 · AgendaViews1440 · AgendaMobile |
 | 16.1 | Opening hours | USwitch per day · USelect (hours) · URadioGroup (duration) · blocked-days list · UInputDate | Availability1440 · AgendaMobile |
 | 16.2 | Assistant (ASSISTANT) | Same agenda and hours screens, without "Abrir ficha" or clinical data | AgendaMobile (note) |
-| 17 | Growth report | In-page preview · `@media print` A4 · 3 pages · UButton (Descargar, Compartir) | ReportA4 · ReportA4p2 · ReportA4p3 |
+| 17 | Growth report | Doctor-approved in-page preview · `@media print` A4 · three board sections with overflow pagination · UButton (Descargar, Compartir) | ReportA4 · ReportA4p2 · ReportA4p3 |
 | 18 | Parents: home | UCard per child · UBadge · UButton · bottom bar (UNavigationMenu horizontal) | ParentMobile · ParentDesktop1440 |
 | 19 | Parents: child | "Ver informe" button above the tabs · UTabs · VChart (parent variant) · UCollapsible ("Ver detalles") · UCard | ParentMobile · ParentDesktop1440 |
 | 20 | Parents: book appointment | USelect (child) · UCalendar · UButton (slots) · UAlert (channels) | ParentMobile |
@@ -45,8 +45,10 @@ exists in the installed version (use the `nuxt-ui` skill) before building.
 
 ## Navigation
 
-Doctor and assistant: UDashboardSidebar at ≥ 1024 px (collapsible to icons at 1024), bottom tabs on
-phones. Parents: bottom tabs on phones, UHeader with the same items on desktop. Admin: sidebar.
+Once Task 2 provides server-verified sessions, doctor and assistant: UDashboardSidebar at ≥ 1024 px
+(collapsible to icons at 1024), bottom tabs on phones. Parents: bottom tabs on phones, UHeader on
+desktop. Admin: sidebar. Until authentication and each route's end-to-end flow exist, keep its
+navigation hidden; a hidden link is not authorization.
 An ADMIN who also treats patients sees "Administración" at the end of the doctor sidebar.
 
 | Role | Item | Route | Sub-routes |

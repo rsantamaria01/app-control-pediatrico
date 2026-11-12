@@ -1,6 +1,30 @@
 {
   "version": 2,
   "skills": {
+    "ui-ux-pro-max": {
+      "source": "nextlevelbuilder/ui-ux-pro-max-skill",
+      "sourceType": "github",
+      "revision": "6ae86f61f520d6ca229d2f40e070410638c908c5",
+      "skillPath": "cli/assets/templates/base/skill-content.md"
+    },
+    "design": {
+      "source": "nextlevelbuilder/ui-ux-pro-max-skill",
+      "sourceType": "github",
+      "revision": "6ae86f61f520d6ca229d2f40e070410638c908c5",
+      "skillPath": "cli/assets/skills/design/SKILL.md"
+    },
+    "design-system": {
+      "source": "nextlevelbuilder/ui-ux-pro-max-skill",
+      "sourceType": "github",
+      "revision": "6ae86f61f520d6ca229d2f40e070410638c908c5",
+      "skillPath": "cli/assets/skills/design-system/SKILL.md"
+    },
+    "ui-styling": {
+      "source": "nextlevelbuilder/ui-ux-pro-max-skill",
+      "sourceType": "github",
+      "revision": "6ae86f61f520d6ca229d2f40e070410638c908c5",
+      "skillPath": "cli/assets/skills/ui-styling/SKILL.md"
+    },
     "brainstorming": {
       "source": "obra/superpowers",
       "sourceType": "github",

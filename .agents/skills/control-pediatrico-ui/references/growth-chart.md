@@ -2,7 +2,7 @@
 
 Source: board artboards `ChartSpec` and `GrowthChart` (props `variant` medico|padres,
 `ind` peso|talla|pc, `dark`, `tooltip`, `corrected`). The board's curves are illustrative shapes:
-real curves come from the SD columns of the official WHO tables.
+  real curves come from the SD columns of independently validated official WHO tables.
 
 ## Series styles
 
@@ -22,7 +22,7 @@ Dark curves use the 400 step for ≥ 3:1 on slate-900. Patient color never follo
 
 ## Behaviour
 
-- Axes: 0–5 years x in months; 5–19 years x in years; weight-for-length/height x in cm. y = value with unit.
+- Axes: verified WHO 2006 0–5 years x in months; weight-for-length/height x in cm. y = value with unit. WHO 2007 5–19 curves are unavailable until independently validated.
 - Zoom/pan: desktop and tablet `dataZoom` inside (wheel + drag) + 24 px slider and a "Restablecer
   zoom" button. 375 px: no slider; default range current age ±6 months; selector "6 m · 1 a · Todo".
 - Selection: click/tap a point → emphasis (radius 5 + halo) and fixed tooltip; the same row is
@@ -59,7 +59,10 @@ const option = {
 }
 ```
 
-`c` is the light or dark palette above. Verify option names against the installed ECharts 6 API.
+`c` is the light or dark palette above. ECharts 6 supports `aria.enabled`, `dataZoom`
+`inside`/`slider`, line `stack`/`areaStyle`, `endLabel` and `selectedMode`. Check the final
+option with installed `echarts` types in Task 8; `sdBands` must use official SD rows and
+fill only the area between −2 and +2, never the area below the −2 curve.
 
 ## PDF report
 

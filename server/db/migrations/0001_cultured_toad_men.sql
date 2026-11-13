@@ -1,0 +1,1 @@
+ALTER TABLE "rateLimit" ALTER COLUMN "lastRequest" SET DATA TYPE bigint;

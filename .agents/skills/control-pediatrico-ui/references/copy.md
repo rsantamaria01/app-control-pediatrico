@@ -37,8 +37,15 @@ but paginate beyond three pages when content overflows. Only doctor-approved sha
 may be printed. Sections: Últimos valores (Z + provisional percentil), charts, Recomendaciones,
 Indicaciones médicas, Vacunas, Desarrollo, Tamizajes, Próximo control.
 
+## Access and recovery (P6 superseded 12 Nov 2026)
+
+- Sign-in fields: `Usuario`, `Contraseña`; action `Ingresar`. Invalid credentials, including missing/unknown account, use `Usuario o contraseña incorrectos`.
+- Recovery entry: `¿Olvidó su contraseña?`; accepts username or email. Generic acknowledgment: `Si la cuenta existe, enviaremos instrucciones al correo registrado` for existing/missing accounts and successful/failed delivery. A resend action appears after cooldown.
+- Invitation/setup link is valid for 7 days; the recipient chooses a 3–32 character lowercase username and a password of at least 10 characters. Show a strength hint without prescribing composition rules. Email remains required on the account but is not used to sign in.
+- Never display passwords or tokens after submission. Provider readiness and delivery failures appear only in admin/audit views, not as account-existence clues in public copy.
+
 ## General
 
 - Buttons are verbs: "Nueva visita", "Agendar cita", "Guardar cambio", "Ver informe".
-- Errors say what happened and what to do: "El código venció. Pida uno nuevo."
+- Errors say what happened and what to do without revealing account existence: `El enlace venció. Solicite uno nuevo.`
 - Sample people and IDs on the board are fictional; never ship them.

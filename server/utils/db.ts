@@ -1,5 +1,5 @@
 import { drizzle } from 'drizzle-orm/node-postgres'
-import * as schema from '../db/schema'
+import * as schema from '../db/schema.js'
 
 let _db: ReturnType<typeof drizzle<typeof schema>> | undefined
 

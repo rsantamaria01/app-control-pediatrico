@@ -7,6 +7,7 @@ const config = useRuntimeConfig()
 const brand = clinicBrand(config.public.clinicPrimary, config.public.clinicLogo)
 updateAppConfig({ ui: { colors: { primary: brand.primary } } })
 const online = ref(true)
+const { data: navigation } = await useFetch('/api/auth/navigation')
 
 const updateConnection = () => {
   online.value = navigator.onLine
@@ -61,6 +62,10 @@ useSeoMeta({
         </span>
       </template>
       <template #right>
+        <UNavigationMenu
+          v-if="navigation?.length"
+          :items="navigation"
+        />
         <UColorModeButton aria-label="Cambiar tema" />
       </template>
     </UHeader>

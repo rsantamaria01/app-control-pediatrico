@@ -2,6 +2,7 @@ export default defineNuxtConfig({
   modules: [
     '@nuxt/eslint',
     '@nuxt/ui',
+    '@nuxtjs/better-auth',
     '@vite-pwa/nuxt'
   ],
 

@@ -1,6 +1,11 @@
 # Devcontainer overlay: adds the workspace service next to db/cache/storage from ../compose.yaml.
 # Relative paths resolve from the repo root (directory of the first compose file), not from .devcontainer/.
 services:
+  mailpit:
+    image: axllent/mailpit:v1.27.8
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:8025:8025'
   workspace:
     build:
       context: .devcontainer
@@ -19,6 +24,10 @@ services:
       GIT_AUTHOR_EMAIL: ${GIT_AUTHOR_EMAIL:-raulsantamariao@hotmail.com}
       GIT_COMMITTER_EMAIL: ${GIT_COMMITTER_EMAIL:-raulsantamariao@hotmail.com}
       DATABASE_URL: postgres://pediatrico:${DB_PASSWORD:-pediatrico}@db:5432/pediatrico
+      SMTP_HOST: mailpit
+      SMTP_PORT: 1025
+      SMTP_SECURE: 'false'
+      SMTP_FROM: access@pediatrico.test
       REDIS_URL: redis://cache:6379
       S3_ENDPOINT: http://storage:9000
       S3_BUCKET: pediatrico

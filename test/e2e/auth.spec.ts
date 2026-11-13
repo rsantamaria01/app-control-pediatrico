@@ -17,12 +17,15 @@ test.describe('username/password access on disposable database', () => {
   const sockets = new Set<Socket>()
   const messages: string[] = []
   const rejectRecipients = new Set<string>()
+  const holdRecipients = new Set<string>()
+  const pendingAcknowledgments: Array<() => void> = []
   const smtp = createServer((socket) => {
     sockets.add(socket)
     socket.on('close', () => sockets.delete(socket))
     socket.write('220 mail.test ESMTP\r\n')
     let data = ''
     let collecting = false
+    let recipient = ''
     socket.on('data', (chunk) => {
       const text = chunk.toString()
       if (collecting) {
@@ -30,11 +33,14 @@ test.describe('username/password access on disposable database', () => {
         if (data.endsWith('\r\n.\r\n')) {
           messages.push(data)
           collecting = false
-          socket.write('250 Accepted\r\n')
+          if ([...holdRecipients].some(email => recipient.includes(email))) pendingAcknowledgments.push(() => socket.write('250 Accepted\r\n'))
+          else socket.write('250 Accepted\r\n')
         }
       } else if (text.startsWith('EHLO')) socket.write('250 mail.test\r\n')
-      else if (text.startsWith('RCPT TO')) socket.write(rejectRecipients.size && [...rejectRecipients].some(email => text.includes(email)) ? '550 Recipient rejected\r\n' : '250 OK\r\n')
-      else if (text.startsWith('MAIL FROM')) socket.write('250 OK\r\n')
+      else if (text.startsWith('RCPT TO')) {
+        recipient = text
+        socket.write(rejectRecipients.size && [...rejectRecipients].some(email => text.includes(email)) ? '550 Recipient rejected\r\n' : '250 OK\r\n')
+      } else if (text.startsWith('MAIL FROM')) socket.write('250 OK\r\n')
       else if (text.startsWith('DATA')) {
         data = ''
         collecting = true
@@ -182,6 +188,204 @@ test.describe('username/password access on disposable database', () => {
     }
   })
 
+  test('a rejected replacement invitation leaves the previously delivered setup link usable', async ({ page }) => {
+    const adminId = crypto.randomUUID()
+    const username = `admin-${adminId.slice(0, 8)}`
+    await db.insert(user).values({ id: adminId, email: `${adminId}@example.test`, name: 'Admin', username })
+    await db.insert(userRole).values({ userId: adminId, role: 'ADMIN' })
+    await db.insert(account).values({ id: crypto.randomUUID(), userId: adminId, accountId: adminId, providerId: 'credential', password: await hashPassword('unique administrator passphrase') })
+    await page.goto('/acceso')
+    await page.waitForLoadState('networkidle')
+    await page.getByRole('textbox', { name: 'Usuario' }).fill(username)
+    await page.getByLabel('Contraseña').fill('unique administrator passphrase')
+    await page.getByRole('button', { name: 'Ingresar' }).click()
+    await expect(page).toHaveURL('/')
+    const email = `${crypto.randomUUID()}@example.test`
+    const invite = () => page.request.post('/api/auth/invite-staff', { data: { email, name: 'Doctor', role: 'DOCTOR' } })
+    expect((await invite()).status()).toBe(200)
+    const first = messages.findLast(message => message.includes(email))?.match(/invitacion\/([a-zA-Z0-9_-]{32,})/)?.[1]
+    expect(first).toBeTruthy()
+    rejectRecipients.add(email)
+    try {
+      expect((await invite()).status()).toBe(200)
+      const { setupToken } = await import('../../server/db/schema')
+      const [invited] = await db.select().from(user).where(eq(user.email, email))
+      const active = (await db.select().from(setupToken).where(eq(setupToken.userId, invited!.id))).filter(row => row.usedAt === null)
+      expect(active).toHaveLength(1)
+      const { createHash } = await import('node:crypto')
+      expect(active[0]?.digest).toBe(createHash('sha256').update(first!).digest('hex'))
+      expect((await page.request.post('/api/auth/setup', { data: { token: first, username: `doctor-${adminId.slice(0, 8)}`, password: 'a new unique invitation phrase' } })).status()).toBe(200)
+    } finally {
+      rejectRecipients.delete(email)
+    }
+  })
+
+  test('keeps the delivered setup link valid while replacement SMTP acceptance is pending', async ({ page }) => {
+    const adminId = crypto.randomUUID()
+    const username = `admin-${adminId.slice(0, 8)}`
+    await db.insert(user).values({ id: adminId, email: `${adminId}@example.test`, name: 'Admin', username })
+    await db.insert(userRole).values({ userId: adminId, role: 'ADMIN' })
+    await db.insert(account).values({ id: crypto.randomUUID(), userId: adminId, accountId: adminId, providerId: 'credential', password: await hashPassword('unique administrator passphrase') })
+    await page.goto('/acceso')
+    await page.waitForLoadState('networkidle')
+    await page.getByRole('textbox', { name: 'Usuario' }).fill(username)
+    await page.getByLabel('Contraseña').fill('unique administrator passphrase')
+    await page.getByRole('button', { name: 'Ingresar' }).click()
+    await expect(page).toHaveURL('/')
+    const email = `${crypto.randomUUID()}@example.test`
+    const invite = () => page.request.post('/api/auth/invite-staff', { data: { email, name: 'Doctor', role: 'DOCTOR' } })
+    expect((await invite()).status()).toBe(200)
+    const first = messages.findLast(message => message.includes(email))!.match(/invitacion\/([a-zA-Z0-9_-]{32,})/)?.[1]
+    expect(first).toBeTruthy()
+    holdRecipients.add(email)
+    try {
+      const replacement = invite()
+      await expect.poll(() => pendingAcknowledgments.length).toBe(1)
+      const { setupToken } = await import('../../server/db/schema')
+      const [invited] = await db.select().from(user).where(eq(user.email, email))
+      const { createHash } = await import('node:crypto')
+      const [old] = await db.select().from(setupToken).where(eq(setupToken.digest, createHash('sha256').update(first!).digest('hex')))
+      expect(old?.userId).toBe(invited?.id)
+      expect(old?.usedAt).toBeNull()
+      const replacementToken = messages.findLast(message => message.includes(email))!.match(/invitacion\/([a-zA-Z0-9_-]{32,})/)?.[1]
+      expect(replacementToken).toBeTruthy()
+      const [prepared] = await db.select().from(setupToken).where(eq(setupToken.digest, createHash('sha256').update(replacementToken!).digest('hex')))
+      expect(prepared).toBeUndefined()
+      expect((await page.request.post('/api/auth/setup', { data: { token: replacementToken, username: `pending-${adminId.slice(0, 8)}`, password: 'a unique pending invitation phrase' } })).status()).toBe(400)
+      pendingAcknowledgments.shift()!()
+      expect((await replacement).status()).toBe(200)
+      const [superseded] = await db.select().from(setupToken).where(eq(setupToken.id, old!.id))
+      expect(superseded?.usedAt).not.toBeNull()
+      const [active] = await db.select().from(setupToken).where(eq(setupToken.digest, createHash('sha256').update(replacementToken!).digest('hex')))
+      expect(active?.usedAt).toBeNull()
+    } finally {
+      holdRecipients.delete(email)
+      for (const acknowledge of pendingAcknowledgments.splice(0)) acknowledge()
+    }
+  })
+
+  test('serializes the first accepted invitation against concurrent replacements', async ({ page }) => {
+    const adminId = crypto.randomUUID()
+    const username = `admin-${adminId.slice(0, 8)}`
+    await db.insert(user).values({ id: adminId, email: `${adminId}@example.test`, name: 'Admin', username })
+    await db.insert(userRole).values({ userId: adminId, role: 'ADMIN' })
+    await db.insert(account).values({ id: crypto.randomUUID(), userId: adminId, accountId: adminId, providerId: 'credential', password: await hashPassword('unique administrator passphrase') })
+    await page.goto('/acceso')
+    await page.waitForLoadState('networkidle')
+    await page.getByRole('textbox', { name: 'Usuario' }).fill(username)
+    await page.getByLabel('Contraseña').fill('unique administrator passphrase')
+    await page.getByRole('button', { name: 'Ingresar' }).click()
+    await expect(page).toHaveURL('/')
+    const email = `${crypto.randomUUID()}@example.test`
+    holdRecipients.add(email)
+    try {
+      const invite = () => page.request.post('/api/auth/invite-staff', { data: { email, name: 'Doctor', role: 'DOCTOR' } })
+      const first = invite()
+      await expect.poll(() => pendingAcknowledgments.length).toBe(1)
+      const second = invite()
+      await new Promise(resolve => setTimeout(resolve, 1000))
+      expect(pendingAcknowledgments).toHaveLength(1)
+      pendingAcknowledgments.shift()!()
+      expect((await first).status()).toBe(200)
+      await expect.poll(() => pendingAcknowledgments.length).toBe(1)
+      pendingAcknowledgments.shift()!()
+      expect((await second).status()).toBe(200)
+      const { setupToken } = await import('../../server/db/schema')
+      const [invited] = await db.select().from(user).where(eq(user.email, email))
+      expect((await db.select().from(setupToken).where(eq(setupToken.userId, invited!.id))).filter(row => !row.usedAt)).toHaveLength(1)
+    } finally {
+      holdRecipients.delete(email)
+      for (const acknowledge of pendingAcknowledgments.splice(0)) acknowledge()
+    }
+  })
+
+  test('a committed invitation cannot leave multiple setup links usable after concurrent sends', async ({ page }) => {
+    const adminId = crypto.randomUUID()
+    const username = `admin-${adminId.slice(0, 8)}`
+    await db.insert(user).values({ id: adminId, email: `${adminId}@example.test`, name: 'Admin', username })
+    await db.insert(userRole).values({ userId: adminId, role: 'ADMIN' })
+    await db.insert(account).values({ id: crypto.randomUUID(), userId: adminId, accountId: adminId, providerId: 'credential', password: await hashPassword('unique administrator passphrase') })
+    await page.goto('/acceso')
+    await page.waitForLoadState('networkidle')
+    await page.getByRole('textbox', { name: 'Usuario' }).fill(username)
+    await page.getByLabel('Contraseña').fill('unique administrator passphrase')
+    await page.getByRole('button', { name: 'Ingresar' }).click()
+    await expect(page).toHaveURL('/')
+    const email = `${crypto.randomUUID()}@example.test`
+    const invite = () => page.request.post('/api/auth/invite-staff', { data: { email, name: 'Doctor', role: 'DOCTOR' } })
+    const results = await Promise.all([invite(), invite(), invite()])
+    expect(results.map(result => result.status())).toEqual([200, 200, 200])
+    const [invited] = await db.select().from(user).where(eq(user.email, email))
+    const { setupToken } = await import('../../server/db/schema')
+    expect((await db.select().from(setupToken).where(eq(setupToken.userId, invited!.id))).filter(entry => !entry.usedAt)).toHaveLength(1)
+  })
+
+  test('a failed concurrent replacement keeps the earlier delivered link valid', async ({ page }) => {
+    const adminId = crypto.randomUUID()
+    const username = `admin-${adminId.slice(0, 8)}`
+    await db.insert(user).values({ id: adminId, email: `${adminId}@example.test`, name: 'Admin', username })
+    await db.insert(userRole).values({ userId: adminId, role: 'ADMIN' })
+    await db.insert(account).values({ id: crypto.randomUUID(), userId: adminId, accountId: adminId, providerId: 'credential', password: await hashPassword('unique administrator passphrase') })
+    await page.goto('/acceso')
+    await page.waitForLoadState('networkidle')
+    await page.getByRole('textbox', { name: 'Usuario' }).fill(username)
+    await page.getByLabel('Contraseña').fill('unique administrator passphrase')
+    await page.getByRole('button', { name: 'Ingresar' }).click()
+    await expect(page).toHaveURL('/')
+    const email = `${crypto.randomUUID()}@example.test`
+    const invite = () => page.request.post('/api/auth/invite-staff', { data: { email, name: 'Doctor', role: 'DOCTOR' } })
+    expect((await invite()).status()).toBe(200)
+    const original = messages.findLast(message => message.includes(email))!.match(/invitacion\/([a-zA-Z0-9_-]{32,})/)?.[1]
+    expect(original).toBeTruthy()
+    rejectRecipients.add(email)
+    const responses = await Promise.all([invite(), invite()])
+    rejectRecipients.delete(email)
+    expect(responses.map(result => result.status())).toEqual([200, 200])
+    const [invited] = await db.select().from(user).where(eq(user.email, email))
+    const { setupToken } = await import('../../server/db/schema')
+    const active = (await db.select().from(setupToken).where(eq(setupToken.userId, invited!.id))).filter(entry => !entry.usedAt)
+    const { createHash } = await import('node:crypto')
+    expect(active.map(entry => entry.digest)).toEqual([createHash('sha256').update(original!).digest('hex')])
+  })
+
+  test('a pending replacement cannot be redeemed before SMTP accepts it', async ({ page }) => {
+    const adminId = crypto.randomUUID()
+    const username = `admin-${adminId.slice(0, 8)}`
+    await db.insert(user).values({ id: adminId, email: `${adminId}@example.test`, name: 'Admin', username })
+    await db.insert(userRole).values({ userId: adminId, role: 'ADMIN' })
+    await db.insert(account).values({ id: crypto.randomUUID(), userId: adminId, accountId: adminId, providerId: 'credential', password: await hashPassword('unique administrator passphrase') })
+    await page.goto('/acceso')
+    await page.waitForLoadState('networkidle')
+    await page.getByRole('textbox', { name: 'Usuario' }).fill(username)
+    await page.getByLabel('Contraseña').fill('unique administrator passphrase')
+    await page.getByRole('button', { name: 'Ingresar' }).click()
+    await expect(page).toHaveURL('/')
+    const email = `${crypto.randomUUID()}@example.test`
+    const invite = () => page.request.post('/api/auth/invite-staff', { data: { email, name: 'Doctor', role: 'DOCTOR' } })
+    expect((await invite()).status()).toBe(200)
+    const first = messages.findLast(message => message.includes(email))!.match(/invitacion\/([a-zA-Z0-9_-]{32,})/)?.[1]
+    expect(first).toBeTruthy()
+    holdRecipients.add(email)
+    try {
+      const replacement = invite()
+      await expect.poll(() => pendingAcknowledgments.length).toBe(1)
+      const [invited] = await db.select().from(user).where(eq(user.email, email))
+      const { setupToken } = await import('../../server/db/schema')
+      const [old] = await db.select().from(setupToken).where(eq(setupToken.userId, invited!.id))
+      expect(old?.usedAt).toBeNull()
+      const replacementToken = messages.findLast(message => message.includes(email))!.match(/invitacion\/([a-zA-Z0-9_-]{32,})/)?.[1]
+      expect(replacementToken).toBeTruthy()
+      expect((await page.request.post('/api/auth/setup', { data: { token: replacementToken, username: `pending-${adminId.slice(0, 8)}`, password: 'a unique pending invitation phrase' } })).status()).toBe(400)
+      pendingAcknowledgments.shift()!()
+      expect((await replacement).status()).toBe(200)
+      const [superseded] = await db.select().from(setupToken).where(eq(setupToken.id, old!.id))
+      expect(superseded?.usedAt).not.toBeNull()
+    } finally {
+      holdRecipients.delete(email)
+      for (const acknowledge of pendingAcknowledgments.splice(0)) acknowledge()
+    }
+  })
+
   test('concurrent staff invitations cannot fail on duplicate email or create duplicate identities', async ({ page }) => {
     const adminId = crypto.randomUUID()
     const username = `admin-${adminId.slice(0, 8)}`
@@ -297,6 +501,20 @@ test.describe('username/password access on disposable database', () => {
     const denied = await page.request.post('/api/auth/invite-staff', { data: { email, name: 'False doctor', role: 'DOCTOR' } })
     expect(denied.status()).toBe(403)
     expect(await db.select().from(user).where(eq(user.email, email))).toHaveLength(0)
+  })
+
+  test('thirty clinic staff can sign in behind one shared connection', async ({ page }) => {
+    const password = 'a unique clinic team password'
+    const hash = await hashPassword(password)
+    for (let i = 0; i < 30; i++) {
+      const id = crypto.randomUUID()
+      const username = `staff-${id.slice(0, 8)}`
+      await db.insert(user).values({ id, email: `${id}@example.test`, name: 'Staff', username })
+      await db.insert(userRole).values({ userId: id, role: 'DOCTOR' })
+      await db.insert(account).values({ id: crypto.randomUUID(), userId: id, accountId: id, providerId: 'credential', password: hash })
+      const response = await page.request.post('/api/auth/sign-in/username', { data: { username, password }, headers: { origin: 'http://127.0.0.1:3000' } })
+      expect(response.status()).toBe(200)
+    }
   })
 
   test('wrong credentials progressively lock the username on phone and desktop', async ({ page }) => {

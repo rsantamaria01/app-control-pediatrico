@@ -58,6 +58,12 @@ if ipReserved == 1 then redis.call('EXPIRE', KEYS[2], 60) end
 return 1
 `
 
+const releaseIpReservationScript = `
+local count = tonumber(redis.call('GET', KEYS[1]) or '0')
+if count > 0 then redis.call('DECR', KEYS[1]) end
+return 1
+`
+
 const failureScript = `
 local count = redis.call('INCR', KEYS[1])
 if count == 1 then redis.call('EXPIRE', KEYS[1], 86400) end
@@ -79,6 +85,12 @@ export async function reserveLoginAttempt(username: string, address: string) {
   const redis = await useRedis()
   const [userKey, ipKey] = loginKeys(username, address)
   return Number(await redis.eval(loginReservationScript, { keys: [`${userKey}:attempts`, `${ipKey}:attempts`, `${userKey}:locked`, `${ipKey}:locked`], arguments: [] })) === 1
+}
+
+export async function releaseSuccessfulLoginIp(address: string) {
+  const redis = await useRedis()
+  const [, ipKey] = loginKeys('unused', address)
+  await redis.eval(releaseIpReservationScript, { keys: [`${ipKey}:attempts`], arguments: [] })
 }
 
 export async function checkLoginLock(username: string, address: string) {

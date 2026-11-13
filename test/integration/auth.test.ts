@@ -853,13 +853,88 @@ describe('username/password access', () => {
     }
   })
 
+  it('allows thirty valid staff logins from one shared IP without exhausting its failure budget', async () => {
+    const { hashPassword } = await import('better-auth/crypto')
+    const password = 'one unique staff passphrase'
+    const hashed = await hashPassword(password)
+    for (let i = 0; i < 30; i++) {
+      const id = crypto.randomUUID()
+      const username = `clinic-${id.slice(0, 8)}`
+      await db.insert(user).values({ id, email: `${id}@example.test`, name: 'Staff', username })
+      await db.insert(userRole).values({ userId: id, role: 'DOCTOR' })
+      await db.insert(account).values({ id: crypto.randomUUID(), userId: id, accountId: id, providerId: 'credential', password: hashed })
+      expect((await post('sign-in/username', { username, password })).status).toBe(200)
+    }
+  })
+
+  it('does not let a successful login erase earlier failed guesses or their progressive lock', async () => {
+    const { hashPassword } = await import('better-auth/crypto')
+    const id = crypto.randomUUID()
+    const username = `mixed-lock-${id.slice(0, 8)}`
+    const password = 'different unique staff password'
+    await db.insert(user).values({ id, email: `${id}@example.test`, name: 'Staff', username })
+    await db.insert(userRole).values({ userId: id, role: 'DOCTOR' })
+    await db.insert(account).values({ id: crypto.randomUUID(), userId: id, accountId: id, providerId: 'credential', password: await hashPassword(password) })
+    for (let i = 0; i < 2; i++) expect((await post('sign-in/username', { username, password: 'incorrect password' })).status).toBe(401)
+    expect((await post('sign-in/username', { username, password })).status).toBe(200)
+    const { createClient } = await import('redis')
+    const { createHash } = await import('node:crypto')
+    const client = createClient({ url: process.env.REDIS_URL })
+    client.on('error', () => {})
+    await client.connect()
+    const key = `auth:login:user:${createHash('sha256').update(username).digest('hex')}`
+    try {
+      expect(await client.get(key)).toBe('2')
+      await client.del(`${key}:attempts`)
+    } finally {
+      await client.quit()
+    }
+    expect((await post('sign-in/username', { username, password: 'incorrect password' })).status).toBe(401)
+    const { checkLoginLock } = await import('../../server/services/otp-rate-limit')
+    expect(await checkLoginLock(username, 'shared')).toBe(false)
+    const locked = await post('sign-in/username', { username, password })
+    expect(locked.status).toBe(401)
+    expect((await locked.json()).message).toBe('Usuario o contraseña incorrectos')
+    expect(await db.select().from(session).where(eq(session.userId, id))).toHaveLength(1)
+  })
+
+  it('keeps the shared-IP gate closed during concurrent incorrect guesses after valid staff logins', async () => {
+    const { hashPassword } = await import('better-auth/crypto')
+    const password = 'a unique team login phrase'
+    const hash = await hashPassword(password)
+    for (let i = 0; i < 30; i++) {
+      const id = crypto.randomUUID()
+      const username = `team-${id.slice(0, 8)}`
+      await db.insert(user).values({ id, email: `${id}@example.test`, name: 'Staff', username })
+      await db.insert(userRole).values({ userId: id, role: 'DOCTOR' })
+      await db.insert(account).values({ id: crypto.randomUUID(), userId: id, accountId: id, providerId: 'credential', password: hash })
+      expect((await post('sign-in/username', { username, password })).status).toBe(200)
+    }
+    const guesses = await Promise.all(Array.from({ length: 30 }, () => post('sign-in/username', { username: `guess-${crypto.randomUUID().slice(0, 8)}`, password: 'invalid password' })))
+    expect(guesses.every(result => result.status === 401)).toBe(true)
+    const { createClient } = await import('redis')
+    const { createHash } = await import('node:crypto')
+    const client = createClient({ url: process.env.REDIS_URL })
+    client.on('error', () => {})
+    await client.connect()
+    try {
+      const keys = ['shared', '127.0.0.1', '::1'].map(address => `auth:login:ip:${createHash('sha256').update(address).digest('hex')}:attempts`)
+      const counts = await Promise.all(keys.map(key => client.get(key)))
+      expect(counts.map(value => Number(value)).reduce((sum, value) => sum + value, 0)).toBe(20)
+      for (const key of keys) await client.del(key)
+    } finally {
+      await client.quit()
+    }
+  })
+
   it('releases a reserved login slot after its window expires', async () => {
     const { reserveLoginAttempt } = await import('../../server/services/otp-rate-limit')
     const { createClient } = await import('redis')
     const { createHash } = await import('node:crypto')
     const username = `window-${crypto.randomUUID().slice(0, 8)}`
-    for (let i = 0; i < 3; i++) expect(await reserveLoginAttempt(username, `192.0.2.${i + 1}`)).toBe(true)
-    expect(await reserveLoginAttempt(username, '192.0.2.4')).toBe(false)
+    const addresses = Array.from({ length: 4 }, (_, i) => `203.0.114.${i + 1}`)
+    for (let i = 0; i < 3; i++) expect(await reserveLoginAttempt(username, addresses[i]!)).toBe(true)
+    expect(await reserveLoginAttempt(username, addresses[3]!)).toBe(false)
     const client = createClient({ url: process.env.REDIS_URL })
     client.on('error', () => {})
     await client.connect()
@@ -868,7 +943,7 @@ describe('username/password access', () => {
     } finally {
       await client.quit()
     }
-    expect(await reserveLoginAttempt(username, '192.0.2.4')).toBe(true)
+    expect(await reserveLoginAttempt(username, addresses[3]!)).toBe(true)
   })
 
   it('limits simultaneous guesses across distinct usernames from one IP', async () => {
@@ -897,8 +972,8 @@ describe('username/password access', () => {
     const { reserveLoginAttempt, recordLoginFailure, clearLoginFailures } = await import('../../server/services/otp-rate-limit')
     const name = `reserved-${crypto.randomUUID().slice(0, 8)}`
     for (let i = 0; i < 3; i++) {
-      expect(await reserveLoginAttempt(name, `192.0.2.${i + 1}`)).toBe(true)
-      await recordLoginFailure(name, `192.0.2.${i + 1}`)
+      expect(await reserveLoginAttempt(name, `203.0.115.${i + 1}`)).toBe(true)
+      await recordLoginFailure(name, `203.0.115.${i + 1}`)
     }
     expect(await reserveLoginAttempt(name, '203.0.113.2')).toBe(false)
     await clearLoginFailures(name)

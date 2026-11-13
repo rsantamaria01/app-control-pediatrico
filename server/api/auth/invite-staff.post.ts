@@ -45,11 +45,16 @@ export default defineEventHandler(async (event) => {
     const origin = process.env.NUXT_PUBLIC_SITE_URL
     if (!origin) throw new Error('Public deployment URL required')
     await sendLink(email, `${origin.replace(/\/$/, '')}/invitacion/${token}`)
-    await db.transaction(async (tx) => {
+    const committed = await db.transaction(async (tx) => {
+      await tx.select({ id: user.id }).from(user).where(eq(user.id, result)).for('update')
+      const [credential] = await tx.select({ id: account.id }).from(account).where(and(eq(account.userId, result), eq(account.providerId, 'credential'))).limit(1)
+      if (credential) return false
       await tx.insert(setupToken).values({ id: randomUUID(), userId: result, purpose: 'SETUP', digest, expiresAt: new Date(Date.now() + 7 * 86400000) })
       await tx.update(setupToken).set({ usedAt: new Date() }).where(and(eq(setupToken.userId, result), eq(setupToken.purpose, 'SETUP'), isNull(setupToken.usedAt), sql`${setupToken.digest} <> ${digest}`))
+      return true
     })
-    await recordAudit('STAFF_INVITE', 'ALLOWED', actor.id, result)
+    await recordAudit('STAFF_INVITE', committed ? 'ALLOWED' : 'DENIED', actor.id, result)
+    if (!committed) console.error(JSON.stringify({ event: 'staff_invite_failed', provider: 'smtp', errorClass: 'ConcurrentSetup' }))
   } catch (error) {
     await markEmailFailure()
     await recordAudit('STAFF_INVITE', 'DENIED', actor.id, targetId)

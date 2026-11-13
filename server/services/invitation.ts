@@ -22,6 +22,9 @@ export async function setupCredential(token: string, username: string, password:
   validatePassword(password)
   const digest = tokenDigest(token)
   return useDb().transaction(async (tx) => {
+    const [candidate] = await tx.select({ userId: setupToken.userId }).from(setupToken).where(and(eq(setupToken.digest, digest), eq(setupToken.purpose, 'SETUP'), gt(setupToken.expiresAt, new Date()), isNull(setupToken.usedAt))).limit(1)
+    if (!candidate) return false
+    await tx.select({ id: user.id }).from(user).where(eq(user.id, candidate.userId)).for('update')
     const [entry] = await tx.update(setupToken).set({ usedAt: new Date() }).where(and(eq(setupToken.digest, digest), eq(setupToken.purpose, 'SETUP'), gt(setupToken.expiresAt, new Date()), isNull(setupToken.usedAt))).returning()
     if (!entry) return false
     const [existing] = await tx.select({ id: account.id }).from(account).where(and(eq(account.userId, entry.userId), eq(account.providerId, 'credential'))).limit(1)

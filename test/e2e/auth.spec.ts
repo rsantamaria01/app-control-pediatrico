@@ -264,6 +264,79 @@ test.describe('username/password access on disposable database', () => {
     }
   })
 
+  test('does not activate a replacement sent after the old invitation was redeemed in flight', async ({ page }) => {
+    const adminId = crypto.randomUUID()
+    const username = `admin-${adminId.slice(0, 8)}`
+    await db.insert(user).values({ id: adminId, email: `${adminId}@example.test`, name: 'Admin', username })
+    await db.insert(userRole).values({ userId: adminId, role: 'ADMIN' })
+    await db.insert(account).values({ id: crypto.randomUUID(), userId: adminId, accountId: adminId, providerId: 'credential', password: await hashPassword('unique administrator passphrase') })
+    await page.goto('/acceso')
+    await page.waitForLoadState('networkidle')
+    await page.getByRole('textbox', { name: 'Usuario' }).fill(username)
+    await page.getByLabel('Contraseña').fill('unique administrator passphrase')
+    await page.getByRole('button', { name: 'Ingresar' }).click()
+    await expect(page).toHaveURL('/')
+    const email = `${crypto.randomUUID()}@example.test`
+    const invite = () => page.request.post('/api/auth/invite-staff', { data: { email, name: 'Doctor', role: 'DOCTOR' } })
+    expect((await invite()).status()).toBe(200)
+    const original = messages.findLast(message => message.includes(email))!.match(/invitacion\/([a-zA-Z0-9_-]{32,})/)?.[1]
+    expect(original).toBeTruthy()
+    holdRecipients.add(email)
+    try {
+      const replacement = invite()
+      await expect.poll(() => pendingAcknowledgments.length).toBe(1)
+      const [owner] = await db.select().from(user).where(eq(user.email, email))
+      expect((await page.request.post('/api/auth/setup', { data: { token: original, username: `redeemed-${adminId.slice(0, 8)}`, password: 'a unique first setup passphrase' } })).status()).toBe(200)
+      pendingAcknowledgments.shift()!()
+      expect((await replacement).status()).toBe(200)
+      const latest = messages.findLast(message => message.includes(email))!.match(/invitacion\/([a-zA-Z0-9_-]{32,})/)?.[1]
+      expect(latest).toBeTruthy()
+      const { createHash } = await import('node:crypto')
+      const { setupToken } = await import('../../server/db/schema')
+      const [sent] = await db.select().from(setupToken).where(eq(setupToken.digest, createHash('sha256').update(latest!).digest('hex')))
+      expect(sent).toBeUndefined()
+      expect((await page.request.post('/api/auth/setup', { data: { token: latest, username: `other-${adminId.slice(0, 8)}`, password: 'a unique second setup passphrase' } })).status()).toBe(400)
+      expect((await db.select().from(account).where(eq(account.userId, owner!.id))).length).toBe(1)
+      const { auditEvent } = await import('../../server/db/schema')
+      expect((await db.select().from(auditEvent).where(eq(auditEvent.action, 'STAFF_INVITE'))).some(entry => entry.subjectId === owner!.id && entry.outcome === 'DENIED')).toBe(true)
+    } finally {
+      holdRecipients.delete(email)
+      for (const acknowledge of pendingAcknowledgments.splice(0)) acknowledge()
+    }
+  })
+
+  test('a replacement accepted first prevents the old setup link from configuring credentials', async ({ page }) => {
+    const adminId = crypto.randomUUID()
+    const username = `admin-${adminId.slice(0, 8)}`
+    await db.insert(user).values({ id: adminId, email: `${adminId}@example.test`, name: 'Admin', username })
+    await db.insert(userRole).values({ userId: adminId, role: 'ADMIN' })
+    await db.insert(account).values({ id: crypto.randomUUID(), userId: adminId, accountId: adminId, providerId: 'credential', password: await hashPassword('unique administrator passphrase') })
+    await page.goto('/acceso')
+    await page.waitForLoadState('networkidle')
+    await page.getByRole('textbox', { name: 'Usuario' }).fill(username)
+    await page.getByLabel('Contraseña').fill('unique administrator passphrase')
+    await page.getByRole('button', { name: 'Ingresar' }).click()
+    await expect(page).toHaveURL('/')
+    const email = `${crypto.randomUUID()}@example.test`
+    const invite = () => page.request.post('/api/auth/invite-staff', { data: { email, name: 'Doctor', role: 'DOCTOR' } })
+    expect((await invite()).status()).toBe(200)
+    const previous = messages.findLast(message => message.includes(email))!.match(/invitacion\/([a-zA-Z0-9_-]{32,})/)?.[1]
+    holdRecipients.add(email)
+    try {
+      const replacement = invite()
+      await expect.poll(() => pendingAcknowledgments.length).toBe(1)
+      pendingAcknowledgments.shift()!()
+      const setup = page.request.post('/api/auth/setup', { data: { token: previous, username: `previous-${adminId.slice(0, 8)}`, password: 'a unique previous password' } })
+      expect((await replacement).status()).toBe(200)
+      expect((await setup).status()).toBe(400)
+      const next = messages.findLast(message => message.includes(email))!.match(/invitacion\/([a-zA-Z0-9_-]{32,})/)?.[1]
+      expect((await page.request.post('/api/auth/setup', { data: { token: next, username: `next-${adminId.slice(0, 8)}`, password: 'a unique next password' } })).status()).toBe(200)
+    } finally {
+      holdRecipients.delete(email)
+      for (const acknowledge of pendingAcknowledgments.splice(0)) acknowledge()
+    }
+  })
+
   test('serializes the first accepted invitation against concurrent replacements', async ({ page }) => {
     const adminId = crypto.randomUUID()
     const username = `admin-${adminId.slice(0, 8)}`

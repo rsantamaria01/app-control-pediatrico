@@ -7,8 +7,9 @@ component catalog; check detailed props/slots against the installed version befo
 
 | # | Screen | Nuxt UI components | Artboard |
 |---|---|---|---|
-| 1 | Sign-in (email OTP) | UCard · UForm · UFormField · UInput type=email · UPinInput length=6 otp · UButton · UAlert | AuthMobile · Login1440 |
-| 2 | Accept invitation | UCard · UAvatar (logo) · UCheckbox (consent) · UPinInput · UButton | AuthMobile |
+| 1 | Sign-in (username + password; P6 superseded 12 Nov 2026) | UCard · UForm · UFormField · UInput username · UInput type=password · UButton · UAlert | AuthMobile · Login1440 are layout references only; replace old OTP copy |
+| 2 | Accept 7-day invitation and set username/password | UCard · UAvatar (logo) · UForm · UFormField · UInput username/password · UCheckbox (consent) · UButton | AuthMobile layout only; no sign-in OTP |
+| 2.1 | Password recovery (username or email; 10-minute single-use link) | UCard · UForm · UFormField · UInput · UButton · UAlert | AuthMobile layout pattern; generic account/delivery-independent response |
 | 3 | Public booking | UStepper · UCalendar · UButton (slots) · UForm · UInput · URadioGroup · USelect · UCheckbox · UPinInput | BookingMobile |
 | 4 | Privacy and "Mis datos" | UPageHeader · UCard · UButton · UModal (confirm deletion) | PwaSystemMobile |
 | 5 | Profile and settings | UForm · UInput · UColorModeSelect · UCheckbox (channels) · USwitch | pattern: PwaSystemMobile |
@@ -72,12 +73,12 @@ An ADMIN who also treats patients sees "Administración" at the end of the docto
 | Admin | Usuarios | `/admin/usuarios` | `?tab=equipo`, `?tab=padres` |
 | Admin | Clínica | `/admin/clinica` | `#marca`, `#recordatorios` |
 | Admin | Auditoría | `/admin/auditoria` | `?tab=solicitudes` |
-| Public | Acceso | `/acceso` | `/acceso/codigo` |
-| Public | Invitación | `/invitacion/:token` | `…/consentimiento`, `…/codigo` |
+| Public | Acceso | `/acceso` | `/recuperar`, `/restablecer/:token` (password recovery; no OTP sign-in) |
+| Public | Invitación | `/invitacion/:token` | account setup: choose username/password and consent |
 | Public | Reservar | `/reservar` | `/horario`, `/datos`, `/consentimiento`, `/verificar`, `/enviada` |
 | Public | Sistema | | `/privacidad`, `/sin-conexion`, `/403`, `/sesion-expirada` |
 
-Redirects: after OTP, doctor and parent → `/`; admin without a clinic → the setup wizard.
+Redirects: after username/password sign-in, doctor and parent → `/`; admin without a clinic → the setup wizard.
 No session: `/pacientes`, `/hijos`, `/admin` → `/acceso?volver=…`.
 No network: any route with data → `/sin-conexion`.
 

@@ -8,7 +8,7 @@ WHO growth standards. Guardians see only their own children's approved shareable
 - Nuxt UI v4 (Tailwind CSS v4). UI text in Spanish; code, identifiers and commits in English.
 - PostgreSQL 18 via Drizzle ORM (`server/db/schema.ts`, migrations in `server/db/migrations`).
 - Valkey (Redis protocol) for cache, sessions and rate limits. RustFS (S3, path-style) for files.
-- Auth: Better Auth through its Nuxt module (to be added): DB sessions, email OTP, roles.
+- Auth: Better Auth through its Nuxt module: username + password, DB sessions, invitation-only accounts and roles. Email is for invitation and password recovery, never OTP sign-in (P6 superseded 12 Nov 2026).
 - Charts: ECharts via `vue-echarts`, client-only components.
 - PWA: `@vite-pwa/nuxt`. Validation: Zod, shared by forms and server routes.
 - Tests: Vitest (`test/unit`), Playwright (`test/e2e`).

@@ -64,6 +64,13 @@
       "when": 1794543707767,
       "tag": "0008_flowery_screwball",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1794546130310,
+      "tag": "0009_exotic_garia",
+      "breakpoints": true
     }
   ]
 }

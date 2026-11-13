@@ -157,7 +157,8 @@ export async function processRecoveryJobs() {
         try {
           await redis.connect()
           const key = `auth:recovery:cooldown:${createHash('sha256').update(existing.id).digest('hex')}`
-          if (await redis.set(key, '1', { EX: 60, NX: true })) {
+          if (job.forced || await redis.set(key, '1', { EX: 60, NX: true })) {
+            if (job.forced) await redis.set(key, '1', { EX: 60 })
             const prepared = await prepareRecovery(job)
             if (prepared?.tokenId && prepared.deliveryPayload) {
               const { email, token } = JSON.parse(decryptIdentity(prepared.deliveryPayload)) as { email: string, token: string }
@@ -179,10 +180,16 @@ export async function processRecoveryJobs() {
   return 1
 }
 
-export async function requestRecovery(identity: string) {
+export async function requestForcedRecovery(userId: string) {
+  const [owner] = await useDb().select({ email: user.email }).from(user).where(eq(user.id, userId)).limit(1)
+  if (!owner) return
+  await useDb().insert(recoveryJob).values({ id: crypto.randomUUID(), payload: encryptIdentity(owner.email), forced: true })
+}
+
+export async function requestRecovery(identity: string, address?: string) {
   const value = identity.trim().toLowerCase()
   try {
-    if (!await consumeAccessLimit(value, 'shared', 'recovery')) return { message }
+    if (!await consumeAccessLimit(value, address || 'shared', 'recovery')) return { message }
     await useDb().insert(recoveryJob).values({ id: crypto.randomUUID(), payload: encryptIdentity(value) })
   } catch (error) {
     console.error(JSON.stringify({ event: 'recovery_enqueue_failed', errorClass: error instanceof Error ? error.name : 'Unknown' }))

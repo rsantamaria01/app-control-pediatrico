@@ -6,7 +6,7 @@ import { eq } from 'drizzle-orm'
 import { recordAudit } from './services/audit.js'
 import * as schema from './db/schema.js'
 import { normalizeUsername, validatePassword } from './services/credentials.js'
-import { checkLoginLock, clearLoginFailures, recordLoginFailure } from './services/otp-rate-limit.js'
+import { reserveLoginAttempt, clearLoginFailures, recordLoginFailure } from './services/otp-rate-limit.js'
 import { useDb } from './utils/db.js'
 
 export function trustedProxyIPSettings(cidr: string | undefined) {
@@ -31,7 +31,7 @@ export default defineServerAuth({
         }
         const ip = ctx.request ? getIP(ctx.request, ctx.context.options) || 'shared' : 'shared'
         try {
-          if (!await checkLoginLock(input, ip)) {
+          if (!await reserveLoginAttempt(input, ip)) {
             await recordAudit('SIGN_IN', 'DENIED')
             throw new APIError('UNAUTHORIZED', { message: 'Usuario o contraseña incorrectos' })
           }

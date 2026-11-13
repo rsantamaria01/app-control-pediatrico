@@ -16,6 +16,7 @@ test.describe('username/password access on disposable database', () => {
   let db: ReturnType<typeof drizzle>
   const sockets = new Set<Socket>()
   const messages: string[] = []
+  const rejectRecipients = new Set<string>()
   const smtp = createServer((socket) => {
     sockets.add(socket)
     socket.on('close', () => sockets.delete(socket))
@@ -32,7 +33,8 @@ test.describe('username/password access on disposable database', () => {
           socket.write('250 Accepted\r\n')
         }
       } else if (text.startsWith('EHLO')) socket.write('250 mail.test\r\n')
-      else if (text.startsWith('MAIL FROM') || text.startsWith('RCPT TO')) socket.write('250 OK\r\n')
+      else if (text.startsWith('RCPT TO')) socket.write(rejectRecipients.size && [...rejectRecipients].some(email => text.includes(email)) ? '550 Recipient rejected\r\n' : '250 OK\r\n')
+      else if (text.startsWith('MAIL FROM')) socket.write('250 OK\r\n')
       else if (text.startsWith('DATA')) {
         data = ''
         collecting = true
@@ -146,6 +148,139 @@ test.describe('username/password access on disposable database', () => {
     await page.context().clearCookies()
   })
 
+  test('admin retries a failed invitation without duplicating or escalating the staff account', async ({ page }) => {
+    const adminId = crypto.randomUUID()
+    const username = `admin-${adminId.slice(0, 8)}`
+    await db.insert(user).values({ id: adminId, email: `${adminId}@example.test`, name: 'Admin', username })
+    await db.insert(userRole).values({ userId: adminId, role: 'ADMIN' })
+    await db.insert(account).values({ id: crypto.randomUUID(), userId: adminId, accountId: adminId, providerId: 'credential', password: await hashPassword('unique administrator passphrase') })
+    await page.goto('/acceso')
+    await page.waitForLoadState('networkidle')
+    await page.getByRole('textbox', { name: 'Usuario' }).fill(username)
+    await page.getByLabel('Contraseña').fill('unique administrator passphrase')
+    await page.getByRole('button', { name: 'Ingresar' }).click()
+    await expect(page).toHaveURL('/')
+    const email = `${crypto.randomUUID()}@example.test`
+    rejectRecipients.add(email)
+    try {
+      const first = await page.request.post('/api/auth/invite-staff', { data: { name: 'New doctor', email, role: 'DOCTOR' } })
+      expect(first.status()).toBe(200)
+      const [invited] = await db.select().from(user).where(eq(user.email, email))
+      expect(invited).toBeDefined()
+      const { setupToken } = await import('../../server/db/schema')
+      expect((await db.select().from(setupToken).where(eq(setupToken.userId, invited!.id))).filter(entry => !entry.usedAt)).toHaveLength(0)
+      rejectRecipients.delete(email)
+      const retry = await page.request.post('/api/auth/invite-staff', { data: { name: 'New doctor', email, role: 'DOCTOR' } })
+      expect(retry.status()).toBe(200)
+      await expect.poll(() => messages.filter(message => message.includes(email)).length).toBe(1)
+      const escalation = await page.request.post('/api/auth/invite-staff', { data: { name: 'Changed name', email, role: 'ASSISTANT' } })
+      expect(escalation.status()).toBe(200)
+      expect(await db.select().from(user).where(eq(user.email, email))).toHaveLength(1)
+      expect((await db.select().from(userRole).where(eq(userRole.userId, invited!.id))).map(row => row.role)).toEqual(['DOCTOR'])
+    } finally {
+      rejectRecipients.delete(email)
+    }
+  })
+
+  test('concurrent staff invitations cannot fail on duplicate email or create duplicate identities', async ({ page }) => {
+    const adminId = crypto.randomUUID()
+    const username = `admin-${adminId.slice(0, 8)}`
+    await db.insert(user).values({ id: adminId, email: `${adminId}@example.test`, name: 'Admin', username })
+    await db.insert(userRole).values({ userId: adminId, role: 'ADMIN' })
+    await db.insert(account).values({ id: crypto.randomUUID(), userId: adminId, accountId: adminId, providerId: 'credential', password: await hashPassword('unique administrator passphrase') })
+    await page.goto('/acceso')
+    await page.waitForLoadState('networkidle')
+    await page.getByRole('textbox', { name: 'Usuario' }).fill(username)
+    await page.getByLabel('Contraseña').fill('unique administrator passphrase')
+    await page.getByRole('button', { name: 'Ingresar' }).click()
+    await expect(page).toHaveURL('/')
+    const email = `${crypto.randomUUID()}@example.test`
+    const requests = await Promise.all(Array.from({ length: 4 }, () => page.request.post('/api/auth/invite-staff', { data: { email, name: 'Doctor', role: 'DOCTOR' } })))
+    expect(requests.map(response => response.status())).toEqual([200, 200, 200, 200])
+    const [invited] = await db.select().from(user).where(eq(user.email, email))
+    expect(invited).toBeDefined()
+    const { setupToken } = await import('../../server/db/schema')
+    expect((await db.select().from(setupToken).where(eq(setupToken.userId, invited!.id))).filter(entry => !entry.usedAt)).toHaveLength(1)
+    expect((await db.select().from(userRole).where(eq(userRole.userId, invited!.id))).map(row => row.role)).toEqual(['DOCTOR'])
+  })
+
+  test('admin forces a one-use reset for existing staff without changing their role or exposing a link', async ({ page }) => {
+    const adminId = crypto.randomUUID()
+    const username = `admin-${adminId.slice(0, 8)}`
+    const password = 'unique administrator passphrase'
+    await db.insert(user).values({ id: adminId, email: `${adminId}@example.test`, name: 'Admin', username })
+    await db.insert(userRole).values({ userId: adminId, role: 'ADMIN' })
+    await db.insert(account).values({ id: crypto.randomUUID(), userId: adminId, accountId: adminId, providerId: 'credential', password: await hashPassword(password) })
+    const staffId = crypto.randomUUID()
+    const staffEmail = `${staffId}@example.test`
+    await db.insert(user).values({ id: staffId, email: staffEmail, name: 'Doctor', username: `doc-${staffId.slice(0, 8)}` })
+    await db.insert(userRole).values({ userId: staffId, role: 'DOCTOR' })
+    await db.insert(account).values({ id: crypto.randomUUID(), userId: staffId, accountId: staffId, providerId: 'credential', password: await hashPassword('old unique staff passphrase') })
+    const guest = await page.request.post('/api/auth/force-reset', { data: { userId: staffId } })
+    expect(guest.status()).toBe(401)
+    await page.goto('/acceso')
+    await page.waitForLoadState('networkidle')
+    await page.getByRole('textbox', { name: 'Usuario' }).fill(username)
+    await page.getByLabel('Contraseña').fill(password)
+    await page.getByRole('button', { name: 'Ingresar' }).click()
+    await expect(page).toHaveURL('/')
+    const initial = await page.request.post('/api/auth/recovery', { data: { identity: `doc-${staffId.slice(0, 8)}` } })
+    expect(initial.status()).toBe(200)
+    await expect.poll(() => messages.filter(message => message.includes(staffEmail)).length).toBe(1)
+    const previous = messages.findLast(message => message.includes(staffEmail))!.match(/restablecer\/([a-zA-Z0-9_-]{32,})/)?.[1]
+    expect(previous).toBeTruthy()
+    const result = await page.request.post('/api/auth/force-reset', { data: { userId: staffId } })
+    expect(result.status()).toBe(200)
+    expect(JSON.stringify(await result.json())).not.toContain('restablecer/')
+    await expect.poll(() => messages.filter(message => message.includes(staffEmail)).length).toBe(2)
+    const mail = messages.findLast(message => message.includes(staffEmail))!
+    const token = mail.match(/restablecer\/([a-zA-Z0-9_-]{32,})/)?.[1]
+    expect(token).toBeTruthy()
+    expect((await page.request.post('/api/auth/reset', { data: { token: previous, password: 'a rejected old phrase' } })).status()).toBe(400)
+    const reset = await page.request.post('/api/auth/reset', { data: { token, password: 'a new unique staff passphrase' } })
+    expect(reset.status()).toBe(200)
+    expect((await page.request.post('/api/auth/reset', { data: { token, password: 'another new unique phrase' } })).status()).toBe(400)
+    expect((await db.select().from(userRole).where(eq(userRole.userId, staffId))).map(row => row.role)).toEqual(['DOCTOR'])
+    const assistantId = crypto.randomUUID()
+    const assistantEmail = `${assistantId}@example.test`
+    await db.insert(user).values({ id: assistantId, email: assistantEmail, name: 'Assistant', username: `asst-${assistantId.slice(0, 8)}` })
+    await db.insert(userRole).values({ userId: assistantId, role: 'ASSISTANT' })
+    await db.insert(account).values({ id: crypto.randomUUID(), userId: assistantId, accountId: assistantId, providerId: 'credential', password: await hashPassword('old assistant passphrase') })
+    expect((await page.request.post('/api/auth/force-reset', { data: { userId: assistantId } })).status()).toBe(200)
+    await expect.poll(() => messages.filter(message => message.includes(assistantEmail)).length).toBe(1)
+    const nonstaffId = crypto.randomUUID()
+    const nonstaffEmail = `${nonstaffId}@example.test`
+    await db.insert(user).values({ id: nonstaffId, email: nonstaffEmail, name: 'Guardian', username: `parent-${nonstaffId.slice(0, 8)}` })
+    await db.insert(userRole).values({ userId: nonstaffId, role: 'PATIENT' })
+    await db.insert(account).values({ id: crypto.randomUUID(), userId: nonstaffId, accountId: nonstaffId, providerId: 'credential', password: await hashPassword('unique guardian passphrase') })
+    expect((await page.request.post('/api/auth/force-reset', { data: { userId: nonstaffId } })).status()).toBe(200)
+    expect(messages.filter(message => message.includes(nonstaffEmail))).toHaveLength(0)
+  })
+
+  test('a second invitation invalidates an earlier delivered setup link without changing the role', async ({ page }) => {
+    const adminId = crypto.randomUUID()
+    const username = `admin-${adminId.slice(0, 8)}`
+    await db.insert(user).values({ id: adminId, email: `${adminId}@example.test`, name: 'Admin', username })
+    await db.insert(userRole).values({ userId: adminId, role: 'ADMIN' })
+    await db.insert(account).values({ id: crypto.randomUUID(), userId: adminId, accountId: adminId, providerId: 'credential', password: await hashPassword('unique administrator passphrase') })
+    await page.goto('/acceso')
+    await page.waitForLoadState('networkidle')
+    await page.getByRole('textbox', { name: 'Usuario' }).fill(username)
+    await page.getByLabel('Contraseña').fill('unique administrator passphrase')
+    await page.getByRole('button', { name: 'Ingresar' }).click()
+    await expect(page).toHaveURL('/')
+    const email = `${crypto.randomUUID()}@example.test`
+    expect((await page.request.post('/api/auth/invite-staff', { data: { email, name: 'Doctor', role: 'DOCTOR' } })).status()).toBe(200)
+    const first = messages.findLast(message => message.includes(email))!.match(/invitacion\/([a-zA-Z0-9_-]{32,})/)?.[1]
+    expect(first).toBeTruthy()
+    expect((await page.request.post('/api/auth/invite-staff', { data: { email, name: 'Doctor', role: 'DOCTOR' } })).status()).toBe(200)
+    const second = messages.findLast(message => message.includes(email))!.match(/invitacion\/([a-zA-Z0-9_-]{32,})/)?.[1]
+    expect(second).toBeTruthy()
+    expect(second).not.toBe(first)
+    expect((await page.request.post('/api/auth/setup', { data: { token: first, username: `first-${adminId.slice(0, 8)}`, password: 'unique first invitation phrase' } })).status()).toBe(400)
+    expect((await page.request.post('/api/auth/setup', { data: { token: second, username: `second-${adminId.slice(0, 8)}`, password: 'unique second invitation phrase' } })).status()).toBe(200)
+  })
+
   test('assistant cannot grant itself a doctor role through an invitation payload', async ({ page }) => {
     const id = crypto.randomUUID()
     const username = `assistant-${id.slice(0, 8)}`
@@ -206,6 +341,23 @@ test.describe('username/password access on disposable database', () => {
     expect((await page.request.get('/api/auth/email-health')).status()).toBe(401)
   })
 
+  test('unrelated recovery requests are not denied by a shared IP, and forged forwarding cannot bypass identity limits', async ({ page }) => {
+    const { recoveryJob } = await import('../../server/db/schema')
+    const before = (await db.select().from(recoveryJob)).length
+    for (let i = 0; i < 21; i++) {
+      const result = await page.request.post('/api/auth/recovery', { data: { identity: `distinct-${crypto.randomUUID().slice(0, 8)}` }, headers: { 'x-forwarded-for': `198.51.100.${i + 1}` } })
+      expect(result.status()).toBe(200)
+    }
+    expect((await db.select().from(recoveryJob)).length - before).toBe(21)
+    const identity = `forged-${crypto.randomUUID().slice(0, 8)}`
+    const count = (await db.select().from(recoveryJob)).length
+    for (let i = 0; i < 4; i++) {
+      const result = await page.request.post('/api/auth/recovery', { data: { identity }, headers: { 'x-forwarded-for': `192.0.2.${i + 1}` } })
+      expect(result.status()).toBe(200)
+    }
+    expect((await db.select().from(recoveryJob)).length - count).toBe(3)
+  })
+
   test('recovery never reveals whether the username exists', async ({ page }) => {
     await page.goto('/recuperar')
     await page.waitForLoadState('networkidle')
@@ -229,6 +381,7 @@ test.describe('username/password access on disposable database', () => {
     await expect(page).toHaveURL('/')
     expect((await page.request.get('/api/clinical/access-check')).status()).toBe(403)
     expect((await page.request.get('/api/auth/email-health')).status()).toBe(403)
+    expect((await page.request.post('/api/auth/force-reset', { data: { userId: id } })).status()).toBe(403)
     expect((await page.request.post('/api/auth/invite-staff', { data: { name: 'Unauthorized', email: 'no@example.test', role: 'DOCTOR' } })).status()).toBe(403)
   })
 })

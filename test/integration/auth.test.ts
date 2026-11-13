@@ -66,7 +66,7 @@ beforeEach(async () => {
     await client.del(recoveryIp)
     for (const address of ['shared', '127.0.0.1']) {
       const key = `auth:login:ip:${createHash('sha256').update(address).digest('hex')}`
-      await client.del([key, `${key}:locked`])
+      await client.del([key, `${key}:locked`, `${key}:attempts`])
     }
   } finally {
     await client.quit()
@@ -237,7 +237,7 @@ describe('username/password access', () => {
     expect(await processRecoveryJobs()).toBe(1)
     const token = received.match(/restablecer\/([a-zA-Z0-9_-]{32,})/)?.[1]
     expect(token).toBeTruthy()
-    expect((await db.select().from(setupToken).where(eq(setupToken.userId, id)))[0]?.usedAt).toBeNull()
+    expect((await db.select().from(setupToken).where(eq(setupToken.userId, id))).filter(entry => !entry.usedAt)).toHaveLength(1)
     expect(await resetCredential(token!, 'another unique fresh phrase')).toBe(true)
   })
 
@@ -642,6 +642,15 @@ describe('username/password access', () => {
     }
   })
 
+  it('queues distinct identities beyond the shared-IP budget without accepting spoofed forwarding headers', async () => {
+    const { requestRecovery } = await import('../../server/services/recovery')
+    const { recoveryJob } = await import('../../server/db/schema')
+    for (let i = 0; i < 21; i++) {
+      expect(await requestRecovery(`individual-${crypto.randomUUID().slice(0, 8)}`)).toEqual({ message: 'Si la cuenta existe, enviaremos instrucciones al correo registrado' })
+    }
+    expect(await db.select().from(recoveryJob)).toHaveLength(21)
+  })
+
   it('maps recovery by username and email to the same account cooldown', async () => {
     const { requestRecovery } = await import('../../server/services/recovery')
     const { setupToken } = await import('../../server/db/schema')
@@ -827,6 +836,75 @@ describe('username/password access', () => {
     expect((await post('sign-in/email', { email, password })).status).not.toBe(200)
   })
 
+  it('admits at most three simultaneous password guesses for one username', async () => {
+    const id = crypto.randomUUID()
+    const username = `burst-${id.slice(0, 8)}`
+    const password = 'a unique password for this burst'
+    await db.insert(user).values({ id, email: `${id}@example.test`, name: 'Burst', username })
+    await db.insert(userRole).values({ userId: id, role: 'DOCTOR' })
+    const { hashPassword } = await import('better-auth/crypto')
+    await db.insert(account).values({ id: crypto.randomUUID(), userId: id, accountId: id, providerId: 'credential', password: await hashPassword(password) })
+    const results = await Promise.all(Array.from({ length: 12 }, () => post('sign-in/username', { username, password })))
+    expect(results.filter(result => result.status === 200)).toHaveLength(3)
+    expect(await db.select().from(session).where(eq(session.userId, id))).toHaveLength(3)
+    for (const result of results.filter(result => result.status !== 200)) {
+      expect(result.status).toBe(401)
+      expect((await result.json()).message).toBe('Usuario o contraseña incorrectos')
+    }
+  })
+
+  it('releases a reserved login slot after its window expires', async () => {
+    const { reserveLoginAttempt } = await import('../../server/services/otp-rate-limit')
+    const { createClient } = await import('redis')
+    const { createHash } = await import('node:crypto')
+    const username = `window-${crypto.randomUUID().slice(0, 8)}`
+    for (let i = 0; i < 3; i++) expect(await reserveLoginAttempt(username, `192.0.2.${i + 1}`)).toBe(true)
+    expect(await reserveLoginAttempt(username, '192.0.2.4')).toBe(false)
+    const client = createClient({ url: process.env.REDIS_URL })
+    client.on('error', () => {})
+    await client.connect()
+    try {
+      await client.del(`auth:login:user:${createHash('sha256').update(username).digest('hex')}:attempts`)
+    } finally {
+      await client.quit()
+    }
+    expect(await reserveLoginAttempt(username, '192.0.2.4')).toBe(true)
+  })
+
+  it('limits simultaneous guesses across distinct usernames from one IP', async () => {
+    const { reserveLoginAttempt } = await import('../../server/services/otp-rate-limit')
+    const ip = `192.0.2.${Math.floor(Math.random() * 180) + 1}`
+    const attempts = await Promise.all(Array.from({ length: 30 }, (_, index) => reserveLoginAttempt(`user-${crypto.randomUUID().slice(0, 8)}-${index}`, ip)))
+    expect(attempts.filter(Boolean)).toHaveLength(20)
+  })
+
+  it('does not clear the reservation budget after a successful login or allow parallel guesses past the lock', async () => {
+    const id = crypto.randomUUID()
+    const username = `mixed-${id.slice(0, 8)}`
+    const password = 'a unique mixed password phrase'
+    await db.insert(user).values({ id, email: `${id}@example.test`, name: 'Mixed', username })
+    await db.insert(userRole).values({ userId: id, role: 'DOCTOR' })
+    const { hashPassword } = await import('better-auth/crypto')
+    await db.insert(account).values({ id: crypto.randomUUID(), userId: id, accountId: id, providerId: 'credential', password: await hashPassword(password) })
+    expect((await post('sign-in/username', { username, password })).status).toBe(200)
+    const responses = await Promise.all(Array.from({ length: 12 }, () => post('sign-in/username', { username, password: 'incorrect mixed password' })))
+    expect(responses.filter(response => response.status === 401)).toHaveLength(12)
+    expect((await post('sign-in/username', { username, password })).status).toBe(401)
+    expect(await db.select().from(session).where(eq(session.userId, id))).toHaveLength(1)
+  })
+
+  it('keeps the reservation limit during a failing-username lock across a second IP', async () => {
+    const { reserveLoginAttempt, recordLoginFailure, clearLoginFailures } = await import('../../server/services/otp-rate-limit')
+    const name = `reserved-${crypto.randomUUID().slice(0, 8)}`
+    for (let i = 0; i < 3; i++) {
+      expect(await reserveLoginAttempt(name, `192.0.2.${i + 1}`)).toBe(true)
+      await recordLoginFailure(name, `192.0.2.${i + 1}`)
+    }
+    expect(await reserveLoginAttempt(name, '203.0.113.2')).toBe(false)
+    await clearLoginFailures(name)
+    expect(await reserveLoginAttempt(name, '203.0.113.2')).toBe(false)
+  })
+
   it('locks failed sign-in attempts with a generic audited error and does not reset the lock on a correct password', async () => {
     const id = crypto.randomUUID()
     const username = `locked-${id.slice(0, 8)}`
@@ -895,6 +973,41 @@ describe('username/password access', () => {
     } finally {
       await client.quit()
     }
+  })
+
+  it('uses only a configured trusted proxy chain and rejects a forged first forwarding hop', async () => {
+    const { recoveryClientAddress } = await import('../../server/services/otp-rate-limit')
+    expect(recoveryClientAddress('198.51.100.22', '203.0.113.8', '192.0.2.0/24')).toBe('198.51.100.22')
+    expect(recoveryClientAddress('192.0.2.10', '198.51.100.99, 203.0.113.8, 192.0.2.11', '192.0.2.0/24')).toBe('203.0.113.8')
+    expect(recoveryClientAddress('192.0.2.10', '203.0.113.8', undefined)).toBe('192.0.2.10')
+    expect(recoveryClientAddress('192.0.2.10', 'invalid, 203.0.113.8', '192.0.2.0/24')).toBe('192.0.2.10')
+    expect(recoveryClientAddress('192.0.2.10', '198.51.100.99, 203.0.113.8', 'bad-cidr')).toBe('192.0.2.10')
+    expect(recoveryClientAddress('192.0.2.10', '203.0.113.8', '0.0.0.0/0')).toBe('192.0.2.10')
+    expect(recoveryClientAddress('192.0.2.10', '203.0.113.8', '192.0.2.0/24,198.51.100.0/24')).toBe('192.0.2.10')
+    expect(recoveryClientAddress('192.0.2.10', '203.0.113.8', '192.0.2.0/24')).toBe('203.0.113.8')
+  })
+
+  it('keeps distinct recovery callers independent behind a configured trusted proxy', async () => {
+    const { recoveryClientAddress, consumeAccessLimit } = await import('../../server/services/otp-rate-limit')
+    const cidr = '192.0.2.0/24'
+    const proxy = '192.0.2.11'
+    const identifier = `proxy-${crypto.randomUUID()}`
+    for (let i = 0; i < 20; i++) {
+      const address = recoveryClientAddress(proxy, '198.51.100.33', cidr)
+      expect(await consumeAccessLimit(`${identifier}-${i}`, address, 'recovery')).toBe(true)
+    }
+    const unrelated = recoveryClientAddress(proxy, '203.0.113.44', cidr)
+    expect(await consumeAccessLimit(`${identifier}-other`, unrelated, 'recovery')).toBe(true)
+  })
+
+  it('keeps distinct recovery identities usable when the request IP is unavailable', async () => {
+    const { consumeAccessLimit } = await import('../../server/services/otp-rate-limit')
+    for (let i = 0; i < 25; i++) {
+      expect(await consumeAccessLimit(`unique-${crypto.randomUUID()}`, 'shared', 'recovery')).toBe(true)
+    }
+    const identity = `same-${crypto.randomUUID()}`
+    for (let i = 0; i < 3; i++) expect(await consumeAccessLimit(identity, 'shared', 'recovery')).toBe(true)
+    expect(await consumeAccessLimit(identity, 'shared', 'recovery')).toBe(false)
   })
 
   it('rate limits username and IP attempts in Valkey without exposing account existence', async () => {

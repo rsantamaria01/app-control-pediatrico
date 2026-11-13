@@ -1,0 +1,1 @@
+ALTER TABLE "recovery_job" ADD COLUMN "forced" boolean DEFAULT false NOT NULL;

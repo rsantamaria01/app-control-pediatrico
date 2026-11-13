@@ -83,6 +83,7 @@ export const recoveryJob = pgTable('recovery_job', {
   payload: text('payload').notNull(),
   tokenId: text('token_id'),
   deliveryPayload: text('delivery_payload'),
+  forced: boolean('forced').notNull().default(false),
   state: text('state').notNull().default('QUEUED'),
   attempts: integer('attempts').notNull().default(0),
   createdAt: timestamp('created_at').notNull().defaultNow(),

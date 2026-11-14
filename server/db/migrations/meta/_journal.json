@@ -113,6 +113,20 @@
       "when": 1794676495715,
       "tag": "0015_keen_demogoblin",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1794681118096,
+      "tag": "0016_giant_guardian",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1794681511313,
+      "tag": "0017_thick_obadiah_stane",
+      "breakpoints": true
     }
   ]
 }

@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import type { FamilyResult } from '../../../server/services/invitations'
 import { familyGrowthCopy } from '#shared/utils/family-growth-copy'
 import type { GrowthResult } from '#shared/types/clinical'
+
+type FamilyResult = { indicator: string } & (Pick<Extract<GrowthResult, { status: 'available' }>, 'status' | 'z' | 'percentile'> | { status: 'unavailable' })
 
 const props = defineProps<{ results: FamilyResult[], doctorTitle?: string }>()
 const names: Record<string, string> = {

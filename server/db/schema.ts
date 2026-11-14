@@ -129,7 +129,8 @@ export const guardianGrant = pgTable('guardian_grant', {
   verifiedAt: timestamp('verified_at', { withTimezone: true }).notNull().defaultNow(),
   status: text('status').notNull(),
   tokenId: text('token_id').references(() => setupToken.id),
-  revokedAt: timestamp('revoked_at', { withTimezone: true })
+  revokedAt: timestamp('revoked_at', { withTimezone: true }),
+  lastSendError: text('last_send_error')
 }, table => [
   primaryKey({ columns: [table.patientId, table.guardianId] }),
   index('guardian_grant_guardian_idx').on(table.guardianId, table.status),
@@ -147,6 +148,8 @@ export const visit = pgTable('clinical_visit', {
   position: text('position').notNull(),
   headCircumferenceCm: numeric('head_circumference_cm').notNull(),
   bmi: numeric('bmi').notNull(),
+  shareWithFamily: boolean('share_with_family').notNull().default(true),
+  nextControlAt: timestamp('next_control_at', { withTimezone: true }),
   gestationDaysAtBirth: integer('gestation_days_at_birth'),
   birthDateAtVisit: text('birth_date_at_visit'),
   sexAtVisit: text('sex_at_visit'),
@@ -158,6 +161,13 @@ export const visit = pgTable('clinical_visit', {
   check('clinical_visit_values_ck', sql`${table.weightKg} > 0 AND ${table.lengthHeightCm} > 0 AND ${table.headCircumferenceCm} > 0 AND ${table.bmi} > 0`),
   check('clinical_visit_position_ck', sql`${table.position} IN ('RECUMBENT', 'STANDING')`)
 ])
+
+export const visitSharing = pgTable('visit_sharing', {
+  visitId: text('visit_id').primaryKey().references(() => visit.id, { onDelete: 'restrict' }),
+  shared: boolean('shared').notNull(),
+  changedBy: text('changed_by').notNull(),
+  changedAt: timestamp('changed_at', { withTimezone: true }).notNull().defaultNow()
+})
 
 export const visitResult = pgTable('visit_result', {
   id: text('id').primaryKey(),

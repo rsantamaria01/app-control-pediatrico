@@ -4,9 +4,36 @@ import type { GuardianGrant } from '../../../server/services/invitations'
 const search = ref('')
 const selected = ref<{ id: string, name: string } | null>(null)
 const contact = reactive({ name: '', email: '', proof: '' })
+const identity = ref<{ id: string, name: string, maskedContact: string } | null>(null)
+const identityChecked = ref(false)
+const confirmed = ref(false)
+const verifiedEmail = ref('')
+watch(() => contact.email, () => {
+  identity.value = null
+  identityChecked.value = false
+  verifiedEmail.value = ''
+  confirmed.value = false
+})
+async function checkIdentity() {
+  const email = contact.email.trim().toLowerCase()
+  identityChecked.value = false
+  try {
+    const match = await $fetch('/api/guardian-grants/identity', { query: { email } })
+    if (contact.email.trim().toLowerCase() !== email) return
+    identity.value = match
+    verifiedEmail.value = email
+    identityChecked.value = true
+  } catch {
+    status.value = 'No se pudo verificar la identidad. Inténtelo otra vez.'
+  }
+}
 const status = ref('')
+const initialPatient = useRoute().query.patient
 const pending = ref(false)
-const candidates = ref<{ id: string, name: string, guardians: { email: string, status: string }[] }[]>([])
+const candidates = ref<{ id: string, name: string, guardians: { email: string, status: string, lastSendError: string | null }[] }[]>([])
+function label(status: string) {
+  return status === 'ACTIVE' ? 'Activo' : status === 'PENDING' ? 'Pendiente de activación' : 'Sin invitar'
+}
 const error = ref(false)
 async function refresh() {
   error.value = false
@@ -20,13 +47,20 @@ async function refresh() {
 watch(search, () => {
   void refresh()
 })
+if (typeof initialPatient === 'string') {
+  const { data: initial } = await useFetch<{ id: string, name: string, guardians: { email: string, status: string, lastSendError: string | null }[] }>(`/api/guardian-grants/${encodeURIComponent(initialPatient)}`)
+  if (initial.value) {
+    selected.value = { id: initial.value.id, name: initial.value.name }
+    candidates.value = [initial.value]
+  }
+}
 
 async function submit() {
-  if (!selected.value || pending.value) return
+  if (!selected.value || pending.value || !identityChecked.value || verifiedEmail.value !== contact.email.trim().toLowerCase() || (identity.value && !confirmed.value)) return
   pending.value = true
   status.value = ''
   try {
-    const result = await $fetch<GuardianGrant>('/api/guardian-grants', { method: 'POST', body: { patientId: selected.value.id, contact } })
+    const result = await $fetch<GuardianGrant>('/api/guardian-grants', { method: 'POST', body: { patientId: selected.value.id, contact: { ...contact, ...(identity.value ? { confirmedGuardianId: identity.value.id } : {}) } } })
     status.value = result.status === 'FAILED' ? 'No se pudo entregar la invitación. Puede reintentar.' : result.status === 'ACTIVE' ? 'Acceso habilitado para la persona verificada.' : 'Invitación pendiente de aceptación.'
     await refresh()
   } catch {
@@ -82,7 +116,7 @@ async function submit() {
             :key="guardian.email"
             class="pl-3 text-sm text-muted"
           >
-            {{ guardian.email }} · {{ guardian.status }}
+            {{ guardian.email }} · {{ label(guardian.status) }}<span v-if="guardian.lastSendError"> · Último error de envío: {{ guardian.lastSendError }}</span>
           </p>
         </li>
       </ul>
@@ -119,6 +153,30 @@ async function submit() {
             required
           />
         </UFormField>
+        <UButton
+          type="button"
+          variant="outline"
+          :disabled="!contact.email"
+          @click="checkIdentity"
+        >
+          Verificar representante
+        </UButton>
+        <p
+          v-if="identityChecked && !identity"
+          class="text-sm"
+        >
+          Sin cuenta previa · Sin invitar
+        </p>
+        <div
+          v-if="identity"
+          class="space-y-2 rounded-md border border-default p-3"
+        >
+          <p>Cuenta existente: {{ identity.name }} · {{ identity.maskedContact }}</p>
+          <UCheckbox
+            v-model="confirmed"
+            label="Confirmo que es la misma persona"
+          />
+        </div>
         <UFormField
           label="Cómo verificó el vínculo"
           required
@@ -133,8 +191,9 @@ async function submit() {
         <UButton
           type="submit"
           :loading="pending"
+          :disabled="!identityChecked || verifiedEmail !== contact.email.trim().toLowerCase() || Boolean(identity && !confirmed)"
         >
-          Registrar y enviar invitación
+          {{ candidates.find(child => child.id === selected?.id)?.guardians.some(guardian => guardian.email === contact.email) ? 'Reenviar invitación' : 'Registrar y enviar invitación' }}
         </UButton>
       </form>
       <p

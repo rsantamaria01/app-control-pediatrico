@@ -6,7 +6,25 @@ import type { WhoIndicator } from '#shared/utils/enums'
 const route = useRoute()
 const id = route.params.id as string
 const { data, error, refresh } = await useFetch<{ patient: PatientView, visits: VisitSnapshot[] }>(`/api/pacientes/${encodeURIComponent(id)}`)
+const { data: navigation } = await useFetch<{ to: string }[]>('/api/auth/navigation')
+const isDoctor = computed(() => navigation.value?.some(item => item.to === '/pacientes') ?? false)
 const latest = computed(() => data.value?.visits[0])
+const sharing = reactive<Record<string, boolean>>({})
+const { data: sharingState } = await useFetch<Record<string, boolean>>(`/api/pacientes/${encodeURIComponent(id)}/visitas/compartir`, { immediate: isDoctor.value })
+const { data: guardianStatus } = await useFetch<{ guardians: { email: string, status: string, lastSendError: string | null }[] }>(`/api/guardian-grants/${encodeURIComponent(id)}`, { immediate: isDoctor.value })
+function guardianLabel(status: string) {
+  return status === 'ACTIVE' ? 'Activo' : status === 'PENDING' ? 'Pendiente de activación' : 'Sin invitar'
+}
+const shareError = ref('')
+async function changeSharing(visitId: string, shared: boolean) {
+  shareError.value = ''
+  try {
+    await $fetch(`/api/pacientes/${encodeURIComponent(id)}/visitas/${encodeURIComponent(visitId)}/compartir`, { method: 'PATCH', body: { shared } })
+    sharing[visitId] = shared
+  } catch {
+    shareError.value = 'No se pudo actualizar el acceso de la familia.'
+  }
+}
 const latestResults = computed(() => latest.value?.results.filter(result => result.parentResultId === null) ?? [])
 const recalculations = computed(() => [...new Set(latest.value?.results.map(result => result.recalculationId).filter((id): id is string => Boolean(id)) ?? [])])
 const labels: Record<WhoIndicator, string> = {
@@ -52,7 +70,7 @@ const dateFormat = new Intl.DateTimeFormat('es-EC', { day: 'numeric', month: 'sh
         </div>
         <div class="flex flex-wrap gap-2">
           <UButton
-            to="/representantes/invitar"
+            :to="`/representantes/invitar?patient=${encodeURIComponent(id)}`"
             variant="outline"
             size="lg"
           >
@@ -67,6 +85,52 @@ const dateFormat = new Intl.DateTimeFormat('es-EC', { day: 'numeric', month: 'sh
           </UButton>
         </div>
       </div>
+      <UCard>
+        <h2 class="font-semibold">
+          Acceso familiar
+        </h2>
+        <p
+          v-if="!guardianStatus?.guardians.length"
+          class="text-sm text-muted"
+        >
+          Sin invitar
+        </p>
+        <p
+          v-for="guardian in guardianStatus?.guardians"
+          :key="guardian.email"
+          class="text-sm"
+        >
+          {{ guardian.email }} · {{ guardianLabel(guardian.status) }}<span v-if="guardian.lastSendError"> · Último error de envío: {{ guardian.lastSendError }}</span>
+        </p>
+      </UCard>
+      <UAlert
+        v-if="shareError"
+        color="error"
+        variant="soft"
+        :title="shareError"
+      />
+      <UCard
+        v-if="data.visits.length"
+        class="space-y-3"
+      >
+        <h2 class="font-semibold">
+          Compartir con la familia
+        </h2>
+        <div
+          v-for="item in data.visits"
+          :key="item.id"
+          class="flex flex-wrap items-center justify-between gap-2 border-t border-default py-2"
+        >
+          <span>{{ dateFormat.format(new Date(item.measuredAt)) }}</span>
+          <UButton
+            variant="outline"
+            :aria-label="`${sharing[item.id] ?? sharingState?.[item.id] ?? item.shareWithFamily ? 'Dejar de compartir' : 'Compartir'} visita del ${dateFormat.format(new Date(item.measuredAt))}`"
+            @click="changeSharing(item.id, !(sharing[item.id] ?? sharingState?.[item.id] ?? item.shareWithFamily))"
+          >
+            {{ (sharing[item.id] ?? sharingState?.[item.id] ?? item.shareWithFamily) ? 'Compartida · cambiar' : 'No compartida · cambiar' }}
+          </UButton>
+        </div>
+      </UCard>
       <UEmpty
         v-if="!latest"
         icon="i-lucide-clipboard-list"

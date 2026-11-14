@@ -61,6 +61,8 @@ it('upgrades a populated immutable visit without guessing the original birth dat
   await pool.query('UPDATE patient SET birth_date = $1, sex = $2 WHERE id = $3', ['2024-02-01', 'MALE', patientId])
   await prepareMigrations(15)
   await migrate(drizzle(pool), { migrationsFolder: migrationDirectory })
+  await prepareMigrations(17)
+  await migrate(drizzle(pool), { migrationsFolder: migrationDirectory })
   const [row] = (await pool.query('SELECT birth_date_at_visit, sex_at_visit, weight_kg FROM clinical_visit WHERE id = $1', [visitId])).rows
   expect(row).toMatchObject({ birth_date_at_visit: null, sex_at_visit: null, weight_kg: '9' })
   expect((await pool.query('SELECT snapshot FROM visit_result WHERE id = $1', [resultId])).rows[0].snapshot).toEqual({ status: 'unavailable', reason: 'WHO reference unavailable' })

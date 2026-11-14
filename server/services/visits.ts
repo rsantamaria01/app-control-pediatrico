@@ -37,12 +37,14 @@ function reviewPlausibility(results: VisitResultSnapshot[]): VisitResultSnapshot
 }
 
 export function shareableVisit(snapshot: VisitSnapshot): ShareableVisit {
+  const originals = reviewPlausibility(snapshot.results.filter(result => result.parentResultId === null && result.recalculationId === null))
   return {
     id: snapshot.id, patientId: snapshot.patientId, measuredAt: snapshot.measuredAt,
     weightKg: snapshot.weightKg, lengthHeightCm: snapshot.lengthHeightCm, position: snapshot.position,
-    headCircumferenceCm: snapshot.headCircumferenceCm, bmi: snapshot.bmi,
+    headCircumferenceCm: snapshot.headCircumferenceCm,
+    bmi: originals.some(result => result.indicator === WhoIndicator.BMI_FOR_AGE && result.status === 'unavailable' && result.reason === 'Verificar medidas con el profesional') ? null : snapshot.bmi,
     gestationDaysAtBirth: snapshot.gestationDaysAtBirth, authorId: snapshot.authorId,
-    results: snapshot.results.filter(result => result.parentResultId === null && result.recalculationId === null).map(result => result.status === 'available'
+    results: originals.map(result => result.status === 'available'
       ? { id: result.id, indicator: result.indicator, status: result.status, sex: result.sex, z: result.z, percentile: result.percentile, classification: result.classification, reference: result.reference, parentResultId: result.parentResultId, recalculationId: result.recalculationId, calculatedBy: result.calculatedBy }
       : { id: result.id, indicator: result.indicator, status: result.status, reason: result.reason, parentResultId: result.parentResultId, recalculationId: result.recalculationId, calculatedBy: result.calculatedBy }),
     ...(snapshot.parentAdvice ? { parentAdvice: snapshot.parentAdvice } : {})
@@ -55,7 +57,7 @@ function hydrate(row: typeof visit.$inferSelect, results: (typeof visitResult.$i
     weightKg: Number(row.weightKg), lengthHeightCm: Number(row.lengthHeightCm),
     position: row.position as VisitSnapshot['position'], headCircumferenceCm: Number(row.headCircumferenceCm),
     bmi: Number(row.bmi), gestationDaysAtBirth: row.gestationDaysAtBirth, authorId: row.authorId,
-    results: results.map(result => ({ ...(result.snapshot as GrowthResult), id: result.id, indicator: result.indicator, parentResultId: result.parentResultId, recalculationId: result.recalculationId, calculatedBy: result.calculatedBy } as VisitResultSnapshot)),
+    results: reviewPlausibility(results.map(result => ({ ...(result.snapshot as GrowthResult), id: result.id, indicator: result.indicator, parentResultId: result.parentResultId, recalculationId: result.recalculationId, calculatedBy: result.calculatedBy } as VisitResultSnapshot))),
     ...(text?.privateNote ? { privateNote: text.privateNote } : {}),
     ...(text?.parentAdvice ? { parentAdvice: text.parentAdvice } : {}),
     ...(text?.clinicianTrend ? { clinicianTrend: text.clinicianTrend } : {})

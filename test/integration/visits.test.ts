@@ -286,11 +286,87 @@ describe('clinical patients and visits on a disposable WHO database', () => {
     const saved = await createVisit(doctor, newborn.id, { ...measurement, weightKg: 20, lengthHeightCm: 50, headCircumferenceCm: 65, measuredAt: '2024-01-01T12:00:00.000Z', requestId: randomUUID() })
     const shared = shareableVisit((await getVisits(doctor, newborn.id))[0]!)
     expect(shared.weightKg).toBe(20)
+    expect(shared.lengthHeightCm).toBe(50)
+    expect(shared.headCircumferenceCm).toBe(65)
+    expect(saved.bmi).toBe(80)
+    expect(shared.bmi).toBeNull()
     expect(shared.results.find(result => result.indicator === WhoIndicator.WEIGHT_FOR_AGE)).toMatchObject({ status: 'unavailable', reason: 'Verificar medidas con el profesional' })
     expect(JSON.stringify(shared)).not.toContain('Macrocefalia')
     expect(JSON.stringify(shared)).not.toContain('Obesidad')
     expect(saved.results.some(result => result.status === 'available')).toBe(true)
   }, 120000)
+
+  it('rechecks previously persisted extreme Z without editing the immutable result row', async () => {
+    const created = await createPatient(doctor, { name: 'Registro anterior', birthDate, sex: Gender.MALE })
+    await importRelease()
+    const snapshot = await createVisit(doctor, created.id, { ...measurement, requestId: randomUUID() })
+    const weightResult = snapshot.results.find(result => result.indicator === WhoIndicator.WEIGHT_FOR_AGE)!
+    const savedRaw = { status: 'available', indicator: WhoIndicator.WEIGHT_FOR_AGE, sex: Gender.MALE, z: 27.48, percentile: null, classification: { name: 'Revisar peso/longitud', tone: 'flag' }, reference: weightResult.status === 'available' ? weightResult.reference : null }
+    await pool.query('ALTER TABLE visit_result DISABLE TRIGGER USER')
+    try {
+      await pool.query('UPDATE visit_result SET snapshot = $1 WHERE id = $2', [JSON.stringify(savedRaw), weightResult.id])
+    } finally {
+      await pool.query('ALTER TABLE visit_result ENABLE TRIGGER USER')
+    }
+    const doctorView = (await getVisits(otherDoctor, created.id))[0]!
+    expect(doctorView.results.find(result => result.indicator === WhoIndicator.WEIGHT_FOR_AGE)).toMatchObject({ status: 'unavailable', reason: 'Verificar medidas con el profesional' })
+    expect(doctorView.weightKg).toBe(9)
+    expect(JSON.stringify(doctorView.results)).not.toContain('Revisar peso/longitud')
+    expect(doctorView.privateNote).toBe('Confidencial clínico')
+    const shared = shareableVisit(doctorView)
+    expect(shared.results.find(result => result.indicator === WhoIndicator.WEIGHT_FOR_AGE)).toMatchObject({ status: 'unavailable', reason: 'Verificar medidas con el profesional' })
+    expect(JSON.stringify(shared)).not.toContain('Revisar peso/longitud')
+    expect(shared.bmi).toBe(doctorView.bmi)
+    expect((await pool.query('SELECT snapshot FROM visit_result WHERE id = $1', [weightResult.id])).rows[0].snapshot).toEqual(savedRaw)
+    expect((await db.select().from(auditEvent).where(eq(auditEvent.subjectId, created.id))).some(event => event.action === 'CLINICAL_READ' && event.actorId === otherDoctor.id && event.outcome === 'ALLOWED')).toBe(true)
+  }, 120000)
+
+  it('hides a previously persisted flagged BMI and raw derived BMI in a direct shareable projection', async () => {
+    const created = await createPatient(doctor, { name: 'BMI anterior', birthDate, sex: Gender.MALE })
+    await importRelease()
+    const snapshot = await createVisit(doctor, created.id, { ...measurement, requestId: randomUUID() })
+    const prior = snapshot.results.find(result => result.indicator === WhoIndicator.BMI_FOR_AGE)!
+    if (prior.status !== 'available') throw new Error('Expected official BMI reference')
+    const savedRaw = { ...prior, status: 'available', z: 37.89, classification: { name: 'Obesidad', tone: 'flag' } }
+    await pool.query('ALTER TABLE visit_result DISABLE TRIGGER USER')
+    try {
+      await pool.query('UPDATE visit_result SET snapshot = $1 WHERE id = $2', [JSON.stringify(savedRaw), prior.id])
+    } finally {
+      await pool.query('ALTER TABLE visit_result ENABLE TRIGGER USER')
+    }
+    const historic = (await getVisits(doctor, created.id))[0]!
+    const unsafe = { ...historic, bmi: 80 }
+    const projected = shareableVisit(unsafe)
+    expect(projected.bmi).toBeNull()
+    expect(projected.results.find(result => result.indicator === WhoIndicator.BMI_FOR_AGE)).toMatchObject({ status: 'unavailable', reason: 'Verificar medidas con el profesional' })
+    expect(JSON.stringify(projected)).not.toContain('Obesidad')
+    expect((await pool.query('SELECT snapshot FROM visit_result WHERE id = $1', [prior.id])).rows[0].snapshot).toEqual(savedRaw)
+  }, 120000)
+
+  it('withholds a synthetic pre-fix extreme on a direct family projection even without a preceding doctor read', async () => {
+    const created = await createPatient(doctor, { name: 'Registro preexistente', birthDate, sex: Gender.MALE })
+    await importRelease()
+    const snapshot = await createVisit(doctor, created.id, { ...measurement, requestId: randomUUID() })
+    const original = snapshot.results.find(result => result.indicator === WhoIndicator.BMI_FOR_AGE)!
+    if (original.status !== 'available') throw new Error('Expected official BMI result')
+    const synthetic = { ...snapshot, bmi: 80, results: snapshot.results.map(result => result.indicator === WhoIndicator.BMI_FOR_AGE ? { ...original, z: 37.89, classification: { name: 'Obesidad', tone: 'flag' } } : result) } as typeof snapshot
+    const family = shareableVisit(synthetic)
+    expect(family.bmi).toBeNull()
+    expect(family.results.find(result => result.indicator === WhoIndicator.BMI_FOR_AGE)).toMatchObject({ status: 'unavailable', reason: 'Verificar medidas con el profesional' })
+    expect(JSON.stringify(family)).not.toContain('Obesidad')
+    expect(family.weightKg).toBe(9)
+    expect(synthetic.results.find(result => result.indicator === WhoIndicator.BMI_FOR_AGE)).toMatchObject({ status: 'available', z: 37.89 })
+  })
+
+  it('withholds a legacy BMI snapshot that is missing a reliable Z instead of exposing its derived value', async () => {
+    const created = await createPatient(doctor, { name: 'BMI sin referencia', birthDate, sex: Gender.MALE })
+    const saved = await createVisit(doctor, created.id, { ...measurement, requestId: randomUUID() })
+    const broken = { ...saved, bmi: 80, results: saved.results.map(result => result.indicator === WhoIndicator.BMI_FOR_AGE ? { ...result, status: 'available', z: Number.NaN, classification: { name: 'Obesidad', tone: 'flag' }, reference: null } : result) } as typeof saved
+    const shared = shareableVisit(broken)
+    expect(shared.bmi).toBeNull()
+    expect(shared.results.find(result => result.indicator === WhoIndicator.BMI_FOR_AGE)).toMatchObject({ status: 'unavailable', reason: 'Verificar medidas con el profesional' })
+    expect(JSON.stringify(shared)).not.toContain('Obesidad')
+  })
 
   it('never projects an unapproved result even when a caller fabricates a different result status', async () => {
     const created = await createPatient(doctor, patientInput)

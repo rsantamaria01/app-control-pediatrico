@@ -51,4 +51,4 @@ export type VisitSnapshot = {
   parentAdvice?: string
   clinicianTrend?: string
 }
-export type ShareableVisit = Omit<VisitSnapshot, 'privateNote' | 'clinicianTrend'>
+export type ShareableVisit = Omit<VisitSnapshot, 'privateNote' | 'clinicianTrend' | 'bmi'> & { bmi: number | null }

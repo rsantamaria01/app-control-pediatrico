@@ -29,18 +29,154 @@ describe('deployment safety', () => {
     expect(new URL(child.url).password).toBe('part%3A%40%2F%3F%23%25%20with%20space')
   })
 
+  it('stops the worker before streaming the backup and requires a RustFS snapshot before migrating', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'pediatric-ops-'))
+    try {
+      const docker = join(dir, 'docker')
+      writeFileSync(docker, '#!/bin/sh\nprintf "%s\\n" "$*" >> "$CALL_LOG"\nif [ "$*" = "compose --profile full exec -T db pg_dump -U pediatrico -d pediatrico -Fc" ]; then printf archive; fi\n')
+      chmodSync(docker, 0o755)
+      const result = spawnSync('sh', ['scripts/upgrade.sh'], { cwd: root, env: { ...process.env, PATH: `${dir}:${process.env.PATH}`, CALL_LOG: join(dir, 'calls'), BACKUP_DIR: dir }, input: 'snapshot-verified\n', encoding: 'utf8' })
+      expect(result.status).toBe(0)
+      expect(readFileSync(join(dir, 'calls'), 'utf8').trim().split('\n')).toEqual([
+        'compose --profile full build app ops',
+        'compose --profile full stop app',
+        'compose --profile full ps --status running -q app',
+        'compose --profile full exec -T db pg_dump -U pediatrico -d pediatrico -Fc',
+        'compose --profile full exec -T db pg_restore --list',
+        'compose --profile full run --rm ops db:migrate',
+        'compose --profile full up -d --no-build'
+      ])
+      expect(result.stdout).not.toContain('archive')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('does not migrate when confirmation is incorrect', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'pediatric-ops-'))
+    try {
+      const docker = join(dir, 'docker')
+      writeFileSync(docker, '#!/bin/sh\nprintf "%s\\n" "$*" >> "$CALL_LOG"\nif [ "$*" = "compose --profile full exec -T db pg_dump -U pediatrico -d pediatrico -Fc" ]; then printf archive; fi\n')
+      chmodSync(docker, 0o755)
+      const result = spawnSync('sh', ['scripts/upgrade.sh'], { cwd: root, env: { ...process.env, PATH: `${dir}:${process.env.PATH}`, CALL_LOG: join(dir, 'calls'), BACKUP_DIR: dir }, input: 'no\n', encoding: 'utf8' })
+      expect(result.status).not.toBe(0)
+      expect(readFileSync(join(dir, 'calls'), 'utf8')).not.toContain('run --rm ops')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('keeps the app stopped when RustFS snapshot confirmation is missing', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'pediatric-ops-'))
+    try {
+      const docker = join(dir, 'docker')
+      writeFileSync(docker, '#!/bin/sh\nprintf "%s\\n" "$*" >> "$CALL_LOG"\nif [ "$*" = "compose --profile full exec -T db pg_dump -U pediatrico -d pediatrico -Fc" ]; then printf archive; fi\n')
+      chmodSync(docker, 0o755)
+      const result = spawnSync('sh', ['scripts/upgrade.sh'], { cwd: root, env: { ...process.env, PATH: `${dir}:${process.env.PATH}`, CALL_LOG: join(dir, 'calls'), BACKUP_DIR: dir }, input: '', encoding: 'utf8' })
+      expect(result.status).not.toBe(0)
+      expect(readFileSync(join(dir, 'calls'), 'utf8').trim().split('\n')).toEqual([
+        'compose --profile full build app ops',
+        'compose --profile full stop app',
+        'compose --profile full ps --status running -q app',
+        'compose --profile full exec -T db pg_dump -U pediatrico -d pediatrico -Fc',
+        'compose --profile full exec -T db pg_restore --list'
+      ])
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('rejects an invalid database archive before allowing migration', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'pediatric-ops-'))
+    try {
+      const docker = join(dir, 'docker')
+      writeFileSync(docker, '#!/bin/sh\nprintf "%s\\n" "$*" >> "$CALL_LOG"\nif [ "$*" = "compose --profile full exec -T db pg_dump -U pediatrico -d pediatrico -Fc" ]; then printf archive; fi\nif [ "$*" = "compose --profile full exec -T db pg_restore --list" ]; then exit 22; fi\n')
+      chmodSync(docker, 0o755)
+      const result = spawnSync('sh', ['scripts/upgrade.sh'], { cwd: root, env: { ...process.env, PATH: `${dir}:${process.env.PATH}`, CALL_LOG: join(dir, 'calls'), BACKUP_DIR: dir }, input: 'snapshot-verified\n', encoding: 'utf8' })
+      expect(result.status).not.toBe(0)
+      expect(readFileSync(join(dir, 'calls'), 'utf8').trim().split('\n')).toEqual([
+        'compose --profile full build app ops',
+        'compose --profile full stop app',
+        'compose --profile full ps --status running -q app',
+        'compose --profile full exec -T db pg_dump -U pediatrico -d pediatrico -Fc',
+        'compose --profile full exec -T db pg_restore --list'
+      ])
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('does not migrate when the database backup stream fails', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'pediatric-ops-'))
+    try {
+      const docker = join(dir, 'docker')
+      writeFileSync(docker, '#!/bin/sh\nprintf "%s\\n" "$*" >> "$CALL_LOG"\nif [ "$*" = "compose --profile full exec -T db pg_dump -U pediatrico -d pediatrico -Fc" ]; then exit 21; fi\n')
+      chmodSync(docker, 0o755)
+      const result = spawnSync('sh', ['scripts/upgrade.sh'], { cwd: root, env: { ...process.env, PATH: `${dir}:${process.env.PATH}`, CALL_LOG: join(dir, 'calls'), BACKUP_DIR: dir }, input: 'snapshot-verified\n', encoding: 'utf8' })
+      expect(result.status).not.toBe(0)
+      expect(readFileSync(join(dir, 'calls'), 'utf8').trim().split('\n')).toEqual([
+        'compose --profile full build app ops',
+        'compose --profile full stop app',
+        'compose --profile full ps --status running -q app',
+        'compose --profile full exec -T db pg_dump -U pediatrico -d pediatrico -Fc'
+      ])
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('does not overwrite an existing backup when retrying an upgrade', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'pediatric-ops-'))
+    try {
+      writeFileSync(join(dir, 'clinic.dump'), 'previous backup')
+      const docker = join(dir, 'docker')
+      writeFileSync(docker, '#!/bin/sh\nprintf "%s\\n" "$*" >> "$CALL_LOG"\n')
+      chmodSync(docker, 0o755)
+      const result = spawnSync('sh', ['scripts/upgrade.sh'], { cwd: root, env: { ...process.env, PATH: `${dir}:${process.env.PATH}`, CALL_LOG: join(dir, 'calls'), BACKUP_DIR: dir }, input: 'snapshot-verified\n', encoding: 'utf8' })
+      expect(result.status).not.toBe(0)
+      expect(readFileSync(join(dir, 'clinic.dump'), 'utf8')).toBe('previous backup')
+      expect(readFileSync(join(dir, 'calls'), 'utf8').trim().split('\n')).toEqual([
+        'compose --profile full build app ops',
+        'compose --profile full stop app',
+        'compose --profile full ps --status running -q app'
+      ])
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('does not migrate if backup destination is missing', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'pediatric-ops-'))
+    try {
+      const docker = join(dir, 'docker')
+      writeFileSync(docker, '#!/bin/sh\nprintf "%s\\n" "$*" >> "$CALL_LOG"\n')
+      chmodSync(docker, 0o755)
+      const result = spawnSync('sh', ['scripts/upgrade.sh'], { cwd: root, env: { ...process.env, PATH: `${dir}:${process.env.PATH}`, CALL_LOG: join(dir, 'calls'), BACKUP_DIR: join(dir, 'absent') }, encoding: 'utf8' })
+      expect(result.status).not.toBe(0)
+      expect(readFileSync(join(dir, 'calls'), 'utf8').trim().split('\n')).toEqual([
+        'compose --profile full build app ops',
+        'compose --profile full stop app',
+        'compose --profile full ps --status running -q app'
+      ])
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
   it('does not start the app when migration fails after it stops serving', () => {
     const dir = mkdtempSync(join(tmpdir(), 'pediatric-ops-'))
     try {
       const docker = join(dir, 'docker')
-      writeFileSync(docker, '#!/bin/sh\nprintf "%s\\n" "$*" >> "$CALL_LOG"\nif [ "$*" = "compose --profile full run --rm ops db:migrate" ]; then exit 13; fi\n')
+      writeFileSync(docker, '#!/bin/sh\nprintf "%s\\n" "$*" >> "$CALL_LOG"\nif [ "$*" = "compose --profile full exec -T db pg_dump -U pediatrico -d pediatrico -Fc" ]; then printf archive; fi\nif [ "$*" = "compose --profile full run --rm ops db:migrate" ]; then exit 13; fi\n')
       chmodSync(docker, 0o755)
-      const result = spawnSync('sh', ['scripts/upgrade.sh'], { cwd: root, env: { ...process.env, PATH: `${dir}:${process.env.PATH}`, CALL_LOG: join(dir, 'calls') }, encoding: 'utf8' })
+      const result = spawnSync('sh', ['scripts/upgrade.sh'], { cwd: root, env: { ...process.env, PATH: `${dir}:${process.env.PATH}`, CALL_LOG: join(dir, 'calls'), BACKUP_DIR: dir }, input: 'snapshot-verified\n', encoding: 'utf8' })
       expect(result.status).toBe(13)
       expect(readFileSync(join(dir, 'calls'), 'utf8').trim().split('\n')).toEqual([
         'compose --profile full build app ops',
         'compose --profile full stop app',
         'compose --profile full ps --status running -q app',
+        'compose --profile full exec -T db pg_dump -U pediatrico -d pediatrico -Fc',
+        'compose --profile full exec -T db pg_restore --list',
         'compose --profile full run --rm ops db:migrate'
       ])
     } finally {
@@ -145,13 +281,15 @@ describe('deployment safety', () => {
     const dir = mkdtempSync(join(tmpdir(), 'pediatric-ops-'))
     try {
       const docker = join(dir, 'docker')
-      writeFileSync(docker, '#!/bin/sh\nprintf "%s\\n" "$*" >> "$CALL_LOG"\n')
+      writeFileSync(docker, '#!/bin/sh\nprintf "%s\\n" "$*" >> "$CALL_LOG"\nif [ "$*" = "compose --profile full exec -T db pg_dump -U pediatrico -d pediatrico -Fc" ]; then printf archive; fi\n')
       chmodSync(docker, 0o755)
-      execFileSync('sh', ['scripts/upgrade.sh'], { cwd: root, env: { ...process.env, PATH: `${dir}:${process.env.PATH}`, CALL_LOG: join(dir, 'calls') } })
+      execFileSync('sh', ['scripts/upgrade.sh'], { cwd: root, env: { ...process.env, PATH: `${dir}:${process.env.PATH}`, CALL_LOG: join(dir, 'calls'), BACKUP_DIR: dir }, input: 'snapshot-verified\n' })
       expect(readFileSync(join(dir, 'calls'), 'utf8').trim().split('\n')).toEqual([
         'compose --profile full build app ops',
         'compose --profile full stop app',
         'compose --profile full ps --status running -q app',
+        'compose --profile full exec -T db pg_dump -U pediatrico -d pediatrico -Fc',
+        'compose --profile full exec -T db pg_restore --list',
         'compose --profile full run --rm ops db:migrate',
         'compose --profile full up -d --no-build'
       ])

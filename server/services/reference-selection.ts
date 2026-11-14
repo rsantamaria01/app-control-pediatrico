@@ -71,14 +71,14 @@ export async function selectReference(input: ReferenceInput): Promise<ReferenceS
   const unavailable = (unavailableReason: string) => ({ unavailableReason })
   const { birthDate, measuredAt, gestationDays, correctionUntilMonths = 24, timeZone = 'America/Guayaquil', measuredLengthHeightCm, position, indicator, sex } = input
   if (!(birthDate instanceof Date) || !(measuredAt instanceof Date) || !Number.isFinite(birthDate.getTime()) || !Number.isFinite(measuredAt.getTime())
-    || birthDate.getTime() > measuredAt.getTime() || birthDate.getTime() % dayMs !== 0
+    || birthDate.getTime() % dayMs !== 0
     || !Number.isFinite(measuredLengthHeightCm) || measuredLengthHeightCm <= 0
     || !Object.values(Gender).includes(sex) || !Object.values(WhoIndicator).includes(indicator)
     || (position !== 'RECUMBENT' && position !== 'STANDING')
     || (correctionUntilMonths !== 24 && correctionUntilMonths !== 36)
     || (gestationDays !== undefined && (!Number.isInteger(gestationDays) || gestationDays <= 0 || gestationDays > 280))
     || (correctionUntilMonths === 36 && (gestationDays === undefined || gestationDays >= 196))
-    || typeof timeZone !== 'string' || !/^[A-Za-z_]+(?:\/[A-Za-z_]+)+$/.test(timeZone)) return unavailable('Invalid reference input')
+    || typeof timeZone !== 'string' || timeZone.length === 0 || timeZone.length > 128) return unavailable('Invalid reference input')
 
   let formatter: Intl.DateTimeFormat
   try {

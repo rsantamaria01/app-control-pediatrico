@@ -24,7 +24,7 @@ describe('reference selection input and age limits', () => {
   })
 
   it('rejects invalid clinic IANA time zones without querying WHO tables', async () => {
-    for (const timeZone of ['', 'Mars/Olympus', '../America/Guayaquil']) unavailable(await selectReference({ ...input, timeZone }))
+    for (const timeZone of ['', 'Mars/Olympus', '../America/Guayaquil', 'America/Guayaquil\u0000', 'America/Guayaquil'.repeat(20)]) unavailable(await selectReference({ ...input, timeZone }))
   })
 
   it('accepts valid multi-part IANA clinic zones before checking for a missing WHO release', async () => {

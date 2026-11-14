@@ -119,6 +119,14 @@ describe('sealed WHO release reference selection', () => {
     await unavailable({ ...base, measuredAt: new Date('2024-01-01T04:59:59Z') })
   })
 
+  it('accepts a first-day Tokyo measurement whose UTC instant precedes the date-only birth encoding', async () => {
+    const tokyoBirth = new Date('2024-01-02T00:00:00Z')
+    const measuredAt = new Date('2024-01-01T18:00:00Z')
+    const result = await available({ ...base, birthDate: tokyoBirth, measuredAt, timeZone: 'Asia/Tokyo' })
+    expect(result).toMatchObject({ birthDate: tokyoBirth, measuredAt, chronologicalAgeDays: 0, referenceAgeDays: 0, x: 0, timeZone: 'Asia/Tokyo' })
+    await unavailable({ ...base, birthDate: tokyoBirth, measuredAt: new Date('2024-01-01T14:59:59Z'), timeZone: 'Asia/Tokyo' })
+  })
+
   it('honors an explicitly selected IANA clinic zone rather than the deployment or process UTC zone', async () => {
     const instant = new Date('2024-01-03T04:30:00Z')
     const ecuador = await available({ ...base, measuredAt: instant })
@@ -127,6 +135,12 @@ describe('sealed WHO release reference selection', () => {
     expect(ecuador).toMatchObject({ chronologicalAgeDays: 1, x: 1, timeZone: 'America/Guayaquil' })
     expect(newYork).toMatchObject({ chronologicalAgeDays: 1, x: 1, timeZone: 'America/New_York' })
     expect(tokyo).toMatchObject({ chronologicalAgeDays: 2, x: 2, timeZone: 'Asia/Tokyo' })
+  })
+
+  it('uses valid hyphenated IANA zones to select the correct local WHO age without losing provenance', async () => {
+    const instant = new Date('2024-01-03T04:30:00Z')
+    const result = await available({ ...base, measuredAt: instant, timeZone: 'America/Port-au-Prince' })
+    expect(result).toMatchObject({ measuredAt: instant, timeZone: 'America/Port-au-Prince', chronologicalAgeDays: 1, referenceAgeDays: 1, x: 1 })
   })
 
   it('chooses the 730/731 position table across clinic-local midnight, not UTC midnight', async () => {

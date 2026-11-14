@@ -17,6 +17,7 @@ type ReferenceInput = {
   measuredAt: Date
   gestationDays?: number
   correctionUntilMonths?: 24 | 36
+  timeZone?: string
   measuredLengthHeightCm: number
   position: Position
   indicator: WhoIndicator
@@ -45,9 +46,18 @@ export type ReferenceSelection = {
   gestationDays: number | null
   prematurityDays: number
   correctionUntilMonths: 24 | 36
+  timeZone: string
   xUnit: WhoXUnit
   x: number
   lms: { l: number, m: number, s: number }
+}
+
+function calendarDay(date: Date, formatter: Intl.DateTimeFormat): number {
+  const parts = formatter.formatToParts(date)
+  const year = Number(parts.find(part => part.type === 'year')!.value)
+  const month = Number(parts.find(part => part.type === 'month')!.value)
+  const day = Number(parts.find(part => part.type === 'day')!.value)
+  return Date.UTC(year, month - 1, day)
 }
 
 function anniversary(date: Date, months: number): Date {
@@ -59,20 +69,29 @@ function anniversary(date: Date, months: number): Date {
 
 export async function selectReference(input: ReferenceInput): Promise<ReferenceSelection | { unavailableReason: string }> {
   const unavailable = (unavailableReason: string) => ({ unavailableReason })
-  const { birthDate, measuredAt, gestationDays, correctionUntilMonths = 24, measuredLengthHeightCm, position, indicator, sex } = input
+  const { birthDate, measuredAt, gestationDays, correctionUntilMonths = 24, timeZone = 'America/Guayaquil', measuredLengthHeightCm, position, indicator, sex } = input
   if (!(birthDate instanceof Date) || !(measuredAt instanceof Date) || !Number.isFinite(birthDate.getTime()) || !Number.isFinite(measuredAt.getTime())
-    || birthDate.getTime() > measuredAt.getTime()
+    || birthDate.getTime() > measuredAt.getTime() || birthDate.getTime() % dayMs !== 0
     || !Number.isFinite(measuredLengthHeightCm) || measuredLengthHeightCm <= 0
     || !Object.values(Gender).includes(sex) || !Object.values(WhoIndicator).includes(indicator)
     || (position !== 'RECUMBENT' && position !== 'STANDING')
     || (correctionUntilMonths !== 24 && correctionUntilMonths !== 36)
     || (gestationDays !== undefined && (!Number.isInteger(gestationDays) || gestationDays <= 0 || gestationDays > 280))
-    || (correctionUntilMonths === 36 && (gestationDays === undefined || gestationDays >= 196))) return unavailable('Invalid reference input')
+    || (correctionUntilMonths === 36 && (gestationDays === undefined || gestationDays >= 196))
+    || typeof timeZone !== 'string' || !/^[A-Za-z_]+(?:\/[A-Za-z_]+)+$/.test(timeZone)) return unavailable('Invalid reference input')
 
+  let formatter: Intl.DateTimeFormat
+  try {
+    formatter = new Intl.DateTimeFormat('en-US', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' })
+  } catch (error) {
+    if (error instanceof RangeError) return unavailable('Invalid reference input')
+    throw error
+  }
   const birthDay = Date.UTC(birthDate.getUTCFullYear(), birthDate.getUTCMonth(), birthDate.getUTCDate())
-  const measurementDay = Date.UTC(measuredAt.getUTCFullYear(), measuredAt.getUTCMonth(), measuredAt.getUTCDate())
+  const measurementDay = calendarDay(measuredAt, formatter)
+  if (measurementDay < birthDay) return unavailable('Invalid reference input')
   const chronologicalAgeDays = (measurementDay - birthDay) / dayMs
-  if (chronologicalAgeDays > 1856) return unavailable('WHO 2007 reference unavailable')
+  if (measurementDay >= anniversary(birthDate, 60).getTime() || chronologicalAgeDays > 1856) return unavailable('WHO 2007 reference unavailable')
   const prematurityDays = gestationDays === undefined || gestationDays >= 259 ? 0 : 280 - gestationDays
   const isCorrected = prematurityDays > 0 && measurementDay <= anniversary(birthDate, correctionUntilMonths).getTime()
   const referenceAgeDays = chronologicalAgeDays - (isCorrected ? prematurityDays : 0)
@@ -110,7 +129,7 @@ export async function selectReference(input: ReferenceInput): Promise<ReferenceS
       indicator, sex, birthDate: new Date(birthDate), measuredAt: new Date(measuredAt), measuredLengthHeightCm,
       position, adjustedLengthHeightCm, adjustmentCm, referencePosition: rowPosition,
       ageBasis: isCorrected ? 'CORRECTED' : 'CHRONOLOGICAL', chronologicalAgeDays, referenceAgeDays,
-      gestationDays: gestationDays ?? null, prematurityDays, correctionUntilMonths, xUnit, x, lms
+      gestationDays: gestationDays ?? null, prematurityDays, correctionUntilMonths, timeZone, xUnit, x, lms
     }
   } finally {
     await pool.end()

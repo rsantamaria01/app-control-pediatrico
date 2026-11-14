@@ -61,7 +61,7 @@ afterAll(async () => {
 })
 
 const birthDate = new Date('2024-01-01T00:00:00Z')
-const at = (days: number) => new Date(birthDate.getTime() + days * 86400000)
+const at = (days: number) => new Date(birthDate.getTime() + days * 86400000 + 12 * 3600000)
 const base = { birthDate, measuredAt: at(0), measuredLengthHeightCm: 50, position: 'RECUMBENT' as const, indicator: WhoIndicator.HEIGHT_FOR_AGE, sex: Gender.MALE }
 
 async function available(input: Parameters<typeof selectReference>[0]) {
@@ -75,21 +75,84 @@ async function unavailable(input: Parameters<typeof selectReference>[0]) {
 }
 
 describe('sealed WHO release reference selection', () => {
-  it('pins birth, day 730/731 and 1856 edges to the exact dated sex and position dataset', async () => {
-    for (const [day, position] of [[0, 'RECUMBENT'], [730, 'RECUMBENT'], [731, 'STANDING'], [1856, 'STANDING']] as const) {
+  it('pins birth and day 730/731 to the exact dated sex and position dataset', async () => {
+    for (const [day, position] of [[0, 'RECUMBENT'], [730, 'RECUMBENT'], [731, 'STANDING']] as const) {
       const result = await available({ ...base, measuredAt: at(day), measuredLengthHeightCm: day ? 85 : 50, position })
       expect(result).toMatchObject({ standard: 'WHO_2006', version: manifest.version, indicator: WhoIndicator.HEIGHT_FOR_AGE, sex: Gender.MALE, referencePosition: position, ageBasis: 'CHRONOLOGICAL', chronologicalAgeDays: day, referenceAgeDays: day, xUnit: 'DAY', x: day, adjustmentCm: 0 })
       expect(result.datasetId).toHaveLength(64)
       expect(result.lms.m).toBeGreaterThan(0)
     }
-    await unavailable({ ...base, measuredAt: at(1857) })
-    await unavailable({ ...base, measuredAt: new Date('2029-02-01T00:00:00Z') })
   })
 
-  it('uses the UTC calendar day for a dated measurement with a time, retaining the original instant', async () => {
-    const instant = new Date('2024-01-02T18:30:00Z')
+  it('stops WHO 2006 at the fifth calendar birthday despite an existing day-1856 workbook row', async () => {
+    const eligible = await available({ ...base, measuredAt: new Date('2028-12-31T17:00:00Z'), measuredLengthHeightCm: 105, position: 'STANDING' })
+    expect(eligible).toMatchObject({ chronologicalAgeDays: 1826, x: 1826, referencePosition: 'STANDING' })
+    const previousLocalEvening = await available({ ...base, measuredAt: new Date('2029-01-01T04:59:59Z'), measuredLengthHeightCm: 105, position: 'STANDING' })
+    expect(previousLocalEvening).toMatchObject({ chronologicalAgeDays: 1826, x: 1826 })
+    await unavailable({ ...base, measuredAt: new Date('2029-01-01T05:00:00Z'), measuredLengthHeightCm: 105, position: 'STANDING' })
+    await unavailable({ ...base, measuredAt: at(1856), measuredLengthHeightCm: 105, position: 'STANDING' })
+    await unavailable({ ...base, measuredAt: at(1857), measuredLengthHeightCm: 105, position: 'STANDING' })
+  })
+
+  it('uses fifth calendar birthdays for leap-day births and preserves sub-five day-count coverage', async () => {
+    const leapBirth = new Date('2024-02-29T00:00:00Z')
+    const before = await available({ ...base, birthDate: leapBirth, measuredAt: new Date('2029-02-27T17:00:00Z'), measuredLengthHeightCm: 105, position: 'STANDING' })
+    expect(before).toMatchObject({ chronologicalAgeDays: 1825, x: 1825 })
+    const finalEvening = await available({ ...base, birthDate: leapBirth, measuredAt: new Date('2029-02-28T04:59:59Z'), measuredLengthHeightCm: 105, position: 'STANDING' })
+    expect(finalEvening).toMatchObject({ chronologicalAgeDays: 1825, x: 1825 })
+    await unavailable({ ...base, birthDate: leapBirth, measuredAt: new Date('2029-02-28T05:00:00Z'), measuredLengthHeightCm: 105, position: 'STANDING' })
+  })
+
+  it('uses the clinic-local calendar day for a measurement instant and retains the original instant', async () => {
+    const beforeMidnight = new Date('2024-01-03T04:59:59Z')
+    const prior = await available({ ...base, measuredAt: beforeMidnight })
+    expect(prior).toMatchObject({ measuredAt: beforeMidnight, chronologicalAgeDays: 1, referenceAgeDays: 1, x: 1 })
+    const atMidnight = new Date('2024-01-03T05:00:00Z')
+    const next = await available({ ...base, measuredAt: atMidnight })
+    expect(next).toMatchObject({ measuredAt: atMidnight, chronologicalAgeDays: 2, referenceAgeDays: 2, x: 2 })
+  })
+
+  it('interprets birthDate as a date-only value, not as an instant shifted into the clinic zone', async () => {
+    const instant = new Date('2024-01-01T05:00:00Z')
     const result = await available({ ...base, measuredAt: instant })
-    expect(result).toMatchObject({ measuredAt: instant, chronologicalAgeDays: 1, referenceAgeDays: 1, x: 1 })
+    expect(result).toMatchObject({ birthDate, measuredAt: instant, chronologicalAgeDays: 0, referenceAgeDays: 0, x: 0 })
+    await unavailable({ ...base, measuredAt: new Date('2024-01-01T04:59:59Z') })
+  })
+
+  it('honors an explicitly selected IANA clinic zone rather than the deployment or process UTC zone', async () => {
+    const instant = new Date('2024-01-03T04:30:00Z')
+    const ecuador = await available({ ...base, measuredAt: instant })
+    const newYork = await available({ ...base, measuredAt: instant, timeZone: 'America/New_York' })
+    const tokyo = await available({ ...base, measuredAt: instant, timeZone: 'Asia/Tokyo' })
+    expect(ecuador).toMatchObject({ chronologicalAgeDays: 1, x: 1, timeZone: 'America/Guayaquil' })
+    expect(newYork).toMatchObject({ chronologicalAgeDays: 1, x: 1, timeZone: 'America/New_York' })
+    expect(tokyo).toMatchObject({ chronologicalAgeDays: 2, x: 2, timeZone: 'Asia/Tokyo' })
+  })
+
+  it('chooses the 730/731 position table across clinic-local midnight, not UTC midnight', async () => {
+    const before = await available({ ...base, measuredAt: new Date('2026-01-01T04:59:59Z'), measuredLengthHeightCm: 85, indicator: WhoIndicator.WEIGHT_FOR_LENGTH })
+    expect(before).toMatchObject({ chronologicalAgeDays: 730, referenceAgeDays: 730, referencePosition: 'RECUMBENT', x: 85 })
+    const after = await available({ ...base, measuredAt: new Date('2026-01-01T05:00:00Z'), measuredLengthHeightCm: 85, position: 'STANDING', indicator: WhoIndicator.WEIGHT_FOR_HEIGHT })
+    expect(after).toMatchObject({ chronologicalAgeDays: 731, referenceAgeDays: 731, referencePosition: 'STANDING', x: 85 })
+  })
+
+  it('changes correction eligibility only at local midnight after the 24/36-month anniversaries', async () => {
+    const corrected24 = await available({ ...base, measuredAt: new Date('2026-01-02T04:59:59Z'), gestationDays: 196, measuredLengthHeightCm: 85 })
+    expect(corrected24).toMatchObject({ chronologicalAgeDays: 731, referenceAgeDays: 647, ageBasis: 'CORRECTED' })
+    const expired24 = await available({ ...base, measuredAt: new Date('2026-01-02T05:00:00Z'), gestationDays: 196, measuredLengthHeightCm: 85 })
+    expect(expired24).toMatchObject({ chronologicalAgeDays: 732, referenceAgeDays: 732, ageBasis: 'CHRONOLOGICAL' })
+    const corrected36 = await available({ ...base, measuredAt: new Date('2027-01-02T04:59:59Z'), gestationDays: 195, correctionUntilMonths: 36, measuredLengthHeightCm: 90 })
+    expect(corrected36).toMatchObject({ chronologicalAgeDays: 1096, referenceAgeDays: 1011, ageBasis: 'CORRECTED' })
+    const expired36 = await available({ ...base, measuredAt: new Date('2027-01-02T05:00:00Z'), gestationDays: 195, correctionUntilMonths: 36, measuredLengthHeightCm: 90 })
+    expect(expired36).toMatchObject({ chronologicalAgeDays: 1097, referenceAgeDays: 1097, ageBasis: 'CHRONOLOGICAL' })
+  })
+
+  it('counts leap day in local calendar age rather than truncating elapsed hours', async () => {
+    const leapBirth = new Date('2024-02-28T00:00:00Z')
+    const result = await available({ ...base, birthDate: leapBirth, measuredAt: new Date('2024-03-01T04:59:59Z') })
+    expect(result).toMatchObject({ chronologicalAgeDays: 1, referenceAgeDays: 1, x: 1 })
+    const next = await available({ ...base, birthDate: leapBirth, measuredAt: new Date('2024-03-01T05:00:00Z') })
+    expect(next).toMatchObject({ chronologicalAgeDays: 2, referenceAgeDays: 2, x: 2 })
   })
 
   it('selects WFL before day 731 and WFH from day 731, never crossing position-specific x ranges', async () => {
@@ -128,10 +191,10 @@ describe('sealed WHO release reference selection', () => {
   })
 
   it('corrects gestational age until the chronological 24-month anniversary, or 36 only when selected for extreme prematurity', async () => {
-    const before24 = new Date('2025-12-31T00:00:00Z')
-    const at24 = new Date('2026-01-01T00:00:00Z')
-    const at36 = new Date('2027-01-01T00:00:00Z')
-    const after36 = new Date('2027-01-02T00:00:00Z')
+    const before24 = new Date('2025-12-31T12:00:00Z')
+    const at24 = new Date('2026-01-01T12:00:00Z')
+    const at36 = new Date('2027-01-01T12:00:00Z')
+    const after36 = new Date('2027-01-02T12:00:00Z')
     const corrected = await available({ ...base, measuredAt: before24, gestationDays: 196, measuredLengthHeightCm: 85 })
     expect(corrected).toMatchObject({ ageBasis: 'CORRECTED', gestationDays: 196, prematurityDays: 84, chronologicalAgeDays: 730, referenceAgeDays: 646, x: 646, referencePosition: 'RECUMBENT' })
     expect(Math.abs(correctZ({ ...corrected.lms, value: 85 }) - (-0.12))).toBeLessThan(0.011)
@@ -141,7 +204,7 @@ describe('sealed WHO release reference selection', () => {
     const correctedWfl = await available({ ...base, measuredAt: at24, gestationDays: 196, measuredLengthHeightCm: 85, indicator: WhoIndicator.WEIGHT_FOR_LENGTH })
     expect(correctedWfl).toMatchObject({ referenceAgeDays: 647, chronologicalAgeDays: 731, x: 85, xUnit: 'CM', referencePosition: 'RECUMBENT' })
     await unavailable({ ...base, measuredAt: at24, gestationDays: 196, measuredLengthHeightCm: 85, indicator: WhoIndicator.WEIGHT_FOR_HEIGHT })
-    const expired = await available({ ...base, measuredAt: new Date('2026-01-02T00:00:00Z'), gestationDays: 196, measuredLengthHeightCm: 85 })
+    const expired = await available({ ...base, measuredAt: new Date('2026-01-02T12:00:00Z'), gestationDays: 196, measuredLengthHeightCm: 85 })
     expect(expired).toMatchObject({ ageBasis: 'CHRONOLOGICAL', referenceAgeDays: 732, referencePosition: 'STANDING' })
     const extended = await available({ ...base, measuredAt: at36, gestationDays: 195, correctionUntilMonths: 36, measuredLengthHeightCm: 90 })
     expect(extended).toMatchObject({ ageBasis: 'CORRECTED', gestationDays: 195, prematurityDays: 85, chronologicalAgeDays: 1096, referenceAgeDays: 1011, correctionUntilMonths: 36, referencePosition: 'STANDING', adjustedLengthHeightCm: 89.3 })

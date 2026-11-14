@@ -11,7 +11,7 @@ function unavailable(result: Awaited<ReturnType<typeof selectReference>>) {
 
 describe('reference selection input and age limits', () => {
   it('rejects invalid and reversed dates before touching the database', async () => {
-    for (const dates of [{ birthDate: new Date('invalid') }, { measuredAt: new Date('2023-12-31T00:00:00Z') }]) unavailable(await selectReference({ ...input, ...dates }))
+    for (const dates of [{ birthDate: new Date('invalid') }, { measuredAt: new Date('2023-12-31T00:00:00Z') }, { birthDate: new Date('2024-01-01T12:00:00Z'), measuredAt: new Date('2024-01-02T12:00:00Z') }]) unavailable(await selectReference({ ...input, ...dates }))
   })
 
   it('rejects missing and implausible gestation for explicit extension, and correction before birth', async () => {
@@ -21,6 +21,14 @@ describe('reference selection input and age limits', () => {
   it('rejects out-of-scope ages even if corrected age would fit WHO 2006', async () => {
     unavailable(await selectReference({ ...input, measuredAt: new Date('2029-02-01T00:00:00Z'), gestationDays: 190 }))
     unavailable(await selectReference({ ...input, measuredAt: new Date('2029-02-01T00:00:00Z') }))
+  })
+
+  it('rejects invalid clinic IANA time zones without querying WHO tables', async () => {
+    for (const timeZone of ['', 'Mars/Olympus', '../America/Guayaquil']) unavailable(await selectReference({ ...input, timeZone }))
+  })
+
+  it('accepts valid multi-part IANA clinic zones before checking for a missing WHO release', async () => {
+    unavailable(await selectReference({ ...input, timeZone: 'America/Argentina/Buenos_Aires' }))
   })
 
   it('rejects invalid measurements, sex, position and indicator', async () => {

@@ -32,7 +32,8 @@ services:
       target: ops
     profiles: ["full"]
     restart: "no"
-    entrypoint: ["node", "scripts/database-env.mjs", "pnpm", "run"]
+    volumes:
+      - who-source:/who-source
     env_file:
       - path: .env
         required: false
@@ -83,3 +84,4 @@ volumes:
   db-data: {}
   cache-data: {}
   storage-data: {}
+  who-source: {}

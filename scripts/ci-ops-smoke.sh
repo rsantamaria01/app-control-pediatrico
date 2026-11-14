@@ -73,6 +73,10 @@ case "$output" in
   *EROFS*|*'Read-only file system'*) fail OFFLINE_READ_ONLY ;;
   *SyntaxError*) fail OFFLINE_SYNTAX_ERROR ;;
   *'connect '*|*'Connection '*|*'connection '*) fail OFFLINE_CONNECTION_OTHER ;;
+  *'applying migrations'*) fail OFFLINE_MIGRATION_STARTED ;;
+  *"Using 'pg' driver"*) fail OFFLINE_DRIVER_LOADED ;;
+  *'Reading config file'*) fail OFFLINE_CONFIG_LOADED ;;
+  *'No config path provided'*) fail OFFLINE_NO_CONFIG_LOADED ;;
   *) fail OFFLINE_RUNTIME_OTHER ;;
 esac
 phase=who-gate

@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import ExcelJS from 'exceljs'
-import { and, eq, isNull } from 'drizzle-orm'
+import { and, eq, isNull, sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/node-postgres'
 import { Pool } from 'pg'
 import { Gender, WhoIndicator } from '../../shared/utils/enums.ts'
@@ -90,26 +90,68 @@ function database() {
   return { pool, db: drizzle(pool) }
 }
 
-export async function importWhoDataset(source: VerifiedSource, rows: WhoRow[]): Promise<DatasetId> {
+async function verifiedEntry(source: VerifiedSource, rows: WhoRow[]) {
   const ordered = validateWhoDataset(source, rows)
   const original = await parseWhoWorkbook(source, source.bytes)
   if (original.some((row, index) => JSON.stringify(row) !== JSON.stringify(ordered[index]))) throw new Error('WHO rows differ from pinned source workbook')
   const id = createHash('sha256').update([source.standard, source.version, source.indicator, source.sex, source.url, source.sha256].join('|')).digest('hex') as DatasetId
+  return { source, rows: ordered, id }
+}
+
+type VerifiedEntry = Awaited<ReturnType<typeof verifiedEntry>>
+
+async function insertEntry(tx: Parameters<Parameters<ReturnType<typeof drizzle>['transaction']>[0]>[0], entry: VerifiedEntry) {
+  const { source, rows, id } = entry
+  const inserted = await tx.insert(whoDataset).values({ id, publisher: source.publisher, standard: source.standard,
+    version: source.version, publicationDate: source.publicationDate, retrievedAt: source.retrievedAt,
+    sourceUrl: source.url, sha256: source.sha256, indicator: source.indicator, sex: source.sex,
+    position: source.position, xUnit: source.xUnit, minX: String(source.minX), maxX: String(source.maxX),
+    rowCount: rows.length }).onConflictDoNothing().returning({ id: whoDataset.id })
+  if (inserted.length === 0) throw new Error('WHO dataset already imported; versions are immutable')
+  for (let start = 0; start < rows.length; start += 250) {
+    await tx.insert(whoReferenceRow).values(rows.slice(start, start + 250).map(row => ({ datasetId: id, ...row, x: String(row.x), l: String(row.l), m: String(row.m), s: String(row.s),
+      sdNeg3: String(row.sdNeg3), sdNeg2: String(row.sdNeg2), sdNeg1: String(row.sdNeg1), sd0: String(row.sd0), sd1: String(row.sd1), sd2: String(row.sd2), sd3: String(row.sd3) })))
+  }
+  await tx.update(whoDataset).set({ sealed: true }).where(eq(whoDataset.id, id))
+}
+
+export async function importWhoDataset(source: VerifiedSource, rows: WhoRow[]): Promise<DatasetId> {
+  const entry = await verifiedEntry(source, rows)
+  const { db, pool } = database()
+  try {
+    await db.transaction(async tx => insertEntry(tx, entry))
+    return entry.id
+  } finally {
+    await pool.end()
+  }
+}
+
+export async function importWhoRelease(entries: { source: VerifiedSource, rows: WhoRow[] }[]): Promise<DatasetId[]> {
+  if (entries.length !== manifest.files.length || new Set(entries.map(entry => `${entry.source.indicator}:${entry.source.sex}`)).size !== manifest.files.length) throw new Error('Incomplete WHO release')
+  const verified = await Promise.all(entries.map(entry => verifiedEntry(entry.source, entry.rows)))
   const { db, pool } = database()
   try {
     await db.transaction(async (tx) => {
-      const inserted = await tx.insert(whoDataset).values({ id, publisher: source.publisher, standard: source.standard,
-        version: source.version, publicationDate: source.publicationDate, retrievedAt: source.retrievedAt,
-        sourceUrl: source.url, sha256: source.sha256, indicator: source.indicator, sex: source.sex,
-        position: source.position, xUnit: source.xUnit, minX: String(source.minX), maxX: String(source.maxX),
-        rowCount: ordered.length }).onConflictDoNothing().returning({ id: whoDataset.id })
-      if (inserted.length === 0) throw new Error('WHO dataset already imported; versions are immutable')
-      for (let start = 0; start < ordered.length; start += 250) {
-        await tx.insert(whoReferenceRow).values(ordered.slice(start, start + 250).map(row => ({ datasetId: id, ...row, x: String(row.x), l: String(row.l), m: String(row.m), s: String(row.s),
-          sdNeg3: String(row.sdNeg3), sdNeg2: String(row.sdNeg2), sdNeg1: String(row.sdNeg1), sd0: String(row.sd0), sd1: String(row.sd1), sd2: String(row.sd2), sd3: String(row.sd3) })))
+      for (const entry of verified) {
+        const [existing] = await tx.select().from(whoDataset).where(eq(whoDataset.id, entry.id))
+        if (!existing) {
+          await insertEntry(tx, entry)
+          continue
+        }
+        if (!existing.sealed || existing.version !== entry.source.version || existing.sha256 !== entry.source.sha256
+          || existing.sourceUrl !== entry.source.url || existing.publicationDate !== entry.source.publicationDate
+          || existing.retrievedAt !== entry.source.retrievedAt || existing.indicator !== entry.source.indicator
+          || existing.sex !== entry.source.sex || existing.position !== entry.source.position || existing.xUnit !== entry.source.xUnit
+          || Number(existing.minX) !== entry.source.minX || Number(existing.maxX) !== entry.source.maxX || existing.rowCount !== entry.rows.length) throw new Error('Existing WHO dataset does not match pinned release')
+        const saved = await tx.select().from(whoReferenceRow).where(eq(whoReferenceRow.datasetId, entry.id)).orderBy(whoReferenceRow.x)
+        if (saved.length !== entry.rows.length || saved.some((row, index) => {
+          const expected = entry.rows[index]!
+          return row.indicator !== expected.indicator || row.sex !== expected.sex || row.position !== expected.position || row.xUnit !== expected.xUnit
+            || Number(row.x) !== expected.x || ['l', 'm', 's', 'sdNeg3', 'sdNeg2', 'sdNeg1', 'sd0', 'sd1', 'sd2', 'sd3'].some(key => Number(row[key as keyof typeof row]) !== expected[key as keyof WhoRow])
+        })) throw new Error('Existing WHO rows do not match pinned release')
       }
     })
-    return id
+    return verified.map(entry => entry.id)
   } finally {
     await pool.end()
   }
@@ -120,7 +162,10 @@ export async function getWhoRows(datasetId: DatasetId, indicator: WhoIndicator, 
   const { db, pool } = database()
   try {
     const [dataset] = await db.select().from(whoDataset).where(eq(whoDataset.id, datasetId))
-    if (!dataset || dataset.standard !== 'WHO_2006' || dataset.indicator !== indicator || dataset.sex !== sex) return []
+    if (!dataset || !dataset.sealed || dataset.standard !== 'WHO_2006' || dataset.indicator !== indicator || dataset.sex !== sex) return []
+    const release = await db.select({ indicator: whoDataset.indicator, sex: whoDataset.sex, sourceUrl: whoDataset.sourceUrl, sha256: whoDataset.sha256, sealed: whoDataset.sealed, rowCount: whoDataset.rowCount,
+      actualCount: sql<number>`(SELECT count(*)::integer FROM who_reference_row WHERE dataset_id = ${whoDataset.id})` }).from(whoDataset).where(eq(whoDataset.version, dataset.version))
+    if (release.length !== manifest.files.length || release.some(entry => !entry.sealed || entry.rowCount !== entry.actualCount || !manifest.files.some(file => file.indicator === entry.indicator && file.sex === entry.sex && file.url === entry.sourceUrl && file.sha256 === entry.sha256))) return []
     const records = await db.select().from(whoReferenceRow).where(and(eq(whoReferenceRow.datasetId, datasetId), eq(whoReferenceRow.indicator, indicator), eq(whoReferenceRow.sex, sex), position === null ? isNull(whoReferenceRow.position) : eq(whoReferenceRow.position, position))).orderBy(whoReferenceRow.x)
     return records.map(row => ({ indicator: row.indicator as WhoIndicator, sex: row.sex as Gender, position: row.position as WhoPosition, xUnit: row.xUnit as WhoXUnit,
       x: Number(row.x), l: Number(row.l), m: Number(row.m), s: Number(row.s), sdNeg3: Number(row.sdNeg3), sdNeg2: Number(row.sdNeg2), sdNeg1: Number(row.sdNeg1),

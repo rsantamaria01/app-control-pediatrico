@@ -119,6 +119,7 @@ export const whoDataset = pgTable('who_dataset', {
   minX: numeric('min_x').notNull(),
   maxX: numeric('max_x').notNull(),
   rowCount: integer('row_count').notNull(),
+  sealed: boolean('sealed').notNull().default(false),
   importedAt: timestamp('imported_at').notNull().defaultNow()
 }, table => [
   uniqueIndex('who_dataset_release_idx').on(table.version, table.indicator, table.sex, table.sourceUrl),

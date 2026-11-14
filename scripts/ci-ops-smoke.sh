@@ -61,11 +61,10 @@ case "$output" in
   *'docker: Error'*|*'Error response from daemon'*|*'Cannot connect to the Docker daemon'*) fail OFFLINE_DOCKER_ERROR ;;
   *'Cannot find module'*|*MODULE_NOT_FOUND*|*ERR_MODULE_NOT_FOUND*) fail OFFLINE_MODULE_NOT_FOUND ;;
   *'Cannot find package'*|*'Cannot resolve'*|*'Failed to resolve'*) fail OFFLINE_DEPENDENCY_ERROR ;;
-  *'server/db/migrations/meta/_journal.json'*|*'server/db/migrations/'*) fail OFFLINE_PATH_MIGRATION_FILE ;;
-  *'scripts/database-env.mjs'*|*'scripts/ops.mjs'*) fail OFFLINE_PATH_LAUNCHER ;;
-  *'drizzle.config.ts'*) fail OFFLINE_PATH_CONFIG ;;
-  *'server/db/schema.ts'*) fail OFFLINE_PATH_SCHEMA ;;
-  *ENOENT*"/app/"*|*'No such file or directory'*"/app/"*) fail OFFLINE_PATH_OTHER_APP ;;
+  *"Error: ENOENT: no such file or directory, open "*) fail OFFLINE_ENOENT_OPEN ;;
+  *"Error: ENOENT: no such file or directory, mkdir "*) fail OFFLINE_ENOENT_MKDIR ;;
+  *"Error: ENOENT: no such file or directory, stat "*) fail OFFLINE_ENOENT_STAT ;;
+  *"Error: ENOENT"*) fail OFFLINE_ENOENT_OTHER ;;
   *"/tmp/"*|*"/root/"*) fail OFFLINE_PATH_TMP ;;
   *ENOENT*|*'No such file or directory'*) fail OFFLINE_PATH_OTHER ;;
   *'Database credentials are missing'*|*'DATABASE_URL required'*|*'dbCredentials'*) fail OFFLINE_DB_CONFIG_ERROR ;;

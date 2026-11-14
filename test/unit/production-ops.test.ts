@@ -53,7 +53,7 @@ describe('production operations', () => {
     expect(content).not.toMatch(/\*'No config path provided'\*\|/)
     expect(content).not.toMatch(/\*"\/app\/"\*\|\*"'\.\/server\/"\*/)
     for (const code of ['OFFLINE_ENOENT_OPEN', 'OFFLINE_ENOENT_MKDIR', 'OFFLINE_ENOENT_STAT', 'OFFLINE_ENOENT_OTHER']) expect(content).toContain(code)
-    for (const code of ['OFFLINE_NO_CONFIG_LOADED', 'OFFLINE_CONFIG_LOADED', 'OFFLINE_DRIVER_LOADED', 'OFFLINE_MIGRATION_STARTED']) expect(content).toContain(code)
+    for (const code of ['OFFLINE_NO_CONFIG_LOADED', 'OFFLINE_CONFIG_LOADED', 'OFFLINE_DRIVER_LOADED', 'OFFLINE_MIGRATION_STARTED', 'OFFLINE_PG_TIMEOUT', 'OFFLINE_PG_REFUSED']) expect(content).toContain(code)
     expect(content).not.toMatch(/\*'drizzle\.config\.ts'\*\) fail OFFLINE_PATH_CONFIG/)
     for (const code of ['OFFLINE_DOCKER_ERROR', 'OFFLINE_DEPENDENCY_ERROR', 'OFFLINE_PATH_TMP', 'OFFLINE_PATH_OTHER', 'OFFLINE_DB_CONFIG_ERROR', 'OFFLINE_RUNTIME_TYPE_ERROR']) expect(content).toContain(code)
     expect(content).toMatch(/ops-smoke failed phase=%s code=%s/)

@@ -72,6 +72,8 @@ case "$output" in
   *'Cannot find config file'*) fail OFFLINE_MISSING_CONFIG ;;
   *EROFS*|*'Read-only file system'*) fail OFFLINE_READ_ONLY ;;
   *SyntaxError*) fail OFFLINE_SYNTAX_ERROR ;;
+  *ETIMEDOUT*|*'timeout expired'*) fail OFFLINE_PG_TIMEOUT ;;
+  *'connection refused'*|*'ECONNREFUSED'*) fail OFFLINE_PG_REFUSED ;;
   *'connect '*|*'Connection '*|*'connection '*) fail OFFLINE_CONNECTION_OTHER ;;
   *'applying migrations'*) fail OFFLINE_MIGRATION_STARTED ;;
   *"Using 'pg' driver"*) fail OFFLINE_DRIVER_LOADED ;;

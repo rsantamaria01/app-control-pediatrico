@@ -11,6 +11,7 @@ import { selectReference } from '../../server/services/reference-selection'
 import { Gender, WhoIndicator } from '../../shared/utils/enums'
 import type { VerifiedSource } from '../../shared/types/who'
 import { correctZ } from '../../shared/utils/zscore'
+import { calculateGrowth } from '../../shared/utils/growth-result'
 
 const configured = process.env.WHO_TEST_DATABASE_URL
 if (!configured || !['/pediatrico_who_slice3_test', '/pediatrico_who_slice3_verify', '/pediatrico_who_slice3_guard', '/pediatrico_who_slice3_sealed_test'].includes(new URL(configured).pathname) || configured === process.env.DATABASE_URL) throw new Error('Dedicated WHO test database required')
@@ -258,6 +259,58 @@ describe('sealed WHO release reference selection', () => {
       const result = await available({ ...base, measuredAt: at(case_.day), sex: case_.sex, indicator: case_.indicator, measuredLengthHeightCm: case_.cm, position: case_.day > 730 ? 'STANDING' : 'RECUMBENT' })
       expect(Math.abs(correctZ({ ...result.lms, value: case_.value }) - case_.z)).toBeLessThan(0.011)
       expect(result.sex).toBe(case_.sex)
+    }
+  })
+
+  it('compares sealed selected WHO 2006 WFA rows against independent WHO percentile expanded tables', async () => {
+    for (const case_ of [
+      { sex: Gender.MALE, day: 0, weight: 2.048, percentile: 0.1, z: -3.09 },
+      { sex: Gender.MALE, day: 0, weight: 2.331, percentile: 1, z: -2.33 },
+      { sex: Gender.MALE, day: 0, weight: 3.346, percentile: 50, z: 0 },
+      { sex: Gender.MALE, day: 0, weight: 4.613, percentile: 99, z: 2.33 },
+      { sex: Gender.MALE, day: 0, weight: 5.088, percentile: 99.9, z: 3.09 },
+      { sex: Gender.MALE, day: 365, weight: 7.465, percentile: 1, z: -2.33 },
+      { sex: Gender.MALE, day: 365, weight: 9.646, percentile: 50, z: 0 },
+      { sex: Gender.MALE, day: 365, weight: 12.412, percentile: 99, z: 2.33 },
+      { sex: Gender.MALE, day: 365, weight: 13.471, percentile: 99.9, z: 3.10 },
+      { sex: Gender.FEMALE, day: 365, weight: 6.779, percentile: 1, z: -2.33 },
+      { sex: Gender.FEMALE, day: 365, weight: 8.946, percentile: 50, z: 0 },
+      { sex: Gender.FEMALE, day: 365, weight: 12.003, percentile: 99, z: 2.33 },
+      { sex: Gender.FEMALE, day: 365, weight: 13.272, percentile: 99.9, z: 3.10 }
+    ]) {
+      const reference = await available({ ...base, measuredAt: at(case_.day), measuredLengthHeightCm: 75, sex: case_.sex, indicator: WhoIndicator.WEIGHT_FOR_AGE })
+      const growth = calculateGrowth({ sex: case_.sex, weightKg: case_.weight, lengthHeightCm: 75 }, reference)
+      expect(growth.status).toBe('available')
+      if (growth.status === 'available') {
+        expect(Math.abs(growth.z - case_.z)).toBeLessThan(0.011)
+        expect(growth.percentile).not.toBeNull()
+        expect(Math.abs(growth.percentile! - case_.percentile)).toBeLessThan(case_.percentile === 50 ? 0.04 : 0.08)
+      }
+    }
+  })
+
+  it('matches WHO percentile P0.1 table bounds for an extreme negative Anthro Z', async () => {
+    const reference = await available({ ...base, measuredAt: at(1800), measuredLengthHeightCm: 110, position: 'STANDING', sex: Gender.FEMALE, indicator: WhoIndicator.WEIGHT_FOR_AGE })
+    const officialP01WeightKg = 11.835
+    const growth = calculateGrowth({ sex: Gender.FEMALE, weightKg: 5, lengthHeightCm: 110 }, reference)
+    expect(growth.status).toBe('available')
+    if (growth.status === 'available') {
+      expect(Math.abs(growth.z - (-7.17))).toBeLessThan(0.011)
+      expect(growth.percentile).toBeNull()
+      expect(growth.z).toBeLessThan(-3.09)
+      expect(5).toBeLessThan(officialP01WeightKg)
+    }
+  })
+
+  it('keeps extreme Anthro Z and bounds percentile outside the official percentile table coverage', async () => {
+    const reference = await available({ ...base, measuredAt: at(365), measuredLengthHeightCm: 75, indicator: WhoIndicator.WEIGHT_FOR_AGE })
+    const officialP999WeightKg = 13.471
+    const growth = calculateGrowth({ sex: Gender.MALE, weightKg: 22, lengthHeightCm: 75 }, reference)
+    expect(growth.status).toBe('available')
+    if (growth.status === 'available') {
+      expect(Math.abs(growth.z - 9.38)).toBeLessThan(0.011)
+      expect(22).toBeGreaterThan(officialP999WeightKg)
+      expect(growth.percentile).toBeNull()
     }
   })
 

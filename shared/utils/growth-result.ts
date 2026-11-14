@@ -17,8 +17,9 @@ const numberFormat = new Intl.NumberFormat('es-EC', { minimumFractionDigits: 2, 
 const tailFormat = new Intl.NumberFormat('es-EC', { minimumSignificantDigits: 2, maximumSignificantDigits: 2, useGrouping: false })
 const upperTailFormat = new Intl.NumberFormat('es-EC', { minimumFractionDigits: 5, maximumFractionDigits: 5, useGrouping: false })
 
-export function formatGrowthValues(z: number, percentile: number): string {
+export function formatGrowthValues(z: number, percentile: number | null): string {
   const signedZ = z < 0 ? `−${numberFormat.format(-z)}` : `+${numberFormat.format(z)}`
+  if (percentile === null) return `Z ${signedZ} · percentil ${z < 0 ? '<0,00001' : '>99,99999'}`
   let percentileValue = numberFormat.format(percentile)
   if (percentile < 0.01) percentileValue = tailFormat.format(percentile)
   if (percentile > 99.99) percentileValue = upperTailFormat.format(percentile)
@@ -61,8 +62,8 @@ export function calculateGrowth(input: MeasurementInput, selectedReference: Refe
   if (value === undefined || !Number.isFinite(value) || value <= 0) return unavailable('Invalid measurement')
   const z = correctZ({ value, ...ref.lms })
   if (!Number.isFinite(z)) return unavailable('Invalid growth result')
-  const percentile = normalCdf(z) * 100
-  if (!Number.isFinite(percentile) || percentile <= 0 || percentile >= 100) return unavailable('Percentile outside verified range')
+  const percentileValue = normalCdf(z) * 100
+  const percentile = percentileValue < 0.00001 || percentileValue > 99.99999 ? null : percentileValue
   const { datasetId, standard, version, publicationDate, sourceUrl, sha256, ageBasis, chronologicalAgeDays, referenceAgeDays,
     x, xUnit, adjustmentCm, referencePosition, position, gestationDays, prematurityDays } = ref
   return Object.freeze({ status: 'available', indicator: ref.indicator, sex: ref.sex, z, percentile,

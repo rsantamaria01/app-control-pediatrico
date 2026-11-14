@@ -16,7 +16,7 @@ export type GrowthResult = { status: 'unavailable', reason: string } | {
   indicator: WhoIndicator
   sex: Gender
   z: number
-  percentile: number
+  percentile: number | null
   classification: ClinicalLabel
   reference: GrowthProvenance
 }

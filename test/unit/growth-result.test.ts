@@ -37,8 +37,7 @@ describe('pure growth result', () => {
     [2, 97.7249868052, 0.00002], [-2, 2.2750131948, 0.00002],
     [3, 99.8650101968, 0.00002], [-3, 0.1349898032, 0.00002],
     [4, 99.9968328759, 0.00002], [-4, 0.0031671241, 0.00002],
-    [5, 99.9999713348, 0.00002], [-5, 0.0000286652, 0.00002],
-    [5.4, 99.999996667955, 0.000005], [-7.17, 0.000000000037, 0.000000000005]
+    [5, 99.9999713348, 0.00002], [-5, 0.0000286652, 0.00002]
   ])('matches independently computed R pnorm at Z %s including extreme tails', (z, expected, tolerance) => {
     const result = calculateGrowth({ ...input, weightKg: 10 + z }, selected)
     expect(result.status).toBe('available')
@@ -83,6 +82,35 @@ describe('pure growth result', () => {
     expect(formatGrowthValues(2.62, 99.56)).toBe('Z +2,62 · percentil 99,56')
     expect(formatGrowthValues(-4, 0.003167)).toBe('Z −4,00 · percentil 0,0032')
     expect(formatGrowthValues(5, 99.999971)).toBe('Z +5,00 · percentil 99,99997')
+    expect(formatGrowthValues(5.4, null)).toBe('Z +5,40 · percentil >99,99999')
+  })
+
+  it.each([
+    [5.4, 'Z +5,40 · percentil >99,99999'],
+    [9.38, 'Z +9,38 · percentil >99,99999'],
+    [-7.17, 'Z −7,17 · percentil <0,00001']
+  ])('keeps Z %s available but bounds unrepresentable tail percentiles', (z, expected) => {
+    const result = calculateGrowth({ ...input, weightKg: 10 + z }, selected)
+    expect(result.status).toBe('available')
+    if (result.status === 'available') {
+      expect(result.z).toBeCloseTo(z, 10)
+      expect(result.percentile).toBeNull()
+      expect(formatGrowthValues(result.z, result.percentile)).toBe(expected)
+      expect(familyGrowthCopy(result, 'La doctora')).toBe(`Peso: fuera del rango esperado · ${expected}. La doctora lo revisará con usted.`)
+    }
+  })
+
+  it('does not report a numeric percentile for extreme-tail results even if CDF loses all floating precision', () => {
+    const high = calculateGrowth({ ...input, weightKg: 22 }, selected)
+    const low = calculateGrowth({ ...input, weightKg: 0.1 }, selected)
+    expect(high.status).toBe('available')
+    expect(low.status).toBe('available')
+    if (high.status === 'available' && low.status === 'available') {
+      expect(high.percentile).toBeNull()
+      expect(low.percentile).toBeNull()
+      expect(formatGrowthValues(high.z, high.percentile)).toContain('percentil >99,99999')
+      expect(formatGrowthValues(low.z, low.percentile)).toContain('percentil <0,00001')
+    }
   })
 
   it('centralizes C10 family copy without clinical labels and reassures outside ±2 only', () => {

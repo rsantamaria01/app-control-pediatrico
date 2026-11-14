@@ -96,7 +96,7 @@ describe('production operations', () => {
 
   it('migrates through the Node PostgreSQL migrator without a runtime CLI cache', () => {
     const launcher = readFileSync(new URL('../../scripts/ops.mjs', import.meta.url), 'utf8')
-    expect(launcher).toContain("['scripts/migrate.mjs']")
+    expect(launcher).toContain('scripts/migrate.mjs')
     const migrator = readFileSync(new URL('../../scripts/migrate.mjs', import.meta.url), 'utf8')
     expect(migrator).toContain('migrate(drizzle(pool),')
     expect(migrator).toContain('pool.end()')

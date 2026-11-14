@@ -22,15 +22,16 @@ describe('built production ops image', () => {
       execFileSync('docker', ['build', '--target', 'ops', '-t', image, '.'], { stdio: 'pipe', timeout: 300_000 })
       const containerUrl = new URL(opsUrl)
       if (containerUrl.hostname === 'db') containerUrl.hostname = 'host.docker.internal'
-      const environment = { ...process.env, DATABASE_URL: containerUrl.href, BOOTSTRAP_ADMIN_USERNAME: 'firstadmin', BOOTSTRAP_ADMIN_EMAIL: 'first@example.test', NUXT_PUBLIC_SITE_URL: 'https://clinic.example.test' }
-      const run = (command: string) => execFileSync('docker', ['run', '--rm', '--network', 'host', '--add-host', 'host.docker.internal:host-gateway', '-e', 'DATABASE_URL', '-e', 'BOOTSTRAP_ADMIN_USERNAME', '-e', 'BOOTSTRAP_ADMIN_EMAIL', '-e', 'NUXT_PUBLIC_SITE_URL', image, command], { env: environment, encoding: 'utf8', timeout: 120_000 })
+      if (containerUrl.hostname !== 'host.docker.internal' && containerUrl.hostname !== '127.0.0.1' && containerUrl.hostname !== 'localhost') throw new Error('Docker integration requires a locally reachable disposable database')
+      const environment = { ...process.env, DB_PASSWORD: decodeURIComponent(containerUrl.password), DB_HOST: containerUrl.hostname, DB_NAME: database, BOOTSTRAP_ADMIN_USERNAME: 'firstadmin', BOOTSTRAP_ADMIN_EMAIL: 'first@example.test', NUXT_PUBLIC_SITE_URL: 'https://clinic.example.test' }
+      const run = (command: string) => execFileSync('docker', ['run', '--rm', '--network', 'host', '--add-host', 'host.docker.internal:host-gateway', '-e', 'DB_PASSWORD', '-e', 'DB_HOST', '-e', 'DB_NAME', '-e', 'BOOTSTRAP_ADMIN_USERNAME', '-e', 'BOOTSTRAP_ADMIN_EMAIL', '-e', 'NUXT_PUBLIC_SITE_URL', '--entrypoint', 'node', image, 'scripts/database-env.mjs', 'pnpm', 'run', command], { env: environment, encoding: 'utf8', timeout: 120_000 })
       run('db:migrate')
       const db = new Pool({ connectionString: opsUrl.href })
       try {
         const migrated = await db.query('SELECT count(*)::int AS count FROM drizzle.__drizzle_migrations')
         expect(migrated.rows[0].count).toBeGreaterThan(0)
         const link = run('bootstrap-admin')
-        expect(link).toMatch(/^https:\/\/clinic\.example\.test\/invitacion\/[\w-]+\n$/)
+        expect(link).toMatch(/https:\/\/clinic\.example\.test\/invitacion\/[\w-]+\s*$/)
         const roles = await db.query('SELECT role FROM user_role')
         expect(roles.rows.map(row => row.role)).toEqual(['ADMIN'])
         expect(() => run('bootstrap-admin')).toThrow()

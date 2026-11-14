@@ -49,6 +49,7 @@ export default defineNitroPlugin((nitroApp) => {
         if (!schemaMissing) console.error(JSON.stringify({ event: 'recovery_worker_failed', errorClass: 'schema not migrated' }))
         schemaMissing = true
       } else {
+        schemaMissing = false
         console.error(JSON.stringify({ event: 'recovery_worker_failed', errorClass: 'WorkerError' }))
       }
     } finally {

@@ -24,6 +24,7 @@ describe('production operations', () => {
     expect(ops).toContain('ENTRYPOINT ["pnpm", "run"]')
     expect(ops).toContain('CMD ["db:migrate"]')
     expect(app).toContain('/app/.output')
+    expect(app).toContain('scripts/database-env.mjs')
     expect(app).not.toContain('node_modules')
     expect(scripts['bootstrap-admin']).toBeTruthy()
   })
@@ -52,6 +53,30 @@ describe('recovery worker before migrations', () => {
       expect(reconcileRecoveryJobs).toHaveBeenCalledTimes(2)
       expect(processRecoveryJobs).toHaveBeenCalled()
       expect(logger.mock.calls[0]?.[0]).toContain('WorkerError')
+    } finally {
+      await hooks.hook.mock.calls[0]?.[1]()
+      logger.mockRestore()
+      vi.useRealTimers()
+      vi.clearAllMocks()
+    }
+  })
+
+  it('logs missing schema again after a different worker failure', async () => {
+    vi.useFakeTimers()
+    const logger = vi.spyOn(console, 'error').mockImplementation(() => {})
+    vi.mocked(acquireRecoveryWorker).mockResolvedValue({ isActive: vi.fn().mockResolvedValue(true), release: vi.fn() })
+    vi.mocked(reconcileRecoveryJobs).mockRejectedValueOnce(Object.assign(new Error('missing table'), { code: '42P01' }))
+      .mockRejectedValueOnce(new Error('connection reset'))
+      .mockRejectedValueOnce(Object.assign(new Error('missing table again'), { code: '42P01' }))
+    const hooks = { hook: vi.fn() }
+    try {
+      recoveryPlugin({ hooks } as never)
+      await vi.advanceTimersByTimeAsync(5500)
+      expect(logger.mock.calls.map(call => JSON.parse(call[0]))).toEqual([
+        { event: 'recovery_worker_failed', errorClass: 'schema not migrated' },
+        { event: 'recovery_worker_failed', errorClass: 'WorkerError' },
+        { event: 'recovery_worker_failed', errorClass: 'schema not migrated' }
+      ])
     } finally {
       await hooks.hook.mock.calls[0]?.[1]()
       logger.mockRestore()

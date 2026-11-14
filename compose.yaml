@@ -10,7 +10,9 @@ services:
       - path: .env
         required: false
     environment:
-      DATABASE_URL: postgres://pediatrico:${DB_PASSWORD:-pediatrico}@db:5432/pediatrico
+      DB_PASSWORD: ${DB_PASSWORD:-pediatrico}
+      DB_HOST: db
+      DB_NAME: pediatrico
       REDIS_URL: redis://cache:6379
       S3_ENDPOINT: http://storage:9000
       S3_BUCKET: pediatrico
@@ -30,11 +32,14 @@ services:
       target: ops
     profiles: ["full"]
     restart: "no"
+    entrypoint: ["node", "scripts/database-env.mjs", "pnpm", "run"]
     env_file:
       - path: .env
         required: false
     environment:
-      DATABASE_URL: postgres://pediatrico:${DB_PASSWORD:-pediatrico}@db:5432/pediatrico
+      DB_PASSWORD: ${DB_PASSWORD:-pediatrico}
+      DB_HOST: db
+      DB_NAME: pediatrico
     depends_on:
       db: { condition: service_healthy }
 

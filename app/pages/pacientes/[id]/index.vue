@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { PatientView, VisitSnapshot } from '#shared/types/measurement'
+import { ecuadorIdSchema } from '#shared/types/patient-registration'
 import { formatGrowthValues } from '#shared/utils/growth-result'
 import type { WhoIndicator } from '#shared/utils/enums'
 
@@ -16,6 +17,33 @@ function guardianLabel(status: string) {
   return status === 'ACTIVE' ? 'Activo' : status === 'PENDING' ? 'Pendiente de activación' : 'Sin invitar'
 }
 const shareError = ref('')
+const patientWarning = ref('')
+onMounted(() => {
+  patientWarning.value = sessionStorage.getItem(`patient-contact-warning-${id}`) ?? ''
+  sessionStorage.removeItem(`patient-contact-warning-${id}`)
+})
+const identity = ref('')
+const identityError = ref('')
+const history = reactive({ gestationWeeks: undefined as number | undefined, gestationExtraDays: 0, birthWeightKg: undefined as number | undefined, birthLengthCm: undefined as number | undefined, birthHeadCircumferenceCm: undefined as number | undefined, perinatalNotes: '', correctionUntilMonths: 24 as 24 | 36 })
+const historyError = ref('')
+async function saveIdentity() {
+  identityError.value = ''
+  if (!ecuadorIdSchema.safeParse(identity.value).success) {
+    identityError.value = 'Cédula ecuatoriana inválida'
+    return
+  }
+  try {
+    await $fetch(`/api/pacientes/${encodeURIComponent(id)}/cedula`, { method: 'PATCH', body: { nationalId: identity.value } })
+    await refresh()
+  } catch { identityError.value = 'No se pudo guardar la cédula; revise si ya existe otra ficha.' }
+}
+async function saveHistory() {
+  historyError.value = ''
+  try {
+    await $fetch(`/api/pacientes/${encodeURIComponent(id)}/antecedentes`, { method: 'PATCH', body: { ...(history.gestationWeeks !== undefined ? { gestationDays: history.gestationWeeks * 7 + history.gestationExtraDays } : {}), ...(history.birthWeightKg !== undefined ? { birthWeightKg: history.birthWeightKg } : {}), ...(history.birthLengthCm !== undefined ? { birthLengthCm: history.birthLengthCm } : {}), ...(history.birthHeadCircumferenceCm !== undefined ? { birthHeadCircumferenceCm: history.birthHeadCircumferenceCm } : {}), ...(history.perinatalNotes ? { perinatalNotes: history.perinatalNotes } : {}), correctionUntilMonths: history.correctionUntilMonths } })
+    await refresh()
+  } catch { historyError.value = 'No se pudieron guardar los antecedentes. Revise las medidas y la edad gestacional.' }
+}
 async function changeSharing(visitId: string, shared: boolean) {
   shareError.value = ''
   try {
@@ -85,6 +113,118 @@ const dateFormat = new Intl.DateTimeFormat('es-EC', { day: 'numeric', month: 'sh
           </UButton>
         </div>
       </div>
+      <UAlert
+        v-if="patientWarning"
+        color="warning"
+        variant="soft"
+        :description="patientWarning"
+      />
+      <UCard class="space-y-4">
+        <h2 class="font-semibold">
+          Identificación y antecedentes perinatales
+        </h2>
+        <p>Fecha de nacimiento: {{ data.patient.birthDate }} · Cédula / NUI: {{ data.patient.nationalId ?? 'Sin registrar' }} · Historia clínica HSM: {{ data.patient.hsmRecord ?? 'Sin registrar' }}</p>
+        <p>{{ data.patient.gestationDays === undefined ? 'Edad gestacional sin registrar · se considera a término hasta que se registre' : `Edad gestacional: ${Math.floor(data.patient.gestationDays / 7)} semanas y ${data.patient.gestationDays % 7} días` }}</p>
+        <p v-if="data.patient.perinatalNotes">
+          {{ data.patient.perinatalNotes }}
+        </p>
+        <form
+          v-if="!data.patient.nationalId"
+          class="flex flex-wrap items-end gap-3"
+          @submit.prevent="saveIdentity"
+        >
+          <UFormField label="Agregar cédula / NUI">
+            <UInput
+              v-model="identity"
+              inputmode="numeric"
+              maxlength="10"
+            />
+          </UFormField>
+          <UButton
+            type="submit"
+            class="min-h-11"
+          >
+            Guardar cédula
+          </UButton>
+        </form>
+        <UAlert
+          v-if="identityError"
+          color="error"
+          variant="soft"
+          :description="identityError"
+        />
+        <form
+          class="space-y-3"
+          @submit.prevent="saveHistory"
+        >
+          <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <UFormField label="Edad gestacional (semanas)">
+              <UInputNumber
+                v-model="history.gestationWeeks"
+                :min="20"
+                :max="43"
+                class="w-full"
+              />
+            </UFormField>
+            <UFormField label="Días adicionales">
+              <UInputNumber
+                v-model="history.gestationExtraDays"
+                :min="0"
+                :max="6"
+                class="w-full"
+              />
+            </UFormField>
+            <UFormField label="Peso al nacer (kg)">
+              <UInputNumber
+                v-model="history.birthWeightKg"
+                :min="0.1"
+                :max="20"
+                class="w-full"
+              />
+            </UFormField>
+            <UFormField label="Talla al nacer (cm)">
+              <UInputNumber
+                v-model="history.birthLengthCm"
+                :min="0.1"
+                :max="80"
+                class="w-full"
+              />
+            </UFormField>
+            <UFormField label="Perímetro cefálico al nacer (cm)">
+              <UInputNumber
+                v-model="history.birthHeadCircumferenceCm"
+                :min="0.1"
+                :max="60"
+                class="w-full"
+              />
+            </UFormField>
+          </div>
+          <UFormField label="Notas perinatales">
+            <UTextarea
+              v-model="history.perinatalNotes"
+              class="w-full"
+            />
+          </UFormField>
+          <UCheckbox
+            :model-value="history.correctionUntilMonths === 36"
+            label="Prematuro extremo: corregir hasta 36 meses"
+            @update:model-value="history.correctionUntilMonths = $event ? 36 : 24"
+          />
+          <UButton
+            type="submit"
+            variant="outline"
+            class="min-h-11"
+          >
+            Guardar antecedentes
+          </UButton>
+        </form>
+        <UAlert
+          v-if="historyError"
+          color="error"
+          variant="soft"
+          :description="historyError"
+        />
+      </UCard>
       <UCard>
         <h2 class="font-semibold">
           Acceso familiar

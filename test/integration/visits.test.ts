@@ -8,7 +8,7 @@ import { eq } from 'drizzle-orm'
 import { Pool } from 'pg'
 import manifest from '../../scripts/who-2006-manifest.json'
 import { importWhoRelease, parseWhoWorkbook } from '../../server/services/who-import'
-import { createPatient, getPatient, listPatients } from '../../server/services/patients'
+import { createPatient, getPatient, listPatients, createQuickPatient, updatePatientBackground, updatePatientIdentity } from '../../server/services/patients'
 import { createVisit, getVisits, recalculateVisit, shareableVisit } from '../../server/services/visits'
 import { auditEvent, patient, visit, visitResult } from '../../server/db/schema'
 import type { VerifiedSource } from '../../shared/types/who'
@@ -98,6 +98,23 @@ describe('clinical patients and visits on a disposable WHO database', () => {
     expect(JSON.stringify(recalculated)).not.toContain('Confidencial clínico')
     expect((await db.select().from(auditEvent).where(eq(auditEvent.subjectId, created.id))).some(event => event.action === 'CLINICAL_RECALCULATE' && event.actorId === otherDoctor.id && event.outcome === 'ALLOWED')).toBe(true)
   }, 120000)
+
+  it('blocks duplicate cédulas, requires provisional confirmation and supports later ID and perinatal editing', async () => {
+    const contact = { name: 'Marta Pérez', phone: '0991234567', relationship: 'Madre', proof: 'Identidad verificada presencialmente', email: '', invite: false }
+    const input = { givenNames: 'José', surnames: 'Pérez', birthDate: '2024-01-01', sex: Gender.MALE, contacts: [contact] }
+    const first = await createQuickPatient(doctor, { ...input, nationalId: '1710034065' })
+    expect(first.patient).toMatchObject({ name: 'José Pérez', nationalId: '1710034065' })
+    await expect(createQuickPatient(doctor, { ...input, nationalId: '1710034065' })).rejects.toMatchObject({ statusCode: 409, data: { existingPatientId: first.patient.id } })
+    await expect(createQuickPatient(doctor, { ...input, givenNames: 'Jóse' })).rejects.toMatchObject({ statusCode: 409, data: { possibleMatches: expect.arrayContaining([expect.objectContaining({ id: first.patient.id })]) } })
+    const provisional = await createQuickPatient(doctor, { ...input, givenNames: 'Jóse', confirmPossibleMatches: true, hsmRecord: 'HSM 123' })
+    expect(provisional.patient.nationalId).toBeUndefined()
+    expect(provisional.patient.hsmRecord).toBe('HSM 123')
+    await expect(updatePatientIdentity(assistant, provisional.patient.id, '1710034065')).rejects.toThrow()
+    await expect(updatePatientIdentity(doctor, provisional.patient.id, '1710034065')).rejects.toMatchObject({ statusCode: 409 })
+    expect((await updatePatientBackground(doctor, provisional.patient.id, { gestationDays: 196, birthWeightKg: 2.1 })).gestationDays).toBe(196)
+    expect((await getPatient(doctor, provisional.patient.id)).birthWeightKg).toBe(2.1)
+    expect((await listPatients(doctor, 'jose')).some(row => row.id === first.patient.id)).toBe(true)
+  })
 
   it('rejects non-doctors, invalid birth/gestation and preserves doctor-wide access with read audit', async () => {
     await expect(createPatient(adminOnly, patientInput)).rejects.toThrow()

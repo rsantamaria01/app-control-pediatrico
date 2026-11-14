@@ -104,6 +104,31 @@ async function seedVisit(patientId: string, shareWithFamily = true) {
 }
 
 describe('verified guardian isolation', () => {
+  it('keeps a quick-created child after failed invitation, reuses one confirmed guardian for siblings, and sends later', async () => {
+    const { createQuickPatient } = await import('../../server/services/patients')
+    const { findGuardianIdentity, grantGuardian } = await import('../../server/services/invitations')
+    const email = `${randomUUID()}@example.test`
+    const phone = `09${randomUUID().replace(/\D/g, '').padEnd(8, '0').slice(0, 8)}`
+    const contact = { name: 'Familia Compartida', relationship: 'Madre', phone, email, proof: 'Documento comprobado presencialmente', invite: false }
+    const created = await createQuickPatient(doctor, { givenNames: 'Luz', surnames: 'Santamaría', birthDate: '2024-02-01', sex: 'FEMALE', contacts: [contact] })
+    expect(created.contacts[0]?.status).toBe('FAILED')
+    const [firstGrant] = await db.select().from(guardianGrant).where(eq(guardianGrant.patientId, created.patient.id))
+    expect(firstGrant?.status).toBe('FAILED')
+    const identity = await findGuardianIdentity(doctor, { email, phone })
+    expect(identity?.id).toBe(firstGrant?.guardianId)
+    const sibling = await createQuickPatient(doctor, { givenNames: 'Sol', surnames: 'Santamaría', birthDate: '2023-02-01', sex: 'MALE', contacts: [{ ...contact, confirmedGuardianId: identity!.id }] })
+    const [secondGrant] = await db.select().from(guardianGrant).where(eq(guardianGrant.patientId, sibling.patient.id))
+    expect(secondGrant?.guardianId).toBe(firstGrant?.guardianId)
+    expect(await db.select().from(user).where(eq(user.email, email))).toHaveLength(1)
+    failDelivery = true
+    try {
+      expect((await grantGuardian(doctor, created.patient.id, { name: contact.name, phone, email, relationship: 'Madre', proof: contact.proof, confirmedGuardianId: identity!.id })).status).toBe('FAILED')
+    } finally {
+      failDelivery = false
+    }
+    expect((await db.select().from(patient).where(eq(patient.id, created.patient.id))).length).toBe(1)
+    expect((await grantGuardian(doctor, created.patient.id, { name: contact.name, phone, email, relationship: 'Madre', proof: contact.proof, confirmedGuardianId: identity!.id })).status).toBe('PENDING')
+  })
   it('requires proof and staff authority, exposes only assistant-safe identity and invitation status', async () => {
     const { grantGuardian, listGrantCandidates } = await import('../../server/services/invitations')
     await expect(grantGuardian(adminActor, first, { name: 'Madre A', email: 'mother-a@example.test', proof: 'Documento verificado presencialmente' })).rejects.toThrow()

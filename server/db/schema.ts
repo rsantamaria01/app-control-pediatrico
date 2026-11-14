@@ -106,6 +106,11 @@ export const rateLimit = pgTable('rateLimit', {
 export const patient = pgTable('patient', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
+  givenNames: text('given_names'),
+  surnames: text('surnames'),
+  nationalId: text('national_id'),
+  hsmRecord: text('hsm_record'),
+  perinatalNotes: text('perinatal_notes'),
   birthDate: text('birth_date').notNull(),
   sex: text('sex').notNull(),
   gestationDays: integer('gestation_days'),
@@ -116,6 +121,8 @@ export const patient = pgTable('patient', {
   createdBy: text('created_by').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
 }, table => [
+  uniqueIndex('patient_national_id_idx').on(table.nationalId),
+  check('patient_national_id_ck', sql`${table.nationalId} IS NULL OR ${table.nationalId} ~ '^[0-9]{10}$'`),
   check('patient_sex_ck', sql`${table.sex} IN ('MALE', 'FEMALE')`),
   check('patient_correction_ck', sql`${table.correctionUntilMonths} IN (24, 36)`)
 ])

@@ -22,7 +22,8 @@ export const guardianContactSchema = z.strictObject({
   phone: z.string().transform(normalizeGuardianPhone).optional(),
   relationship: z.string().trim().min(2).max(80).optional(),
   proof: z.string().trim().min(8).max(500),
-  confirmedGuardianId: z.uuid().optional()
+  confirmedGuardianId: z.uuid().optional(),
+  deferDelivery: z.boolean().optional()
 }).refine(value => Boolean(value.email || value.phone), { message: 'Email or phone required' })
 export type GuardianContact = z.input<typeof guardianContactSchema>
 export type GuardianGrant = { patientId: string, status: 'PENDING' | 'ACTIVE' | 'FAILED', email: string | null }
@@ -197,9 +198,9 @@ export async function grantGuardian(actor: Actor, patientId: string, input: Guar
   }
   const id = matched?.id ?? randomUUID()
   const [existingCredential] = matched ? await db.select({ id: account.id }).from(account).where(and(eq(account.userId, matched.id), eq(account.providerId, 'credential'))) : []
-  const token = contact.email && !existingCredential ? randomBytes(32).toString('base64url') : null
+  const token = contact.email && !existingCredential && !contact.deferDelivery ? randomBytes(32).toString('base64url') : null
   const tokenId = token ? randomUUID() : null
-  const deliveryId = contact.email ? randomUUID() : null
+  const deliveryId = contact.email && !contact.deferDelivery ? randomUUID() : null
   const payload = contact.email ? encryptDelivery(JSON.stringify({ email: contact.email, token })) : null
   await db.transaction(async (tx) => {
     let owner = matched ? { id: matched.id } : undefined

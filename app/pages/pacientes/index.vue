@@ -2,6 +2,13 @@
 import type { PatientView } from '#shared/types/measurement'
 
 const query = ref('')
+const age = (birthDate: string) => {
+  const today = new Date()
+  const [year, month, day] = birthDate.split('-').map(Number)
+  const months = (today.getFullYear() - year!) * 12 + today.getMonth() + 1 - month! - (today.getDate() < day! ? 1 : 0)
+  return months < 12 ? `${months} meses` : `${Math.floor(months / 12)} años ${months % 12} meses`
+}
+const weight = new Intl.NumberFormat('es-EC', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const { data: patients, status, error, refresh } = await useFetch<PatientView[]>('/api/pacientes', { query: { q: query }, default: () => [] })
 </script>
 
@@ -25,13 +32,13 @@ const { data: patients, status, error, refresh } = await useFetch<PatientView[]>
       </UButton>
     </div>
     <UFormField
-      label="Buscar por nombre"
+      label="Buscar por nombre o identificación"
       name="search"
     >
       <UInput
         v-model="query"
         icon="i-lucide-search"
-        placeholder="Buscar paciente por nombre"
+        placeholder="Buscar por nombre o identificación"
         class="w-full"
         size="lg"
       />
@@ -63,6 +70,9 @@ const { data: patients, status, error, refresh } = await useFetch<PatientView[]>
       :actions="[{ label: 'Nuevo paciente', to: '/pacientes/nuevo' }]"
     />
     <UCard v-else>
+      <p class="mb-2 text-sm text-muted">
+        Orden A–Z
+      </p>
       <ul class="divide-y divide-default">
         <li
           v-for="person in patients"
@@ -73,11 +83,10 @@ const { data: patients, status, error, refresh } = await useFetch<PatientView[]>
             class="flex min-h-14 items-center gap-3 rounded-md px-2 py-3 hover:bg-elevated focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           >
             <UAvatar
-              :text="person.name.slice(0, 2).toUpperCase()"
+              :text="person.name.split(' ').map(part => part[0]).slice(0, 2).join('').toUpperCase()"
               size="md"
             />
-            <span class="min-w-0 flex-1 font-medium">{{ person.name }}</span>
-            <span class="text-sm text-muted">{{ person.sex === 'FEMALE' ? 'Niña' : 'Niño' }}</span>
+            <span class="min-w-0 flex-1"><span class="block truncate font-medium">{{ person.name }}</span><span class="block text-sm text-muted">{{ age(person.birthDate) }} · {{ person.lastWeightKg === undefined ? 'Sin peso registrado' : `${weight.format(person.lastWeightKg)} kg` }}</span></span>
             <UIcon
               name="i-lucide-chevron-right"
               aria-hidden="true"

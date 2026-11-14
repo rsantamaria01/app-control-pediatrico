@@ -71,6 +71,13 @@
       "when": 1794546130310,
       "tag": "0009_exotic_garia",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1794638577003,
+      "tag": "0010_lethal_shadowcat",
+      "breakpoints": true
     }
   ]
 }

@@ -34,6 +34,8 @@ cp .env.example .env   # set real passwords
 docker compose --profile full up -d --build
 ```
 
+See [deployment runbook](docs/deployment.md) for migrations, first-admin bootstrap, upgrades and backups.
+
 ## PWA
 Installable from the browser. Service workers need a secure context: `localhost` works
 (through the forwarded port); phones need HTTPS, which is added outside the app later.

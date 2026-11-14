@@ -6,8 +6,10 @@ export default defineNitroPlugin((nitroApp) => {
   let ready = false
   let release: (() => Promise<void>) | null = null
   let isActive: (() => Promise<boolean>) | null = null
+  let schemaMissing = false
+  let retryAt = 0
   const timer = setInterval(async () => {
-    if (running) return
+    if (running || Date.now() < retryAt) return
     running = true
     try {
       if (!ready) {
@@ -32,9 +34,23 @@ export default defineNitroPlugin((nitroApp) => {
         return
       }
       await processRecoveryJobs()
-    } catch {
+      schemaMissing = false
+    } catch (error) {
       ready = false
-      console.error(JSON.stringify({ event: 'recovery_worker_failed', errorClass: 'WorkerError' }))
+      let cause: unknown = error
+      const seen = new Set<unknown>()
+      while (cause && typeof cause === 'object' && !seen.has(cause)) {
+        seen.add(cause)
+        if ('code' in cause && cause.code === '42P01') break
+        cause = 'cause' in cause ? cause.cause : null
+      }
+      if (cause && typeof cause === 'object' && 'code' in cause && cause.code === '42P01') {
+        retryAt = Date.now() + 5000
+        if (!schemaMissing) console.error(JSON.stringify({ event: 'recovery_worker_failed', errorClass: 'schema not migrated' }))
+        schemaMissing = true
+      } else {
+        console.error(JSON.stringify({ event: 'recovery_worker_failed', errorClass: 'WorkerError' }))
+      }
     } finally {
       running = false
     }

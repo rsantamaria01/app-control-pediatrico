@@ -22,6 +22,21 @@ services:
       db: { condition: service_healthy }
       cache: { condition: service_healthy }
       storage: { condition: service_started }
+      ops: { condition: service_completed_successfully }
+
+  ops:
+    build:
+      context: .
+      target: ops
+    profiles: ["full"]
+    restart: "no"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgres://pediatrico:${DB_PASSWORD:-pediatrico}@db:5432/pediatrico
+    depends_on:
+      db: { condition: service_healthy }
 
   db:
     image: postgres:18-alpine

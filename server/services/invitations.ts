@@ -100,8 +100,10 @@ export async function processGuardianDelivery(id: string) {
     if (!row || row.state !== 'QUEUED' || !row.payload) return []
     const [owner] = await tx.select({ id: user.id }).from(user).where(eq(user.id, row.guardianId)).for('update')
     if (!owner) return []
-    const [link] = await tx.select({ status: guardianGrant.status }).from(guardianGrant).where(and(eq(guardianGrant.patientId, row.patientId), eq(guardianGrant.guardianId, row.guardianId)))
-    if (!link || link.status === 'REVOKED') {
+    const [link] = await tx.select({ status: guardianGrant.status, tokenId: guardianGrant.tokenId }).from(guardianGrant).where(and(eq(guardianGrant.patientId, row.patientId), eq(guardianGrant.guardianId, row.guardianId)))
+    const [newer] = await tx.select({ id: guardianDelivery.id }).from(guardianDelivery).where(and(eq(guardianDelivery.patientId, row.patientId), eq(guardianDelivery.guardianId, row.guardianId), eq(guardianDelivery.state, 'DONE'), sql`(${guardianDelivery.createdAt}, ${guardianDelivery.id}) > (${row.createdAt}, ${row.id})`)).limit(1)
+    if (!link || link.status === 'REVOKED' || newer) {
+      if (newer && row.tokenId) await tx.update(setupToken).set({ usedAt: new Date() }).where(and(eq(setupToken.id, row.tokenId), isNull(setupToken.usedAt)))
       await tx.update(guardianDelivery).set({ state: 'CANCELLED', payload: null }).where(eq(guardianDelivery.id, id))
       return []
     }
@@ -130,7 +132,8 @@ export async function processGuardianDelivery(id: string) {
     const [owner] = await tx.select({ id: user.id }).from(user).where(eq(user.id, locked.guardianId)).for('update')
     if (!owner) return
     const [link] = await tx.select().from(guardianGrant).where(and(eq(guardianGrant.patientId, locked.patientId), eq(guardianGrant.guardianId, locked.guardianId)))
-    if (!link || link.status === 'REVOKED') {
+    const [newer] = await tx.select({ id: guardianDelivery.id }).from(guardianDelivery).where(and(eq(guardianDelivery.patientId, locked.patientId), eq(guardianDelivery.guardianId, locked.guardianId), eq(guardianDelivery.state, 'DONE'), sql`(${guardianDelivery.createdAt}, ${guardianDelivery.id}) > (${locked.createdAt}, ${locked.id})`)).limit(1)
+    if (!link || link.status === 'REVOKED' || newer) {
       if (locked.tokenId) await tx.update(setupToken).set({ usedAt: new Date() }).where(and(eq(setupToken.id, locked.tokenId), isNull(setupToken.usedAt)))
       await tx.update(guardianDelivery).set({ state: 'CANCELLED', payload: null }).where(eq(guardianDelivery.id, id))
       return

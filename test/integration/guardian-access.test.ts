@@ -319,6 +319,66 @@ describe('verified guardian isolation', () => {
     expect(await setupCredential(previousToken, 'old-guardian', 'unique passphrase for guardian')).toBe(false)
   })
 
+  it('does not send a stale queued invite after a newer resend was delivered', async () => {
+    const { grantGuardian, processQueuedGuardianDeliveries, processGuardianDelivery } = await import('../../server/services/invitations')
+    const { setupCredential, tokenDigest } = await import('../../server/services/invitation')
+    const childId = randomUUID()
+    const email = `${randomUUID()}@example.test`
+    await db.insert(patient).values({ id: childId, name: 'Reordenado', birthDate: '2024-01-01', sex: 'MALE', createdBy: doctor.id })
+    await pool.query(`CREATE FUNCTION reject_first_claim() RETURNS trigger AS $$ BEGIN IF NEW.patient_id = '${childId}' AND NEW.state = 'SENDING' THEN RAISE EXCEPTION 'forced old claim failure'; END IF; RETURN NEW; END; $$ LANGUAGE plpgsql`)
+    await pool.query('CREATE TRIGGER forced_first_claim BEFORE UPDATE ON guardian_delivery FOR EACH ROW EXECUTE FUNCTION reject_first_claim()')
+    try {
+      await expect(grantGuardian(doctor, childId, { name: 'Familiar ordenado', email, proof: 'Identidad verificada' })).rejects.toThrow()
+    } finally {
+      await pool.query('DROP TRIGGER forced_first_claim ON guardian_delivery')
+      await pool.query('DROP FUNCTION reject_first_claim()')
+    }
+    const [old] = await db.select().from(guardianDelivery).where(eq(guardianDelivery.patientId, childId))
+    expect(old?.state).toBe('QUEUED')
+    const [owner] = await db.select({ id: user.id }).from(user).where(eq(user.email, email))
+    await grantGuardian(doctor, childId, { name: 'Familiar ordenado', email, proof: 'Identidad verificada', confirmedGuardianId: owner!.id })
+    const newest = latestToken()
+    const sent = mails.length
+    const [newToken] = await db.select().from(setupToken).where(eq(setupToken.digest, tokenDigest(newest)))
+    expect((await db.select().from(guardianGrant).where(eq(guardianGrant.patientId, childId)))[0]?.tokenId).toBe(newToken!.id)
+    await processGuardianDelivery(old!.id)
+    expect((await db.select().from(guardianDelivery).where(eq(guardianDelivery.id, old!.id)))[0]?.state).toBe('CANCELLED')
+    expect((await db.select().from(setupToken).where(eq(setupToken.id, old!.tokenId!)))[0]?.usedAt).toBeInstanceOf(Date)
+    expect(await processQueuedGuardianDeliveries()).toBe(0)
+    expect(mails).toHaveLength(sent)
+    expect((await db.select().from(guardianGrant).where(eq(guardianGrant.patientId, childId)))[0]?.tokenId).toBe(newToken!.id)
+    expect((await db.select().from(setupToken).where(eq(setupToken.id, newToken!.id)))[0]?.usedAt).toBeNull()
+    expect(await setupCredential(newest, `ordered-${randomUUID().slice(0, 8)}`, 'unique guardian passphrase')).toBe(true)
+  })
+
+  it('ignores an older sending job if a newer resend finishes while its SMTP call is in flight', async () => {
+    const { grantGuardian, processGuardianDelivery } = await import('../../server/services/invitations')
+    const { setupCredential, tokenDigest } = await import('../../server/services/invitation')
+    const childId = randomUUID()
+    const email = `${randomUUID()}@example.test`
+    await db.insert(patient).values({ id: childId, name: 'Entrega tardía', birthDate: '2024-01-01', sex: 'MALE', createdBy: doctor.id })
+    await pool.query(`CREATE FUNCTION reject_first_claim() RETURNS trigger AS $$ BEGIN IF NEW.patient_id = '${childId}' AND NEW.state = 'SENDING' THEN RAISE EXCEPTION 'forced old claim failure'; END IF; RETURN NEW; END; $$ LANGUAGE plpgsql`)
+    await pool.query('CREATE TRIGGER forced_first_claim BEFORE UPDATE ON guardian_delivery FOR EACH ROW EXECUTE FUNCTION reject_first_claim()')
+    try {
+      await expect(grantGuardian(doctor, childId, { name: 'Familiar tardío', email, proof: 'Identidad verificada' })).rejects.toThrow()
+    } finally {
+      await pool.query('DROP TRIGGER forced_first_claim ON guardian_delivery')
+      await pool.query('DROP FUNCTION reject_first_claim()')
+    }
+    const [old] = await db.select().from(guardianDelivery).where(eq(guardianDelivery.patientId, childId))
+    const [owner] = await db.select({ id: user.id }).from(user).where(eq(user.email, email))
+    await db.update(guardianDelivery).set({ state: 'SENDING' }).where(eq(guardianDelivery.id, old!.id))
+    await grantGuardian(doctor, childId, { name: 'Familiar tardío', email, proof: 'Identidad verificada', confirmedGuardianId: owner!.id })
+    const newest = latestToken()
+    const [newToken] = await db.select().from(setupToken).where(eq(setupToken.digest, tokenDigest(newest)))
+    const sent = mails.length
+    await processGuardianDelivery(old!.id)
+    expect(mails).toHaveLength(sent)
+    expect((await db.select().from(guardianGrant).where(eq(guardianGrant.patientId, childId)))[0]?.tokenId).toBe(newToken!.id)
+    expect(await setupCredential(newest, `late-${randomUUID().slice(0, 8)}`, 'unique guardian passphrase')).toBe(true)
+    await db.update(guardianDelivery).set({ state: 'CANCELLED', payload: null }).where(eq(guardianDelivery.id, old!.id))
+  })
+
   it('activates two delivered sibling grants with one setup and excludes revoked or undelivered links', async () => {
     const { grantGuardian, revokeGuardian, getShareableChild, listShareableChildren } = await import('../../server/services/invitations')
     const { setupCredential } = await import('../../server/services/invitation')

@@ -134,6 +134,13 @@
       "when": 1794685487001,
       "tag": "0018_romantic_iceman",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1794689457302,
+      "tag": "0019_guardian-legacy-privacy",
+      "breakpoints": true
     }
   ]
 }

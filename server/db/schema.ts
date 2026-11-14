@@ -1,4 +1,4 @@
-import { bigint, boolean, index, integer, pgTable, primaryKey, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core'
+import { bigint, boolean, check, index, integer, numeric, pgTable, primaryKey, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
 
 export const user = pgTable('user', {
@@ -102,3 +102,58 @@ export const rateLimit = pgTable('rateLimit', {
   count: integer('count').notNull(),
   lastRequest: bigint('lastRequest', { mode: 'number' }).notNull()
 })
+
+export const whoDataset = pgTable('who_dataset', {
+  id: text('id').primaryKey(),
+  publisher: text('publisher').notNull(),
+  standard: text('standard').notNull(),
+  version: text('version').notNull(),
+  publicationDate: text('publication_date').notNull(),
+  retrievedAt: text('retrieved_at').notNull(),
+  sourceUrl: text('source_url').notNull(),
+  sha256: text('sha256').notNull(),
+  indicator: text('indicator').notNull(),
+  sex: text('sex').notNull(),
+  position: text('position'),
+  xUnit: text('x_unit').notNull(),
+  minX: numeric('min_x').notNull(),
+  maxX: numeric('max_x').notNull(),
+  rowCount: integer('row_count').notNull(),
+  sealed: boolean('sealed').notNull().default(false),
+  importedAt: timestamp('imported_at').notNull().defaultNow()
+}, table => [
+  uniqueIndex('who_dataset_release_idx').on(table.version, table.indicator, table.sex, table.sourceUrl),
+  check('who_dataset_standard_ck', sql`${table.publisher} = 'WHO' AND ${table.standard} = 'WHO_2006'`),
+  check('who_dataset_sex_ck', sql`${table.sex} IN ('MALE', 'FEMALE')`),
+  check('who_dataset_indicator_ck', sql`${table.indicator} IN ('WEIGHT_FOR_AGE', 'HEIGHT_FOR_AGE', 'WEIGHT_FOR_LENGTH', 'WEIGHT_FOR_HEIGHT', 'BMI_FOR_AGE', 'HEAD_CIRCUMFERENCE_FOR_AGE')`),
+  check('who_dataset_unit_ck', sql`${table.xUnit} IN ('DAY', 'CM')`),
+  check('who_dataset_position_ck', sql`${table.position} IS NULL OR ${table.position} IN ('RECUMBENT', 'STANDING')`),
+  check('who_dataset_count_ck', sql`${table.rowCount} > 0 AND ${table.minX} >= 0 AND ${table.maxX} > ${table.minX}`),
+  check('who_dataset_hash_ck', sql`${table.sha256} ~ '^[a-f0-9]{64}$'`)
+])
+
+export const whoReferenceRow = pgTable('who_reference_row', {
+  datasetId: text('dataset_id').notNull().references(() => whoDataset.id, { onDelete: 'restrict' }),
+  indicator: text('indicator').notNull(),
+  sex: text('sex').notNull(),
+  position: text('position'),
+  xUnit: text('x_unit').notNull(),
+  x: numeric('x').notNull(),
+  l: numeric('l').notNull(),
+  m: numeric('m').notNull(),
+  s: numeric('s').notNull(),
+  sdNeg3: numeric('sd_neg3').notNull(),
+  sdNeg2: numeric('sd_neg2').notNull(),
+  sdNeg1: numeric('sd_neg1').notNull(),
+  sd0: numeric('sd_0').notNull(),
+  sd1: numeric('sd_1').notNull(),
+  sd2: numeric('sd_2').notNull(),
+  sd3: numeric('sd_3').notNull()
+}, table => [
+  primaryKey({ columns: [table.datasetId, table.x] }),
+  check('who_row_lms_ck', sql`${table.m} > 0 AND ${table.s} > 0 AND ${table.x} >= 0`),
+  check('who_row_sd_ck', sql`${table.sdNeg3} > 0 AND ${table.sdNeg3} < ${table.sdNeg2} AND ${table.sdNeg2} < ${table.sdNeg1} AND ${table.sdNeg1} < ${table.sd0} AND ${table.sd0} < ${table.sd1} AND ${table.sd1} < ${table.sd2} AND ${table.sd2} < ${table.sd3}`),
+  check('who_row_sex_ck', sql`${table.sex} IN ('MALE', 'FEMALE')`),
+  check('who_row_unit_ck', sql`${table.xUnit} IN ('DAY', 'CM')`),
+  check('who_row_position_ck', sql`${table.position} IS NULL OR ${table.position} IN ('RECUMBENT', 'STANDING')`)
+])

@@ -114,6 +114,57 @@ test.describe('doctor clinical journey with isolated auth and WHO database', () 
     await guest.close()
   })
 
+  test('quick create confirms provisional matches and searches accent-insensitively on phones and desktop', async ({ page }) => {
+    const db = drizzle(pool)
+    const doctorId = crypto.randomUUID()
+    const username = `quick-${doctorId.slice(0, 8)}`
+    await db.insert(user).values({ id: doctorId, name: 'Doctora', email: `${doctorId}@example.test`, username })
+    await db.insert(userRole).values({ userId: doctorId, role: 'DOCTOR' })
+    await db.insert(account).values({ id: crypto.randomUUID(), userId: doctorId, accountId: doctorId, providerId: 'credential', password: await hashPassword('quick clinical password') })
+    await page.goto('/acceso')
+    await page.getByRole('textbox', { name: 'Usuario' }).fill(username)
+    await page.getByLabel('Contraseña').fill('quick clinical password')
+    await page.getByRole('button', { name: 'Ingresar' }).click()
+    const fill = async (given: string, nationalId: string, phone: string) => {
+      await page.goto('/pacientes/nuevo')
+      await page.getByRole('textbox', { name: 'Nombres', exact: true }).fill(given)
+      await page.getByRole('textbox', { name: 'Apellidos', exact: true }).fill('Pérez')
+      await page.getByLabel('Fecha de nacimiento').fill('2024-03-01')
+      if (nationalId) await page.getByRole('textbox', { name: 'Cédula / NUI' }).fill(nationalId)
+      await page.getByRole('textbox', { name: 'Nombre completo' }).fill('Representante verificado')
+      await page.getByRole('textbox', { name: 'Parentesco' }).fill('Madre')
+      await page.getByRole('textbox', { name: 'Teléfono / WhatsApp' }).fill(phone)
+      await page.getByRole('button', { name: 'Verificar representante' }).click()
+      if (await page.getByText('Sin cuenta previa').count()) await expect(page.getByText('Sin cuenta previa')).toBeVisible()
+      else {
+        await expect(page.getByText(/Cuenta existente:/)).toBeVisible()
+        await page.getByRole('checkbox', { name: 'Confirmo que es la misma persona' }).check()
+      }
+      await page.getByRole('textbox', { name: 'Cómo verificó el vínculo' }).fill('Documento verificado presencialmente')
+      await page.getByRole('button', { name: 'Crear paciente' }).click()
+    }
+    for (const width of [375, 1440]) {
+      await page.setViewportSize({ width, height: 850 })
+      const unique = crypto.randomUUID().replace(/\D/g, '').padEnd(8, '0').slice(0, 8)
+      const given = `José${unique}`
+      await fill(given, '', `9${unique}`)
+      await expect(page).toHaveURL(/\/pacientes\/[a-z0-9-]+$/)
+      const firstId = page.url().split('/').at(-1)!
+      await expect(page.getByText('Sin invitar').first()).toBeVisible()
+      await fill(given, '', `9${unique}`)
+      await expect(page.getByText('Posibles pacientes existentes')).toBeVisible()
+      await expect(page.getByRole('link', { name: `Abrir ficha de ${given} Pérez` })).toHaveAttribute('href', `/pacientes/${firstId}`)
+      await page.getByRole('checkbox', { name: /He revisado las coincidencias/ }).check()
+      await page.getByRole('button', { name: 'Crear paciente' }).click()
+      await expect(page).toHaveURL(/\/pacientes\/[a-z0-9-]+$/)
+      expect(page.url().split('/').at(-1)).not.toBe(firstId)
+      await page.goto('/pacientes')
+      await page.getByRole('textbox', { name: 'Buscar por nombre o identificación' }).fill(`jose${unique}`)
+      await expect(page.getByRole('link', { name: new RegExp(given, 'i') }).first()).toBeVisible()
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true)
+    }
+  })
+
   for (const width of [375, 1024, 1440]) {
     test(`doctor registers a real patient and visit at ${width}px`, async ({ page }) => {
       const db = drizzle(pool)

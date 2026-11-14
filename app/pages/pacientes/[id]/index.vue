@@ -13,6 +13,45 @@ const latest = computed(() => data.value?.visits[0])
 const sharing = reactive<Record<string, boolean>>({})
 const { data: sharingState } = await useFetch<Record<string, boolean>>(`/api/pacientes/${encodeURIComponent(id)}/visitas/compartir`, { immediate: isDoctor.value })
 const { data: guardianStatus } = await useFetch<{ guardians: { email: string, status: string, lastSendError: string | null }[] }>(`/api/guardian-grants/${encodeURIComponent(id)}`, { immediate: isDoctor.value })
+const { data: pendingContacts, refresh: refreshPendingContacts } = await useFetch<{ id: string, name: string, relationship: string, phone: string, email: string | null }[]>(`/api/pacientes/${encodeURIComponent(id)}/contactos-pendientes`, { immediate: isDoctor.value, default: () => [] })
+const contactMatches = reactive<Record<string, { id: string, name: string, maskedContact: string } | null>>({})
+const contactChecked = reactive<Record<string, boolean>>({})
+const contactConfirmed = reactive<Record<string, boolean>>({})
+const contactErrors = reactive<Record<string, string>>({})
+const contactEdits = reactive<Record<string, { name: string, relationship: string, phone: string, email: string, proof: string }>>({})
+function editableContact(contact: { id: string, name: string, relationship: string, phone: string, email: string | null }) {
+  contactEdits[contact.id] ??= { name: contact.name, relationship: contact.relationship, phone: contact.phone, email: contact.email ?? '', proof: '' }
+  return contactEdits[contact.id]!
+}
+async function checkPendingContact(contact: { id: string, name: string, relationship: string, phone: string, email: string | null }) {
+  contactChecked[contact.id] = false
+  contactConfirmed[contact.id] = false
+  contactErrors[contact.id] = ''
+  try {
+    const edit = editableContact(contact)
+    contactMatches[contact.id] = await $fetch('/api/guardian-grants/identity', { query: { phone: edit.phone, ...(edit.email ? { email: edit.email } : {}) } })
+    contactChecked[contact.id] = true
+  } catch {
+    contactErrors[contact.id] = 'No se pudo verificar esta identidad. Revise el contacto con la familia.'
+  }
+}
+async function retryContact(contact: { id: string, name: string, relationship: string, phone: string, email: string | null }) {
+  if (!contactChecked[contact.id] || (contactMatches[contact.id] && !contactConfirmed[contact.id])) return
+  contactErrors[contact.id] = ''
+  const edit = editableContact(contact)
+  const changed = edit.name !== contact.name || edit.relationship !== contact.relationship || edit.phone !== contact.phone || edit.email !== (contact.email ?? '')
+  if (changed && edit.proof.trim().length < 8) {
+    contactErrors[contact.id] = 'Registre cómo verificó nuevamente el vínculo antes de cambiar los datos.'
+    return
+  }
+  try {
+    const result = await $fetch<{ status: string }>(`/api/pacientes/${encodeURIComponent(id)}/contactos-pendientes/${encodeURIComponent(contact.id)}`, { method: 'POST', body: { ...(contactMatches[contact.id] ? { confirmedGuardianId: contactMatches[contact.id]!.id } : {}), ...(changed ? { name: edit.name, relationship: edit.relationship, phone: edit.phone, ...(edit.email ? { email: edit.email } : {}), proof: edit.proof } : {}) } })
+    await refreshPendingContacts()
+    if (result.status === 'FAILED') contactErrors[contact.id] = 'Vínculo registrado, pero falló el correo. Reenvíe la invitación desde Acceso familiar.'
+  } catch {
+    contactErrors[contact.id] = 'No se pudo vincular. Verifique los datos y vuelva a intentarlo.'
+  }
+}
 function guardianLabel(status: string) {
   return status === 'ACTIVE' ? 'Activo' : status === 'PENDING' ? 'Pendiente de activación' : status === 'FAILED' ? 'Envío fallido · Reenviar invitación' : 'Sin invitar'
 }
@@ -25,6 +64,20 @@ onMounted(() => {
 const identity = ref('')
 const identityError = ref('')
 const history = reactive({ gestationWeeks: undefined as number | undefined, gestationExtraDays: 0, birthWeightKg: undefined as number | undefined, birthLengthCm: undefined as number | undefined, birthHeadCircumferenceCm: undefined as number | undefined, perinatalNotes: '', correctionUntilMonths: 24 as 24 | 36 })
+let savedHistory: typeof history | undefined
+watch(() => data.value?.patient, (person) => {
+  if (!person) return
+  Object.assign(history, {
+    gestationWeeks: person.gestationDays === undefined ? undefined : Math.floor(person.gestationDays / 7),
+    gestationExtraDays: person.gestationDays === undefined ? 0 : person.gestationDays % 7,
+    birthWeightKg: person.birthWeightKg,
+    birthLengthCm: person.birthLengthCm,
+    birthHeadCircumferenceCm: person.birthHeadCircumferenceCm,
+    perinatalNotes: person.perinatalNotes ?? '',
+    correctionUntilMonths: person.correctionUntilMonths
+  })
+  savedHistory = { ...history }
+}, { immediate: true })
 const historyError = ref('')
 async function saveIdentity() {
   identityError.value = ''
@@ -40,7 +93,16 @@ async function saveIdentity() {
 async function saveHistory() {
   historyError.value = ''
   try {
-    await $fetch(`/api/pacientes/${encodeURIComponent(id)}/antecedentes`, { method: 'PATCH', body: { ...(history.gestationWeeks !== undefined ? { gestationDays: history.gestationWeeks * 7 + history.gestationExtraDays } : {}), ...(history.birthWeightKg !== undefined ? { birthWeightKg: history.birthWeightKg } : {}), ...(history.birthLengthCm !== undefined ? { birthLengthCm: history.birthLengthCm } : {}), ...(history.birthHeadCircumferenceCm !== undefined ? { birthHeadCircumferenceCm: history.birthHeadCircumferenceCm } : {}), ...(history.perinatalNotes ? { perinatalNotes: history.perinatalNotes } : {}), correctionUntilMonths: history.correctionUntilMonths } })
+    if (!savedHistory) return
+    const body = {
+      ...((history.gestationWeeks !== savedHistory.gestationWeeks || history.gestationExtraDays !== savedHistory.gestationExtraDays) && history.gestationWeeks !== undefined ? { gestationDays: history.gestationWeeks * 7 + history.gestationExtraDays } : {}),
+      ...(history.birthWeightKg !== savedHistory.birthWeightKg && history.birthWeightKg !== undefined ? { birthWeightKg: history.birthWeightKg } : {}),
+      ...(history.birthLengthCm !== savedHistory.birthLengthCm && history.birthLengthCm !== undefined ? { birthLengthCm: history.birthLengthCm } : {}),
+      ...(history.birthHeadCircumferenceCm !== savedHistory.birthHeadCircumferenceCm && history.birthHeadCircumferenceCm !== undefined ? { birthHeadCircumferenceCm: history.birthHeadCircumferenceCm } : {}),
+      ...(history.perinatalNotes !== savedHistory.perinatalNotes ? { perinatalNotes: history.perinatalNotes } : {}),
+      ...(history.correctionUntilMonths !== savedHistory.correctionUntilMonths ? { correctionUntilMonths: history.correctionUntilMonths } : {})
+    }
+    await $fetch(`/api/pacientes/${encodeURIComponent(id)}/antecedentes`, { method: 'PATCH', body })
     await refresh()
   } catch { historyError.value = 'No se pudieron guardar los antecedentes. Revise las medidas y la edad gestacional.' }
 }
@@ -224,6 +286,104 @@ const dateFormat = new Intl.DateTimeFormat('es-EC', { day: 'numeric', month: 'sh
           variant="soft"
           :description="historyError"
         />
+      </UCard>
+      <UCard
+        v-if="pendingContacts?.length"
+        class="space-y-4"
+      >
+        <h2 class="font-semibold">
+          Contactos pendientes de vincular
+        </h2>
+        <div
+          v-for="contact in pendingContacts"
+          :key="contact.id"
+          class="space-y-2 rounded-lg border border-default p-3"
+        >
+          <p class="font-medium">
+            {{ contact.name }} · {{ contact.relationship }}
+          </p>
+          <p class="text-sm">
+            {{ contact.phone }}<span v-if="contact.email"> · {{ contact.email }}</span>
+          </p>
+          <p class="text-sm text-muted">
+            El vínculo no se registró. Verifique la identidad antes de reintentar; la familia aún no tiene acceso.
+          </p>
+          <div class="grid gap-3 sm:grid-cols-2">
+            <UFormField label="Nombre del contacto">
+              <UInput
+                v-model="editableContact(contact).name"
+                class="w-full"
+                @update:model-value="contactChecked[contact.id] = false"
+              />
+            </UFormField>
+            <UFormField label="Parentesco del contacto">
+              <UInput
+                v-model="editableContact(contact).relationship"
+                class="w-full"
+                @update:model-value="contactChecked[contact.id] = false"
+              />
+            </UFormField>
+            <UFormField label="Teléfono del contacto">
+              <UInput
+                v-model="editableContact(contact).phone"
+                type="tel"
+                class="w-full"
+                @update:model-value="contactChecked[contact.id] = false"
+              />
+            </UFormField>
+            <UFormField label="Correo del contacto">
+              <UInput
+                v-model="editableContact(contact).email"
+                type="email"
+                class="w-full"
+                @update:model-value="contactChecked[contact.id] = false"
+              />
+            </UFormField>
+          </div>
+          <UFormField label="Cómo verificó la corrección">
+            <UTextarea
+              v-model="editableContact(contact).proof"
+              class="w-full"
+            />
+          </UFormField>
+          <UButton
+            type="button"
+            variant="outline"
+            class="min-h-11"
+            :aria-label="`Verificar identidad de ${contact.name}`"
+            @click="checkPendingContact(contact)"
+          >
+            Verificar identidad
+          </UButton>
+          <p
+            v-if="contactChecked[contact.id] && !contactMatches[contact.id]"
+            role="status"
+          >
+            Sin cuenta previa
+          </p>
+          <div v-if="contactChecked[contact.id] && contactMatches[contact.id]">
+            <p>Cuenta existente: {{ contactMatches[contact.id]?.name }} · {{ contactMatches[contact.id]?.maskedContact }}</p>
+            <UCheckbox
+              v-model="contactConfirmed[contact.id]"
+              label="Confirmo que es la misma persona"
+            />
+          </div>
+          <UButton
+            type="button"
+            class="min-h-11"
+            :disabled="!contactChecked[contact.id] || Boolean(contactMatches[contact.id] && !contactConfirmed[contact.id])"
+            :aria-label="`Reintentar vínculo de ${contact.name}`"
+            @click="retryContact(contact)"
+          >
+            Reintentar vínculo
+          </UButton>
+          <UAlert
+            v-if="contactErrors[contact.id]"
+            color="error"
+            variant="soft"
+            :description="contactErrors[contact.id]"
+          />
+        </div>
       </UCard>
       <UCard>
         <h2 class="font-semibold">

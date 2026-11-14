@@ -11,7 +11,7 @@ import { importWhoRelease, parseWhoWorkbook } from '../../server/services/who-im
 import type { VerifiedSource } from '../../shared/types/who'
 import type { Gender } from '../../shared/utils/enums'
 import { WhoIndicator } from '../../shared/utils/enums'
-import { account, auditEvent, patient, user, userRole } from '../../server/db/schema'
+import { account, auditEvent, patient, patientContactIntake, user, userRole, visit } from '../../server/db/schema'
 
 const enabled = process.env.AUTH_E2E === '1' && process.env.CLINICAL_E2E === '1' && process.env.CLINICAL_E2E_DATABASE_URL === process.env.TEST_DATABASE_URL
 const url = process.env.TEST_DATABASE_URL
@@ -177,6 +177,92 @@ test.describe('doctor clinical journey with isolated auth and WHO database', () 
       expect(rows.length).toBe(2)
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true)
     }
+  })
+
+  test('post-insert contact failure remains recoverable after reload and cannot be exposed to assistants', async ({ page }) => {
+    const db = drizzle(pool)
+    const doctorId = crypto.randomUUID()
+    const assistantId = crypto.randomUUID()
+    const username = `recovery-${doctorId.slice(0, 8)}`
+    await db.insert(user).values({ id: doctorId, name: 'Doctora', email: `${doctorId}@example.test`, username })
+    await db.insert(userRole).values({ userId: doctorId, role: 'DOCTOR' })
+    await db.insert(account).values({ id: crypto.randomUUID(), userId: doctorId, accountId: doctorId, providerId: 'credential', password: await hashPassword('recovery clinical password') })
+    await db.insert(user).values({ id: assistantId, name: 'Asistente', email: `${assistantId}@example.test`, username: `assistant-${assistantId.slice(0, 8)}` })
+    await db.insert(userRole).values({ userId: assistantId, role: 'ASSISTANT' })
+    await page.goto('/acceso')
+    await page.waitForLoadState('networkidle')
+    await page.getByRole('textbox', { name: 'Usuario' }).fill(username)
+    await page.getByLabel('Contraseña').fill('recovery clinical password')
+    await page.getByRole('button', { name: 'Ingresar' }).click()
+    await expect(page).toHaveURL('/')
+    const phone = `09${String(Math.floor(Math.random() * 1e8)).padStart(8, '0')}`
+    const family = `Recuperación${doctorId.slice(0, 8)}`
+    const created = await page.request.post('/api/pacientes/rapido', { data: { givenNames: 'Paciente', surnames: family, birthDate: '2024-01-01', sex: 'FEMALE', contacts: [
+      { name: 'Primer contacto', relationship: 'Padre', phone, email: '', proof: 'Identidad confirmada presencialmente', invite: false },
+      { name: 'Contacto Sin Vincular', relationship: 'Madre', phone, email: '', proof: 'Identidad confirmada presencialmente', invite: false }
+    ] } })
+    expect(created.status()).toBe(200)
+    const result = await created.json()
+    expect(result.contacts.map((contact: { status: string }) => contact.status)).toEqual(['UNINVITED', 'LINK_FAILED'])
+    const childId = result.patient.id as string
+    await page.goto(`/pacientes/${childId}`)
+    await expect(page.getByText('Contacto Sin Vincular')).toBeVisible()
+    await page.reload()
+    await page.waitForLoadState('networkidle')
+    await expect(page.getByText('Contacto Sin Vincular')).toBeVisible()
+    const response = await page.request.get(`/api/pacientes/${childId}/contactos-pendientes`)
+    expect(response.status()).toBe(200)
+    const pending = await response.json()
+    expect(pending).toEqual([expect.objectContaining({ phone, name: 'Contacto Sin Vincular' })])
+    const contactId = pending[0].id as string
+    await page.getByRole('button', { name: /Verificar identidad de Contacto Sin Vincular/ }).click()
+    await expect(page.getByText(/Cuenta existente:/)).toBeVisible()
+    await page.getByRole('checkbox', { name: 'Confirmo que es la misma persona' }).check()
+    await page.getByRole('button', { name: /Reintentar vínculo de Contacto Sin Vincular/ }).click()
+    await expect(page.getByText('Contacto Sin Vincular')).toHaveCount(0)
+    expect((await db.select().from(patientContactIntake).where(eq(patientContactIntake.id, contactId)))[0]?.status).toBe('LINKED')
+    const assistantContext = await page.context().browser()!.newContext()
+    const assistantPage = await assistantContext.newPage()
+    await assistantPage.goto('/acceso')
+    await assistantPage.waitForLoadState('networkidle')
+    expect((await assistantPage.request.get(`/api/pacientes/${childId}/contactos-pendientes`)).status()).toBe(401)
+    await assistantContext.close()
+  })
+
+  test('perinatal editor hydrates a 36-month preterm child and preserves correction when editing only notes or birth weight', async ({ page }) => {
+    const db = drizzle(pool)
+    const doctorId = crypto.randomUUID()
+    const username = `history-${doctorId.slice(0, 8)}`
+    await db.insert(user).values({ id: doctorId, name: 'Doctora', email: `${doctorId}@example.test`, username })
+    await db.insert(userRole).values({ userId: doctorId, role: 'DOCTOR' })
+    await db.insert(account).values({ id: crypto.randomUUID(), userId: doctorId, accountId: doctorId, providerId: 'credential', password: await hashPassword('perinatal clinical password') })
+    const patientId = crypto.randomUUID()
+    await db.insert(patient).values({ id: patientId, name: 'Prematura Extrema', birthDate: '2024-01-01', sex: 'FEMALE', gestationDays: 190, correctionUntilMonths: 36, birthWeightKg: '0.85', birthLengthCm: '33', birthHeadCircumferenceCm: '24', perinatalNotes: 'Nota que se debe borrar', createdBy: doctorId })
+    await page.goto('/acceso')
+    await page.waitForLoadState('networkidle')
+    await page.getByRole('textbox', { name: 'Usuario' }).fill(username)
+    await page.getByLabel('Contraseña').fill('perinatal clinical password')
+    await page.getByRole('button', { name: 'Ingresar' }).click()
+    await expect(page).toHaveURL('/')
+    await page.goto(`/pacientes/${patientId}`)
+    await page.waitForLoadState('networkidle')
+    await expect(page.getByRole('checkbox', { name: 'Prematuro extremo: corregir hasta 36 meses' })).toBeChecked()
+    await expect(page.getByRole('spinbutton', { name: 'Edad gestacional (semanas)' })).toHaveValue('27')
+    await expect(page.getByRole('spinbutton', { name: 'Días adicionales' })).toHaveValue('1')
+    await expect(page.getByRole('spinbutton', { name: 'Peso al nacer (kg)' })).toHaveValue('0,85')
+    await expect(page.getByRole('textbox', { name: 'Notas perinatales' })).toHaveValue('Nota que se debe borrar')
+    await page.getByRole('textbox', { name: 'Notas perinatales' }).fill('')
+    await page.getByRole('button', { name: 'Guardar antecedentes' }).click()
+    await expect.poll(async () => (await page.request.get(`/api/pacientes/${patientId}`).then(response => response.json())).patient).toMatchObject({ gestationDays: 190, correctionUntilMonths: 36, birthWeightKg: 0.85 })
+    await expect.poll(async () => (await page.request.get(`/api/pacientes/${patientId}`).then(response => response.json())).patient.perinatalNotes).toBeUndefined()
+    await page.getByRole('textbox', { name: 'Notas perinatales' }).fill('Nueva nota')
+    await page.getByRole('button', { name: 'Guardar antecedentes' }).click()
+    await expect.poll(async () => (await page.request.get(`/api/pacientes/${patientId}`).then(response => response.json())).patient).toMatchObject({ gestationDays: 190, correctionUntilMonths: 36, birthWeightKg: 0.85, perinatalNotes: 'Nueva nota' })
+    const submitted = await page.request.post(`/api/pacientes/${patientId}/visitas`, { data: { requestId: crypto.randomUUID(), measuredAt: '2026-07-01T12:00:00.000Z', weightKg: 10, lengthHeightCm: 80, position: 'STANDING', headCircumferenceCm: 46 } })
+    expect(submitted.status()).toBe(200)
+    const savedVisitId = (await submitted.json()).id as string
+    const [savedVisit] = await db.select().from(visit).where(eq(visit.id, savedVisitId))
+    expect(savedVisit?.correctionUntilMonths).toBe(36)
   })
 
   test('duplicate cédula opens the existing chart and does not create another patient', async ({ page }) => {

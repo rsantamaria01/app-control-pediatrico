@@ -104,6 +104,36 @@ async function seedVisit(patientId: string, shareWithFamily = true) {
 }
 
 describe('verified guardian isolation', () => {
+  it('persists each contact when a second guardian link fails after patient insert and permits doctor-only verified recovery', async () => {
+    const { createQuickPatient, listPendingContacts, retryPendingContact } = await import('../../server/services/patients')
+    const phone = `09${randomUUID().replace(/\D/g, '').padEnd(8, '0').slice(0, 8)}`
+    const firstContact = { name: 'Primera persona', relationship: 'Madre', phone, email: '', proof: 'Identidad comprobada presencialmente', invite: false }
+    const secondContact = { ...firstContact, name: 'Segunda persona', relationship: 'Padre' }
+    const result = await createQuickPatient(doctor, { givenNames: 'Niña', surnames: 'Recuperación', birthDate: '2024-04-01', sex: 'FEMALE', contacts: [firstContact, secondContact] })
+    expect(result.contacts.map(contact => contact.status)).toEqual(['UNINVITED', 'LINK_FAILED'])
+    const pending = await listPendingContacts(doctor, result.patient.id)
+    expect(pending).toEqual([expect.objectContaining({ name: secondContact.name, relationship: secondContact.relationship, phone, email: null, status: 'LINK_FAILED' })])
+    await expect(listPendingContacts(assistant, result.patient.id)).rejects.toThrow()
+    await expect(listPendingContacts({ id: otherId, roles: ['PATIENT'] }, result.patient.id)).rejects.toThrow()
+    await expect(retryPendingContact(doctor, result.patient.id, pending[0]!.id, {})).rejects.toMatchObject({ statusCode: 409 })
+    expect(await listPendingContacts(doctor, result.patient.id)).toHaveLength(1)
+    const identity = await import('../../server/services/invitations').then(module => module.findGuardianIdentity(doctor, { phone }))
+    const recovered = await retryPendingContact(doctor, result.patient.id, pending[0]!.id, { confirmedGuardianId: identity!.id })
+    expect(recovered.status).toBe('UNINVITED')
+    expect(await listPendingContacts(doctor, result.patient.id)).toEqual([])
+    expect(await db.select().from(guardianGrant).where(eq(guardianGrant.patientId, result.patient.id))).toHaveLength(1)
+    await expect(retryPendingContact(doctor, result.patient.id, pending[0]!.id, { confirmedGuardianId: identity!.id })).rejects.toMatchObject({ statusCode: 404 })
+    const wrongPhone = `09${randomUUID().replace(/\D/g, '').padEnd(8, '0').slice(0, 8)}`
+    const corrected = await createQuickPatient(doctor, { givenNames: 'Otro', surnames: 'Contacto Corregible', birthDate: '2024-05-01', sex: 'MALE', contacts: [
+      { ...firstContact, phone: wrongPhone }, { ...secondContact, phone: wrongPhone }
+    ] })
+    const [failed] = await listPendingContacts(doctor, corrected.patient.id)
+    await expect(retryPendingContact(doctor, corrected.patient.id, failed!.id, { phone, confirmedGuardianId: identity!.id })).rejects.toMatchObject({ statusCode: 400 })
+    const recoveredCorrection = await retryPendingContact(doctor, corrected.patient.id, failed!.id, { phone, confirmedGuardianId: identity!.id, proof: 'Documento revisado nuevamente' })
+    expect(recoveredCorrection.status).toBe('UNINVITED')
+    expect(await listPendingContacts(doctor, corrected.patient.id)).toEqual([])
+  })
+
   it('keeps a quick-created child after failed invitation, reuses one confirmed guardian for siblings, and sends later', async () => {
     const { createQuickPatient } = await import('../../server/services/patients')
     const { findGuardianIdentity, grantGuardian } = await import('../../server/services/invitations')

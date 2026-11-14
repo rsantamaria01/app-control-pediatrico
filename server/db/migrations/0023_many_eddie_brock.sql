@@ -1,0 +1,1 @@
+ALTER TABLE "patient_contact_intake" ADD COLUMN "position" integer DEFAULT 0 NOT NULL;

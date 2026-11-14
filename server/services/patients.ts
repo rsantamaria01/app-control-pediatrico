@@ -3,7 +3,7 @@ import { createError } from 'nuxt/server'
 import type { Actor } from '../../shared/types/access'
 import { patientSchema, type PatientInput, type PatientView } from '../../shared/types/measurement'
 import { ecuadorIdSchema, normalizePatientName, quickPatientSchema, type QuickPatientInput } from '../../shared/types/patient-registration'
-import { patient, visit } from '../db/schema'
+import { patient, patientContactIntake, visit } from '../db/schema'
 import { findGuardianIdentity, grantGuardian } from './invitations'
 import { useDb } from '../utils/db'
 import { recordAudit } from './audit'
@@ -79,7 +79,11 @@ export async function createQuickPatient(actor: Actor, input: QuickPatientInput)
   }
   let row: typeof patient.$inferSelect
   try {
-    [row] = await db.insert(patient).values({ id: crypto.randomUUID(), name: names, givenNames: values.givenNames, surnames: values.surnames, nationalId: values.nationalId, hsmRecord: values.hsmRecord, birthDate: values.birthDate, sex: values.sex, createdBy: actor.id }).returning() as [typeof patient.$inferSelect]
+    row = await db.transaction(async (tx) => {
+      const [created] = await tx.insert(patient).values({ id: crypto.randomUUID(), name: names, givenNames: values.givenNames, surnames: values.surnames, nationalId: values.nationalId, hsmRecord: values.hsmRecord, birthDate: values.birthDate, sex: values.sex, createdBy: actor.id }).returning()
+      await tx.insert(patientContactIntake).values(values.contacts.map((contact, position) => ({ id: crypto.randomUUID(), patientId: created!.id, position, name: contact.name, relationship: contact.relationship, phone: contact.phone, email: contact.email || null, proof: contact.proof!, invite: contact.invite, createdBy: actor.id })))
+      return created!
+    })
   } catch (error) {
     if ((error as { code?: string, cause?: { code?: string } }).code === '23505' || (error as { cause?: { code?: string } }).cause?.code === '23505') {
       const [existing] = values.nationalId ? await db.select({ id: patient.id }).from(patient).where(eq(patient.nationalId, values.nationalId)) : []
@@ -87,16 +91,45 @@ export async function createQuickPatient(actor: Actor, input: QuickPatientInput)
     }
     throw error
   }
+  const intakes = await db.select().from(patientContactIntake).where(eq(patientContactIntake.patientId, row.id)).orderBy(asc(patientContactIntake.position))
   const contacts = []
-  for (const contact of values.contacts) {
+  for (const [index, contact] of values.contacts.entries()) {
+    const intake = intakes[index]!
     try {
       const result = await grantGuardian(actor, row.id, { name: contact.name, relationship: contact.relationship, phone: contact.phone, ...(contact.email ? { email: contact.email } : {}), deferDelivery: !contact.invite, proof: contact.proof!, ...(contact.confirmedGuardianId ? { confirmedGuardianId: contact.confirmedGuardianId } : {}) })
+      await db.update(patientContactIntake).set({ status: 'LINKED', proof: '' }).where(eq(patientContactIntake.id, intake.id))
       contacts.push(result)
     } catch {
-      contacts.push({ status: 'FAILED' as const, email: contact.email || null })
+      contacts.push({ status: 'LINK_FAILED' as const, email: contact.email || null })
     }
   }
   return { patient: toView(row), contacts }
+}
+
+export async function listPendingContacts(actor: Actor, patientId: string) {
+  await authorizeClinical(actor, 'CLINICAL_READ', patientId)
+  const db = useDb()
+  const [child] = await db.select({ id: patient.id }).from(patient).where(eq(patient.id, patientId))
+  if (!child) throw createError({ statusCode: 404, statusMessage: 'Patient not found' })
+  return db.select({ id: patientContactIntake.id, name: patientContactIntake.name, relationship: patientContactIntake.relationship, phone: patientContactIntake.phone, email: patientContactIntake.email, status: patientContactIntake.status }).from(patientContactIntake).where(and(eq(patientContactIntake.patientId, patientId), eq(patientContactIntake.status, 'LINK_FAILED'))).orderBy(asc(patientContactIntake.position))
+}
+
+export async function retryPendingContact(actor: Actor, patientId: string, intakeId: string, confirmation: { confirmedGuardianId?: string, phone?: string, email?: string, name?: string, relationship?: string, proof?: string }) {
+  await authorizeClinical(actor, 'CLINICAL_WRITE', patientId)
+  const db = useDb()
+  const [row] = await db.select().from(patientContactIntake).where(and(eq(patientContactIntake.id, intakeId), eq(patientContactIntake.patientId, patientId), eq(patientContactIntake.status, 'LINK_FAILED')))
+  if (!row) throw createError({ statusCode: 404, statusMessage: 'Pending contact not found' })
+  const changed = confirmation.phone !== undefined || confirmation.email !== undefined || confirmation.name !== undefined || confirmation.relationship !== undefined
+  if (changed && (!confirmation.proof || confirmation.proof.trim().length < 8)) throw createError({ statusCode: 400, statusMessage: 'Verifique nuevamente el vínculo' })
+  const details = {
+    name: confirmation.name ?? row.name, relationship: confirmation.relationship ?? row.relationship,
+    phone: confirmation.phone ?? row.phone, email: confirmation.email ?? row.email ?? '', proof: confirmation.proof ?? row.proof
+  }
+  const matched = await findGuardianIdentity(actor, { email: details.email || undefined, phone: details.phone })
+  if (matched?.id !== confirmation.confirmedGuardianId || (!matched && confirmation.confirmedGuardianId)) throw createError({ statusCode: 409, statusMessage: 'Confirme la identidad del representante' })
+  const result = await grantGuardian(actor, patientId, { name: details.name, phone: details.phone, relationship: details.relationship, proof: details.proof, ...(details.email ? { email: details.email } : {}), deferDelivery: !row.invite, ...(confirmation.confirmedGuardianId ? { confirmedGuardianId: confirmation.confirmedGuardianId } : {}) })
+  await db.update(patientContactIntake).set({ status: 'LINKED', proof: '' }).where(and(eq(patientContactIntake.id, intakeId), eq(patientContactIntake.status, 'LINK_FAILED')))
+  return result
 }
 
 export async function updatePatientIdentity(actor: Actor, id: string, nationalId: string) {

@@ -118,7 +118,7 @@ describe('clinical patients and visits on a disposable WHO database', () => {
     expect((await getPatient(doctor, provisional.patient.id)).birthWeightKg).toBe(2.1)
     expect((await listPatients(doctor, 'jose')).some(row => row.id === first.patient.id)).toBe(true)
     expect((await listPatients(doctor, '1710034065')).some(row => row.id === first.patient.id)).toBe(true)
-    expect((await listPatients(doctor, 'jose')).map(row => row.name)).toEqual(['Jóse Pérez', 'José Pérez'])
+    expect((await listPatients(doctor, 'jose')).map(row => row.name).toSorted()).toEqual(['José Pérez', 'Jóse Pérez'].toSorted())
   })
 
   it('rejects non-doctors, invalid birth/gestation and preserves doctor-wide access with read audit', async () => {

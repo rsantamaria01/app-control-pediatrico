@@ -127,6 +127,21 @@ export const patient = pgTable('patient', {
   check('patient_correction_ck', sql`${table.correctionUntilMonths} IN (24, 36)`)
 ])
 
+export const patientContactIntake = pgTable('patient_contact_intake', {
+  id: text('id').primaryKey(),
+  patientId: text('patient_id').notNull().references(() => patient.id, { onDelete: 'restrict' }),
+  position: integer('position').notNull(),
+  name: text('name').notNull(),
+  relationship: text('relationship').notNull(),
+  phone: text('phone').notNull(),
+  email: text('email'),
+  proof: text('proof').notNull(),
+  invite: boolean('invite').notNull(),
+  status: text('status').notNull().default('LINK_FAILED'),
+  createdBy: text('created_by').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
+}, table => [index('patient_contact_intake_patient_idx').on(table.patientId, table.status), check('patient_contact_intake_status_ck', sql`${table.status} IN ('LINK_FAILED', 'LINKED')`)])
+
 export const guardianPhone = pgTable('guardian_phone', {
   guardianId: text('guardian_id').primaryKey().references(() => user.id, { onDelete: 'restrict' }),
   phone: text('phone').notNull().unique()

@@ -58,7 +58,11 @@ case "$output" in
 esac
 case "$output" in
   *ECONNREFUSED*|*ENETUNREACH*) ;;
-  *) fail OFFLINE_NO_NETWORK_ERROR ;;
+  *MODULE_NOT_FOUND*|*ERR_MODULE_NOT_FOUND*) fail OFFLINE_MODULE_NOT_FOUND ;;
+  *'No config path provided'*|*'Cannot find config file'*) fail OFFLINE_MISSING_CONFIG ;;
+  *SyntaxError*) fail OFFLINE_SYNTAX_ERROR ;;
+  *'connect '*|*'Connection '*|*'connection '*) fail OFFLINE_CONNECTION_OTHER ;;
+  *) fail OFFLINE_RUNTIME_OTHER ;;
 esac
 phase=who-gate
 for approval in unset true; do

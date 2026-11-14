@@ -46,9 +46,10 @@ describe('production operations', () => {
     for (const phase of ['build', 'offline-migration', 'who-gate', 'compose-up', 'compose-verify', 'who-volume', 'bootstrap']) {
       expect(content).toContain(`phase=${phase}`)
     }
-    for (const code of ['OFFLINE_UNEXPECTED_SUCCESS', 'OFFLINE_COREPACK', 'OFFLINE_PERMISSION', 'OFFLINE_DOWNLOAD', 'OFFLINE_NO_NETWORK_ERROR']) {
+    for (const code of ['OFFLINE_UNEXPECTED_SUCCESS', 'OFFLINE_COREPACK', 'OFFLINE_PERMISSION', 'OFFLINE_DOWNLOAD']) {
       expect(content).toContain(code)
     }
+    for (const code of ['OFFLINE_MODULE_NOT_FOUND', 'OFFLINE_MISSING_CONFIG', 'OFFLINE_SYNTAX_ERROR', 'OFFLINE_CONNECTION_OTHER', 'OFFLINE_RUNTIME_OTHER']) expect(content).toContain(code)
     expect(content).toMatch(/ops-smoke failed phase=%s code=%s/)
     expect(content).not.toMatch(/(?:printf|echo)\s+[^\n]*\$output/)
     expect(content).not.toMatch(/set -x/)

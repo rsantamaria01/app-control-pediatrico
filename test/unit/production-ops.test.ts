@@ -88,6 +88,11 @@ describe('production operations', () => {
     expect(result.stderr).toContain('Explicit WHO import approval required')
   })
 
+  it('avoids a runtime tsx cache write during migrations', () => {
+    const launcher = readFileSync(new URL('../../scripts/ops.mjs', import.meta.url), 'utf8')
+    expect(launcher).toContain('TSX_DISABLE_CACHE')
+  })
+
   it('starts migrations through Node without Corepack before failing on an unreachable database', () => {
     const result = spawnSync('node', ['scripts/ops.mjs', 'db:migrate'], {
       env: { ...process.env, DB_PASSWORD: 'offline', DB_HOST: '127.0.0.1', DB_NAME: 'pediatrico_ops_offline_test', COREPACK_HOME: '/nonexistent-corepack', COREPACK_ENABLE_NETWORK: '0' },

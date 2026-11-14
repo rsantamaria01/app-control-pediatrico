@@ -19,7 +19,8 @@ if (command === 'who-import' && action === 'import' && process.env.WHO_ALLOW_CLI
 const args = command === 'who-import' && action === 'download'
   ? paths[command]
   : ['scripts/database-env.mjs', 'node', ...paths[command]]
-const child = spawn(process.execPath, args, { stdio: 'inherit', env: process.env })
+const env = command === 'db:migrate' ? { ...process.env, TSX_DISABLE_CACHE: '1' } : process.env
+const child = spawn(process.execPath, args, { stdio: 'inherit', env })
 child.on('error', () => {
   process.stderr.write('Ops command failed to start\n')
   process.exitCode = 1

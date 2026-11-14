@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 const dockerfile = readFileSync(new URL('../../Dockerfile', import.meta.url), 'utf8')
 const compose = readFileSync(new URL('../../compose.yaml', import.meta.url), 'utf8')
+const ci = readFileSync(new URL('../../.github/workflows/ci.yml', import.meta.url), 'utf8')
 const scripts = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8')).scripts
 
 vi.mock('nitropack/runtime', () => ({ defineNitroPlugin: (plugin: unknown) => plugin }))
@@ -17,6 +18,29 @@ const { default: recoveryPlugin } = await import('../../server/plugins/recovery-
 const { acquireRecoveryWorker, reconcileRecoveryJobs, processRecoveryJobs } = await import('../../server/services/recovery')
 
 describe('production operations', () => {
+  it('runs an unconditional Docker ops and Compose smoke on pushes and PRs', () => {
+    expect(ci).toMatch(/on:\s*\[push, pull_request\]/)
+    expect(ci).toMatch(/runs-on: ubuntu-latest/)
+    expect(ci).toMatch(/scripts\/ci-ops-smoke\.sh/)
+    const script = new URL('../../scripts/ci-ops-smoke.sh', import.meta.url)
+    const syntax = spawnSync('sh', ['-n', script.pathname], { encoding: 'utf8' })
+    expect(syntax.status).toBe(0)
+    const content = readFileSync(script, 'utf8')
+    expect(content).toMatch(/docker build --target ops/)
+    expect(content).toMatch(/--network none/)
+    expect(content).toMatch(/--read-only/)
+    expect(content).toMatch(/docker compose --env-file \/dev\/null --project-name "\$project" --profile full/)
+    expect(content).toMatch(/compose up -d --build/)
+    expect(content).toMatch(/compose ps -a -q ops/)
+    expect(content).toMatch(/compose ps --status running -q app/)
+    expect(content).toMatch(/\[ ! -e \.env \]/)
+    expect(content).toMatch(/NUXT_APP_SECRET=%s/)
+    expect(content).toMatch(/rm -f \.env/)
+    expect(content).toMatch(/WHO_ALLOW_CLINICAL_IMPORT=true/)
+    expect(content).toMatch(/ci-volume-check/)
+    expect(content).toMatch(/bootstrap-admin/)
+  })
+
   it('ships migration and bootstrap inputs in an ops image without adding them to the app image', () => {
     expect(dockerfile).toMatch(/FROM node:24-alpine AS ops/)
     const ops = dockerfile.split('FROM node:24-alpine AS ops')[1]?.split('FROM node:24-alpine AS app')[0]

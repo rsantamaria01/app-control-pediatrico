@@ -1,6 +1,6 @@
 name: ci
 
-on: push
+on: [push, pull_request]
 
 jobs:
   ci:
@@ -32,3 +32,12 @@ jobs:
 
       - name: Typecheck
         run: pnpm run typecheck
+
+  ops-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Verify production ops and Compose startup
+        run: sh scripts/ci-ops-smoke.sh

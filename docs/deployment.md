@@ -6,7 +6,7 @@ Deploy one Compose project and one database per clinic. TLS termination and the 
 
 Create a local, git-ignored `.env` from `.env.example` and set unique production values before starting. Compose uses `DB_PASSWORD` for PostgreSQL and the app/ops database connection, and `S3_ACCESS_KEY` and `S3_SECRET_KEY` for RustFS and the app. Set `NUXT_APP_SECRET` (stable, random, at least 32 characters), `RECOVERY_QUEUE_SECRET` (stable 32 random bytes in hex), and `NUXT_PUBLIC_SITE_URL` (externally reachable HTTPS origin). Set `SMTP_HOST`, `SMTP_PORT`, `SMTP_FROM`, `SMTP_SECURE`, and, for authenticated SMTP, both `SMTP_USER` and `SMTP_PASS`. Set `AUTH_TRUSTED_PROXY_CIDR` only for a proxy that overwrites forwarded headers and blocks direct access. Optional branding uses `NUXT_PUBLIC_CLINIC_PRIMARY` and `NUXT_PUBLIC_CLINIC_LOGO`. Do not use example passwords in a public deployment.
 
-Compose passes the raw `DB_PASSWORD` with fixed `DB_HOST=db` and `DB_NAME=pediatrico` to the app and ops; the Node entrypoint percent-encodes the password into `DATABASE_URL` for each child and removes the raw variable from the child environment. Do not assemble `DATABASE_URL` by string interpolation or override it in `.env`; delimiters in passwords must remain valid. The app gets `REDIS_URL` and S3 connection details; ops gets the same database password and the `.env` values needed for bootstrap. Avoid changing `DB_PASSWORD` without also updating the PostgreSQL user's password in the existing volume. Pin and review the RustFS image version before production use.
+Compose passes the raw `DB_PASSWORD` with fixed `DB_HOST=db` and `DB_NAME=pediatrico` to the app and ops; the Node launcher percent-encodes the password into `DATABASE_URL` for each database child and removes the raw variable from the child environment. Ops dispatches migrations, bootstrap and WHO import directly with Node; it needs no Corepack cache or package-manager download at runtime. Do not assemble `DATABASE_URL` by string interpolation or override it in `.env`; delimiters in passwords must remain valid. The app gets `REDIS_URL` and S3 connection details; ops gets the same database password and the `.env` values needed for bootstrap. Avoid changing `DB_PASSWORD` without also updating the PostgreSQL user's password in the existing volume. Pin and review the RustFS image version before production use.
 
 ## First deployment
 
@@ -14,6 +14,24 @@ Compose passes the raw `DB_PASSWORD` with fixed `DB_HOST=db` and `DB_NAME=pediat
 2. Run `docker compose --profile full up -d --build`. The `ops` container waits for a healthy database, runs committed Drizzle migrations, and exits successfully before the `app` starts. If migration fails, the app must not start: inspect `docker compose --profile full logs ops`, fix the cause and retry. Do not bypass the migration gate.
 3. Set `BOOTSTRAP_ADMIN_USERNAME` and `BOOTSTRAP_ADMIN_EMAIL` temporarily in the git-ignored `.env` (restrict its permissions). Run `docker compose run --rm ops bootstrap-admin`. The command requires the HTTPS site URL and an empty user table with no prior bootstrap marker; it prints one single-use, seven-day invitation link. Deliver it privately to the administrator, set a password via the link, then remove the temporary bootstrap variables. Do not rerun bootstrap after users exist.
 4. Verify sign-in, invitation email delivery, application logs, and the protected clinical access path with a real authorized account.
+
+### Optional WHO 2006 clinical reference import
+
+The app does not import reference tables during startup or migration. The ops image includes the 12 pinned WHO 2006 XLSX URLs and SHA256 checksums in `scripts/who-2006-manifest.json`; `who-source` is a persistent, non-root-writable ops volume, separate from Git. Before any clinical import, confirm the clinic has the necessary rights to retrieve and use these spreadsheets and obtain explicit approval. Do not set the approval flag in `.env`, or run these commands against a clinic whose rights have not been verified.
+
+After the first deployment's migrations, or after a gated upgrade with writes blocked and a verified paired backup, download the originals with outbound access and verify all 12 checksums:
+
+```sh
+docker compose --profile full run --rm --no-deps ops who-import download
+```
+
+If downloads are unavailable on the deployment host, transfer the 12 original files securely from an authorized source into the `who-source` volume as `<manifest name>-expanded.xlsx`; do not put them in the repository. The import reads only local files and rechecks each pinned SHA256 before any database write. Once rights have been confirmed, explicitly allow this one import invocation (do not persist the flag):
+
+```sh
+docker compose --profile full run --rm --no-deps -e WHO_ALLOW_CLINICAL_IMPORT=yes ops who-import import
+```
+
+The flag must be exactly `yes`. If any file is missing or mismatched, the import fails without adding a partial release. The complete release is sealed atomically, and rerunning the command verifies the existing rows without replacing them. Check the command output for 12 datasets and validate the clinical reference availability with an authorized doctor; keep external writes blocked during an upgrade import. An absent or unapproved import leaves WHO indicators unavailable, not filled with fictional data.
 
 ## Upgrades and recovery
 

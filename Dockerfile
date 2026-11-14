@@ -8,16 +8,19 @@ RUN pnpm build
 
 FROM node:24-alpine AS ops
 WORKDIR /app
-ENV COREPACK_HOME=/usr/local/share/corepack
-RUN corepack enable && corepack install --global pnpm@12.15.0 && chmod -R a+rX /usr/local/share/corepack
 COPY --from=build --chown=node:node /app/node_modules ./node_modules
 COPY --chown=node:node package.json pnpm-lock.yaml pnpm-workspace.yaml drizzle.config.ts ./
 COPY --chown=node:node server/db/schema.ts ./server/db/schema.ts
 COPY --chown=node:node server/db/migrations ./server/db/migrations
 COPY --chown=node:node server/services/credentials.ts ./server/services/credentials.ts
-COPY --chown=node:node scripts/bootstrap-admin.ts scripts/database-env.mjs ./scripts/
+COPY --chown=node:node shared/utils/enums.ts ./shared/utils/enums.ts
+COPY --chown=node:node shared/types/who.ts ./shared/types/who.ts
+COPY --chown=node:node scripts/bootstrap-admin.ts scripts/database-env.mjs scripts/ops.mjs scripts/import-who.ts scripts/who-2006-manifest.json ./scripts/
+COPY --chown=node:node server/services/who-import.ts ./server/services/who-import.ts
+RUN mkdir /who-source && chown node:node /who-source
+ENV WHO_SOURCE_DIR=/who-source
 USER node
-ENTRYPOINT ["pnpm", "run"]
+ENTRYPOINT ["node", "scripts/ops.mjs"]
 CMD ["db:migrate"]
 
 FROM node:24-alpine AS app

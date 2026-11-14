@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
 import { describe, expect, it, vi } from 'vitest'
 
 const dockerfile = readFileSync(new URL('../../Dockerfile', import.meta.url), 'utf8')
@@ -21,7 +22,7 @@ describe('production operations', () => {
     const ops = dockerfile.split('FROM node:24-alpine AS ops')[1]?.split('FROM node:24-alpine AS app')[0]
     const app = dockerfile.split('FROM node:24-alpine AS app')[1]
     for (const path of ['node_modules', 'drizzle.config.ts', 'server/db/schema.ts', 'server/db/migrations', 'server/services/credentials.ts', 'scripts/bootstrap-admin.ts']) expect(ops).toContain(path)
-    expect(ops).toContain('ENTRYPOINT ["pnpm", "run"]')
+    expect(ops).toContain('ENTRYPOINT ["node", "scripts/ops.mjs"]')
     expect(ops).toContain('CMD ["db:migrate"]')
     expect(app).toContain('/app/.output')
     expect(app).toContain('scripts/database-env.mjs')
@@ -36,6 +37,32 @@ describe('production operations', () => {
     expect(ops).toContain('target: ops')
     expect(ops).toContain('profiles: ["full"]')
     expect(ops).toMatch(/db:\s*\{ condition: service_healthy \}/)
+  })
+
+  it('rejects WHO import without explicit rights before launching database or downloading', () => {
+    const result = spawnSync('node', ['scripts/ops.mjs', 'who-import', 'import'], {
+      env: { ...process.env, WHO_ALLOW_CLINICAL_IMPORT: 'true', DB_PASSWORD: 'unused', WHO_SOURCE_DIR: '/nonexistent' },
+      encoding: 'utf8'
+    })
+    expect(result.status).toBe(1)
+    expect(result.stderr).toContain('Explicit WHO import approval required')
+  })
+
+  it('starts migrations through Node without Corepack before failing on an unreachable database', () => {
+    const result = spawnSync('node', ['scripts/ops.mjs', 'db:migrate'], {
+      env: { ...process.env, DB_PASSWORD: 'offline', DB_HOST: '127.0.0.1', DB_NAME: 'pediatrico_ops_offline_test', COREPACK_HOME: '/nonexistent-corepack', COREPACK_ENABLE_NETWORK: '0' },
+      encoding: 'utf8', timeout: 30_000
+    })
+    expect(result.status).not.toBe(0)
+    expect(result.stderr).not.toMatch(/Corepack|EACCES|download/i)
+    expect(`${result.stdout}\n${result.stderr}`).toMatch(/connect|ECONNREFUSED|database/i)
+  })
+
+  it('does not run WHO import automatically when the ops command is omitted', () => {
+    const result = spawnSync('node', ['scripts/ops.mjs'], { env: { ...process.env, DB_PASSWORD: undefined, WHO_ALLOW_CLINICAL_IMPORT: 'yes' }, encoding: 'utf8' })
+    expect(result.status).toBe(1)
+    expect(result.stderr).toContain('Database password required')
+    expect(result.stderr).not.toContain('WHO')
   })
 })
 

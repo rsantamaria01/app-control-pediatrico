@@ -4,8 +4,7 @@ import {
   computeAllZScores,
   correctZ,
   rawZ,
-  valueAtZ,
-  zScoreBand
+  valueAtZ
 } from '../../shared/utils/zscore'
 import { Gender, WhoIndicator } from '../../shared/utils/enums'
 import type { LmsRow } from '../../shared/utils/zscore'
@@ -74,17 +73,6 @@ describe('bmi', () => {
   })
 })
 
-describe('zScoreBand', () => {
-  it('bands by absolute z', () => {
-    expect(zScoreBand(0)).toBe('green')
-    expect(zScoreBand(1)).toBe('green')
-    expect(zScoreBand(-1.5)).toBe('yellow')
-    expect(zScoreBand(2.5)).toBe('orange')
-    expect(zScoreBand(-3.5)).toBe('red')
-    expect(zScoreBand(null)).toBe('na')
-  })
-})
-
 describe('computeAllZScores', () => {
   const lmsRows: LmsRow[] = [
     {
@@ -127,11 +115,28 @@ describe('computeAllZScores', () => {
       heightCm: 75.7,
       ageMonths: 12,
       gender: Gender.MALE,
-      lmsRows
+      lmsRows,
+      position: 'RECUMBENT'
     })
     expect(z.haz).toBeCloseTo(0, 6)
     expect(z.waz).toBeCloseTo(0, 6)
     expect(z.bmi).toBeCloseTo(9.6 / 0.757 / 0.757, 3)
+  })
+
+  it('never computes WHO 2006 results after age 5 or from the wrong position table', () => {
+    const rows = [...lmsRows,
+      { indicator: WhoIndicator.WEIGHT_FOR_HEIGHT, gender: Gender.MALE, xValue: 75.7, l: 1, m: 9.6, s: 0.1 },
+      { indicator: WhoIndicator.HEIGHT_FOR_AGE, gender: Gender.MALE, xValue: 60, l: 1, m: 75.7, s: 0.1 },
+      { indicator: WhoIndicator.WEIGHT_FOR_AGE, gender: Gender.MALE, xValue: 60, l: 1, m: 9.6, s: 0.1 },
+      { indicator: WhoIndicator.BMI_FOR_AGE, gender: Gender.MALE, xValue: 60, l: 1, m: 16.8, s: 0.1 }
+    ]
+    const unsupported = computeAllZScores({ weightKg: 9.6, heightCm: 75.7, ageMonths: 60, gender: Gender.MALE, lmsRows: rows, position: 'RECUMBENT' })
+    expect([unsupported.haz, unsupported.waz, unsupported.whz, unsupported.baz]).toEqual([null, null, null, null])
+    const infant = computeAllZScores({ weightKg: 9.6, heightCm: 75.7, ageMonths: 12, gender: Gender.MALE, lmsRows: rows, position: 'RECUMBENT' })
+    expect(infant.whz).toBeNull()
+    const wrongPosition = computeAllZScores({ weightKg: 9.6, heightCm: 75.7, ageMonths: 12, gender: Gender.MALE, lmsRows: rows, position: 'STANDING' })
+    expect(wrongPosition.haz).toBeNull()
+    expect(wrongPosition.whz).toBeNull()
   })
 
   it('returns null for indicators outside their range', () => {
@@ -140,7 +145,8 @@ describe('computeAllZScores', () => {
       heightCm: 130,
       ageMonths: 240, // beyond WFA range and WFH x range
       gender: Gender.MALE,
-      lmsRows
+      lmsRows,
+      position: 'RECUMBENT'
     })
     expect(z.haz).toBeNull()
     expect(z.waz).toBeNull()

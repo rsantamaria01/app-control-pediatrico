@@ -11,8 +11,7 @@
  * Annex C "Computation of z-scores for restricted applications".
  */
 
-import type { Gender } from './enums'
-import { WhoIndicator } from './enums'
+import { Gender, WhoIndicator } from './enums'
 
 export interface LmsRow {
   indicator: WhoIndicator
@@ -148,6 +147,7 @@ export interface AllZScoresInput {
   ageMonths: number
   gender: Gender
   lmsRows: readonly LmsRow[]
+  position: 'RECUMBENT' | 'STANDING'
 }
 
 export interface AllZScores {
@@ -164,8 +164,13 @@ export interface AllZScores {
  * for that indicator.
  */
 export function computeAllZScores(input: AllZScoresInput): AllZScores {
-  const { weightKg, heightCm, ageMonths, gender, lmsRows } = input
+  const { weightKg, heightCm, ageMonths, gender, lmsRows, position } = input
   const bmiValue = bmi(weightKg, heightCm)
+  if (!Number.isFinite(ageMonths) || ageMonths < 0 || ageMonths >= 60 || !Object.values(Gender).includes(gender)) {
+    return { haz: null, waz: null, whz: null, baz: null, bmi: bmiValue }
+  }
+  const expectedPosition = ageMonths < 24 ? 'RECUMBENT' : 'STANDING'
+  const matchingPosition = position === expectedPosition
 
   const lookup = (indicator: WhoIndicator, x: number, value: number): number | null => {
     const lms = lookupLms(lmsRows, indicator, gender, x)
@@ -176,22 +181,10 @@ export function computeAllZScores(input: AllZScoresInput): AllZScores {
   }
 
   return {
-    haz: lookup(WhoIndicator.HEIGHT_FOR_AGE, ageMonths, heightCm),
+    haz: matchingPosition ? lookup(WhoIndicator.HEIGHT_FOR_AGE, ageMonths, heightCm) : null,
     waz: lookup(WhoIndicator.WEIGHT_FOR_AGE, ageMonths, weightKg),
-    whz: lookup(WhoIndicator.WEIGHT_FOR_HEIGHT, heightCm, weightKg),
+    whz: matchingPosition ? lookup(ageMonths < 24 ? WhoIndicator.WEIGHT_FOR_LENGTH : WhoIndicator.WEIGHT_FOR_HEIGHT, heightCm, weightKg) : null,
     baz: lookup(WhoIndicator.BMI_FOR_AGE, ageMonths, bmiValue),
     bmi: bmiValue
   }
-}
-
-/** Z-score band helper for the table view's color coding. */
-export function zScoreBand(z: number | null): 'na' | 'green' | 'yellow' | 'orange' | 'red' {
-  if (z === null || Number.isNaN(z)) {
-    return 'na'
-  }
-  const abs = Math.abs(z)
-  if (abs <= 1) return 'green'
-  if (abs <= 2) return 'yellow'
-  if (abs <= 3) return 'orange'
-  return 'red'
 }

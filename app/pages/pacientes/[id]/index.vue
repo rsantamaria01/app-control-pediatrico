@@ -7,6 +7,8 @@ const route = useRoute()
 const id = route.params.id as string
 const { data, error, refresh } = await useFetch<{ patient: PatientView, visits: VisitSnapshot[] }>(`/api/pacientes/${encodeURIComponent(id)}`)
 const latest = computed(() => data.value?.visits[0])
+const latestResults = computed(() => latest.value?.results.filter(result => result.parentResultId === null) ?? [])
+const recalculations = computed(() => [...new Set(latest.value?.results.map(result => result.recalculationId).filter((id): id is string => Boolean(id)) ?? [])])
 const labels: Record<WhoIndicator, string> = {
   HEIGHT_FOR_AGE: 'Longitud/talla para la edad', WEIGHT_FOR_AGE: 'Peso para la edad',
   WEIGHT_FOR_LENGTH: 'Peso para la longitud', WEIGHT_FOR_HEIGHT: 'Peso para la talla',
@@ -96,7 +98,7 @@ const dateFormat = new Intl.DateTimeFormat('es-EC', { day: 'numeric', month: 'sh
           </div>
           <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <UCard
-              v-for="result in latest.results"
+              v-for="result in latestResults"
               :key="result.id"
             >
               <h3 class="text-sm font-medium">
@@ -121,6 +123,41 @@ const dateFormat = new Intl.DateTimeFormat('es-EC', { day: 'numeric', month: 'sh
               </p>
             </UCard>
           </div>
+          <UCard v-if="recalculations.length">
+            <h3 class="font-semibold">
+              Resultados recalculados · revisión médica
+            </h3>
+            <p class="mt-1 text-sm text-muted">
+              El registro original permanece sin cambios. Los resultados nuevos se muestran por separado y no se comparten automáticamente.
+            </p>
+            <div
+              v-for="recalculationId in recalculations"
+              :key="recalculationId"
+              class="mt-3 space-y-2"
+            >
+              <p class="text-xs text-muted">
+                Revisión {{ recalculationId }}
+              </p>
+              <ul class="grid gap-2 sm:grid-cols-2">
+                <li
+                  v-for="result in latest.results.filter(item => item.recalculationId === recalculationId)"
+                  :key="result.id"
+                  class="rounded-md border border-default p-2"
+                >
+                  <strong class="text-sm">{{ labels[result.indicator as WhoIndicator] }}</strong>
+                  <p class="tabular-nums">
+                    {{ result.status === 'available' ? formatGrowthValues(result.z, result.percentile) : 'No disponible' }}
+                  </p>
+                  <p
+                    v-if="result.status === 'available'"
+                    class="text-xs text-muted"
+                  >
+                    {{ result.reference.version }} · {{ result.reference.ageBasis === 'CORRECTED' ? 'Edad corregida' : 'Edad cronológica' }}
+                  </p>
+                </li>
+              </ul>
+            </div>
+          </UCard>
         </section>
         <section class="space-y-3">
           <h2 class="text-lg font-semibold">
@@ -182,7 +219,7 @@ const dateFormat = new Intl.DateTimeFormat('es-EC', { day: 'numeric', month: 'sh
                       {{ lengthFormat.format(item.headCircumferenceCm) }} cm
                     </td><td class="p-3 tabular-nums">
                       <template
-                        v-for="result in item.results"
+                        v-for="result in item.results.filter(result => result.parentResultId === null)"
                         :key="result.id"
                       >
                         <span v-if="result.indicator === WhoIndicator.WEIGHT_FOR_AGE">{{ result.status === 'available' ? formatGrowthValues(result.z, result.percentile) : 'No disponible' }}</span>

@@ -9,7 +9,7 @@ export const patientSchema = z.strictObject({
   name: z.string().trim().min(2).max(160),
   birthDate: dateOnly,
   sex: z.enum(Gender),
-  gestationDays: z.number().int().min(140).max(280).optional(),
+  gestationDays: z.number().int().min(140).max(301).optional(),
   correctionUntilMonths: z.union([z.literal(24), z.literal(36)]).default(24),
   birthWeightKg: positive(20).optional(),
   birthLengthCm: positive(80).optional(),
@@ -19,19 +19,22 @@ export const patientSchema = z.strictObject({
 export const visitSchema = z.strictObject({
   requestId: z.uuid(),
   measuredAt: z.iso.datetime({ offset: true }),
-  weightKg: positive(250),
-  lengthHeightCm: z.number().finite().min(40).max(220),
+  weightKg: positive(100),
+  lengthHeightCm: z.number().finite().min(40).max(200),
   position: z.enum(['RECUMBENT', 'STANDING']),
-  headCircumferenceCm: z.number().finite().min(20).max(80),
+  headCircumferenceCm: z.number().finite().min(20).max(65),
   privateNote: z.string().trim().max(10000).optional(),
   parentAdvice: z.string().trim().max(10000).optional(),
   clinicianTrend: z.string().trim().max(1000).optional()
+}).superRefine((value, context) => {
+  const weightToHeight = value.weightKg / (value.lengthHeightCm / 100) ** 2
+  if (weightToHeight < 2 || weightToHeight > 90) context.addIssue({ code: 'custom', path: ['weightKg'], message: 'Medidas incompatibles; verifique los datos' })
 })
 
 export type PatientInput = z.input<typeof patientSchema>
 export type MeasurementInput = z.input<typeof visitSchema>
 export type PatientView = z.output<typeof patientSchema> & { id: string, createdBy: string }
-export type VisitResultSnapshot = { id: string, indicator: string } & (GrowthResult | { status: 'unavailable', reason: string })
+export type VisitResultSnapshot = { id: string, indicator: string, parentResultId: string | null, recalculationId: string | null, calculatedBy: string | null } & (GrowthResult | { status: 'unavailable', reason: string })
 export type VisitSnapshot = {
   id: string
   patientId: string

@@ -99,7 +99,7 @@ async function save() {
               <UInputNumber
                 v-model="state.gestationWeeks"
                 :min="20"
-                :max="40"
+                :max="43"
                 :increment="false"
                 :decrement="false"
                 class="w-full"

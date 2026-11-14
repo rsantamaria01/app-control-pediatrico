@@ -132,6 +132,8 @@ export const visit = pgTable('clinical_visit', {
   headCircumferenceCm: numeric('head_circumference_cm').notNull(),
   bmi: numeric('bmi').notNull(),
   gestationDaysAtBirth: integer('gestation_days_at_birth'),
+  birthDateAtVisit: text('birth_date_at_visit').notNull(),
+  sexAtVisit: text('sex_at_visit').notNull(),
   correctionUntilMonths: integer('correction_until_months').notNull(),
   authorId: text('author_id').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
@@ -146,8 +148,11 @@ export const visitResult = pgTable('visit_result', {
   visitId: text('visit_id').notNull().references(() => visit.id, { onDelete: 'restrict' }),
   indicator: text('indicator').notNull(),
   snapshot: jsonb('snapshot').notNull(),
+  parentResultId: text('parent_result_id'),
+  recalculationId: text('recalculation_id'),
+  calculatedBy: text('calculated_by').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
-}, table => [index('visit_result_visit_idx').on(table.visitId)])
+}, table => [index('visit_result_visit_idx').on(table.visitId), uniqueIndex('visit_result_recalculation_indicator_idx').on(table.recalculationId, table.indicator)])
 
 export const visitText = pgTable('visit_text', {
   visitId: text('visit_id').primaryKey().references(() => visit.id, { onDelete: 'restrict' }),

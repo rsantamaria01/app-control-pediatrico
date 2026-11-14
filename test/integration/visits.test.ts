@@ -9,7 +9,7 @@ import { Pool } from 'pg'
 import manifest from '../../scripts/who-2006-manifest.json'
 import { importWhoRelease, parseWhoWorkbook } from '../../server/services/who-import'
 import { createPatient, getPatient, listPatients } from '../../server/services/patients'
-import { createVisit, getVisits, shareableVisit } from '../../server/services/visits'
+import { createVisit, getVisits, recalculateVisit, shareableVisit } from '../../server/services/visits'
 import { auditEvent, patient, visit, visitResult } from '../../server/db/schema'
 import type { VerifiedSource } from '../../shared/types/who'
 import type { Actor } from '../../shared/types/access'
@@ -73,22 +73,7 @@ async function importRelease() {
 }
 
 describe('clinical patients and visits on a disposable WHO database', () => {
-  it('rejects non-doctors, invalid birth/gestation and preserves doctor-wide access with read audit', async () => {
-    await expect(createPatient(adminOnly, patientInput)).rejects.toThrow()
-    await expect(createPatient(assistant, patientInput)).rejects.toThrow()
-    await expect(createPatient(doctor, { ...patientInput, birthDate: '2024-02-30' })).rejects.toThrow()
-    await expect(createPatient(doctor, { ...patientInput, gestationDays: 300 })).rejects.toThrow()
-    const created = await createPatient(doctor, patientInput)
-    expect(created).toMatchObject(patientInput)
-    expect(await getPatient(otherDoctor, created.id)).toMatchObject({ id: created.id, name: patientInput.name })
-    expect((await listPatients(otherDoctor, 'Niña')).map(item => item.id)).toContain(created.id)
-    expect((await listPatients(otherDoctor, 'Ni_a')).map(item => item.id)).not.toContain(created.id)
-    await expect(listPatients(assistant, '')).rejects.toThrow()
-    await expect(getPatient(adminOnly, created.id)).rejects.toThrow()
-    expect((await db.select().from(auditEvent).where(eq(auditEvent.subjectId, created.id))).map(row => row.action)).toContain('CLINICAL_READ')
-  })
-
-  it('stores unavailable, never invented, results when no approved sealed WHO data exist', async () => {
+  it('appends identified WHO results after an approved import while preserving the unavailable originals', async () => {
     const created = await createPatient(doctor, patientInput)
     const snapshot = await createVisit(doctor, created.id, { ...measurement, requestId: randomUUID() })
     expect(snapshot.results.every(result => result.status === 'unavailable')).toBe(true)
@@ -99,6 +84,176 @@ describe('clinical patients and visits on a disposable WHO database', () => {
     expect((await db.select().from(visitResult).where(eq(visitResult.visitId, snapshot.id)))).toHaveLength(5)
     await importRelease()
     expect((await getVisits(doctor, created.id))[0]?.results.every(result => result.status === 'unavailable')).toBe(true)
+    const initial = snapshot
+    const recalculated = await recalculateVisit(otherDoctor, created.id, initial.id, { requestId: randomUUID() })
+    expect(recalculated.results).toHaveLength(5)
+    expect(recalculated.results.find(result => result.indicator === WhoIndicator.WEIGHT_FOR_AGE)).toMatchObject({ status: 'available', sex: Gender.FEMALE, reference: { version: manifest.version } })
+    expect(recalculated.results.every(result => result.parentResultId && initial.results.some(original => original.id === result.parentResultId && original.indicator === result.indicator))).toBe(true)
+    expect(recalculated.results.every(result => !initial.results.some(original => original.id === result.id))).toBe(true)
+    const stored = (await getVisits(doctor, created.id))[0]!
+    expect(stored.results.filter(result => result.parentResultId === null).toSorted((a, b) => a.indicator.localeCompare(b.indicator))).toEqual(initial.results.toSorted((a, b) => a.indicator.localeCompare(b.indicator)))
+    expect(stored.results).toHaveLength(10)
+    expect(stored.weightKg).toBe(initial.weightKg)
+    expect(stored.privateNote).toBe('Confidencial clínico')
+    expect(JSON.stringify(recalculated)).not.toContain('Confidencial clínico')
+    expect((await db.select().from(auditEvent).where(eq(auditEvent.subjectId, created.id))).some(event => event.action === 'CLINICAL_RECALCULATE' && event.actorId === otherDoctor.id && event.outcome === 'ALLOWED')).toBe(true)
+  }, 120000)
+
+  it('rejects non-doctors, invalid birth/gestation and preserves doctor-wide access with read audit', async () => {
+    await expect(createPatient(adminOnly, patientInput)).rejects.toThrow()
+    await expect(createPatient(assistant, patientInput)).rejects.toThrow()
+    await expect(createPatient(doctor, { ...patientInput, birthDate: '2024-02-30' })).rejects.toThrow()
+    await expect(createPatient(doctor, { ...patientInput, gestationDays: 302 })).rejects.toThrow()
+    const created = await createPatient(doctor, patientInput)
+    expect(created).toMatchObject(patientInput)
+    expect(await getPatient(otherDoctor, created.id)).toMatchObject({ id: created.id, name: patientInput.name })
+    expect((await listPatients(otherDoctor, 'Niña')).map(item => item.id)).toContain(created.id)
+    expect((await listPatients(otherDoctor, 'Ni_a')).map(item => item.id)).not.toContain(created.id)
+    await expect(listPatients(assistant, '')).rejects.toThrow()
+    await expect(getPatient(adminOnly, created.id)).rejects.toThrow()
+    expect((await db.select().from(auditEvent).where(eq(auditEvent.subjectId, created.id))).map(row => row.action)).toContain('CLINICAL_READ')
+  })
+
+  it('accepts a post-term 42-week birth without correction and rejects unsupported gestational values', async () => {
+    const postTerm = await createPatient(doctor, { name: 'Postérmino', birthDate, sex: Gender.MALE, gestationDays: 294 })
+    expect(postTerm.gestationDays).toBe(294)
+    await expect(createPatient(doctor, { name: 'Fuera de rango', birthDate, sex: Gender.MALE, gestationDays: 302 })).rejects.toThrow()
+    const snapshot = await createVisit(doctor, postTerm.id, { ...measurement, requestId: randomUUID() })
+    expect(snapshot.results.find(item => item.indicator === WhoIndicator.WEIGHT_FOR_AGE)).toMatchObject({ status: 'available', reference: { ageBasis: 'CHRONOLOGICAL', gestationDays: 294, prematurityDays: 0 } })
+  }, 120000)
+
+  it('retries a recalculation concurrently without duplicating results or altering a completed visit submission', async () => {
+    const created = await createPatient(doctor, patientInput)
+    const input = { ...measurement, requestId: randomUUID() }
+    const original = await createVisit(doctor, created.id, input)
+    const requestId = randomUUID()
+    const [first, second] = await Promise.all([
+      recalculateVisit(doctor, created.id, original.id, { requestId }),
+      recalculateVisit(otherDoctor, created.id, original.id, { requestId })
+    ])
+    expect(first).toEqual(second)
+    expect((await db.select().from(visitResult).where(eq(visitResult.visitId, original.id)))).toHaveLength(10)
+    const retry = await createVisit(doctor, created.id, input)
+    expect(retry.results).toEqual(original.results)
+    expect((await getVisits(doctor, created.id))[0]?.results).toHaveLength(10)
+  })
+
+  it('rejects a recalculation request ID reused from a patient visit submission', async () => {
+    const created = await createPatient(doctor, patientInput)
+    const original = await createVisit(doctor, created.id, { ...measurement, requestId: randomUUID() })
+    await expect(recalculateVisit(otherDoctor, created.id, original.id, { requestId: (await db.select().from(visit).where(eq(visit.id, original.id)))[0]!.requestId })).rejects.toThrow()
+    expect((await db.select().from(visitResult).where(eq(visitResult.visitId, original.id)))).toHaveLength(5)
+  })
+
+  it('rejects malformed recalculation requests without appending results', async () => {
+    const created = await createPatient(doctor, patientInput)
+    const original = await createVisit(doctor, created.id, { ...measurement, requestId: randomUUID() })
+    await expect(recalculateVisit(doctor, created.id, original.id, { requestId: 'invalid' })).rejects.toThrow()
+    expect((await db.select().from(visitResult).where(eq(visitResult.visitId, original.id)))).toHaveLength(5)
+  })
+
+  it('does not accept a visit request ID reused for a prior recalculation', async () => {
+    const created = await createPatient(doctor, patientInput)
+    const first = await createVisit(doctor, created.id, { ...measurement, requestId: randomUUID() })
+    const requestId = randomUUID()
+    await recalculateVisit(doctor, created.id, first.id, { requestId })
+    await expect(createVisit(doctor, created.id, { ...measurement, requestId, measuredAt: '2025-03-01T12:00:00.000Z' })).rejects.toThrow()
+    expect((await db.select().from(visit).where(eq(visit.patientId, created.id)))).toHaveLength(1)
+  })
+
+  it('does not attach a previous recalculation to another patient with a reused request ID', async () => {
+    const created = await createPatient(doctor, patientInput)
+    const other = await createPatient(doctor, { ...patientInput, name: 'Segundo paciente' })
+    const original = await createVisit(doctor, created.id, { ...measurement, requestId: randomUUID() })
+    const second = await createVisit(doctor, other.id, { ...measurement, requestId: randomUUID() })
+    const requestId = randomUUID()
+    await recalculateVisit(doctor, created.id, original.id, { requestId })
+    await expect(recalculateVisit(otherDoctor, other.id, second.id, { requestId })).rejects.toThrow()
+    expect((await getVisits(doctor, other.id))[0]?.results).toHaveLength(5)
+  })
+
+  it('does not accept a recalculation request ID used for a different visit', async () => {
+    const created = await createPatient(doctor, patientInput)
+    const first = await createVisit(doctor, created.id, { ...measurement, requestId: randomUUID() })
+    const second = await createVisit(doctor, created.id, { ...measurement, requestId: randomUUID(), measuredAt: '2025-03-01T12:00:00.000Z' })
+    const requestId = randomUUID()
+    await recalculateVisit(doctor, created.id, first.id, { requestId })
+    await expect(recalculateVisit(doctor, created.id, second.id, { requestId })).rejects.toThrow()
+    expect((await db.select().from(visitResult).where(eq(visitResult.visitId, second.id)))).toHaveLength(5)
+  })
+
+  it('denies recalculation for non-doctors and for a visit belonging to a different patient', async () => {
+    const created = await createPatient(doctor, patientInput)
+    const other = await createPatient(doctor, { ...patientInput, name: 'Otro paciente' })
+    const original = await createVisit(doctor, created.id, { ...measurement, requestId: randomUUID() })
+    for (const actor of [assistant, adminOnly, { id: randomUUID(), roles: ['PATIENT'] } as Actor]) {
+      await expect(recalculateVisit(actor, created.id, original.id, { requestId: randomUUID() })).rejects.toThrow()
+    }
+    await expect(recalculateVisit(otherDoctor, other.id, original.id, { requestId: randomUUID() })).rejects.toThrow()
+    await expect(recalculateVisit(otherDoctor, created.id, randomUUID(), { requestId: randomUUID() })).rejects.toThrow()
+    expect((await db.select().from(visitResult).where(eq(visitResult.visitId, original.id)))).toHaveLength(5)
+    expect((await db.select().from(auditEvent).where(eq(auditEvent.subjectId, created.id))).filter(event => event.action === 'CLINICAL_RECALCULATE' && event.outcome === 'DENIED')).toHaveLength(3)
+  })
+
+  it('uses the historical gestation and corrected-age setting when the patient record later changes', async () => {
+    const created = await createPatient(doctor, { ...patientInput, birthDate: '2023-01-01' })
+    const original = await createVisit(doctor, created.id, { ...measurement, requestId: randomUUID(), measuredAt: '2026-01-01T12:00:00.000Z', lengthHeightCm: 90 })
+    await pool.query('UPDATE patient SET birth_date = $1, sex = $2, gestation_days = 280, correction_until_months = 24 WHERE id = $3', ['2023-02-01', Gender.MALE, created.id])
+    await importRelease()
+    const recalculated = await recalculateVisit(doctor, created.id, original.id, { requestId: randomUUID() })
+    expect(recalculated.results.find(result => result.indicator === WhoIndicator.HEIGHT_FOR_AGE)).toMatchObject({ status: 'available', sex: Gender.FEMALE, reference: { ageBasis: 'CORRECTED', chronologicalAgeDays: 1096, gestationDays: 195, adjustmentCm: -0.7 } })
+    expect(recalculated.results.some(result => result.indicator === WhoIndicator.WEIGHT_FOR_HEIGHT)).toBe(true)
+    expect((await getVisits(doctor, created.id))[0]?.results.filter(result => result.parentResultId === null)).toHaveLength(5)
+  }, 120000)
+
+  it('preserves original position and snapshot when recalculated after a local-midnight correction boundary', async () => {
+    const created = await createPatient(doctor, { ...patientInput, gestationDays: 196, correctionUntilMonths: 24 })
+    const before = await createVisit(doctor, created.id, { ...measurement, measuredAt: '2026-01-02T04:59:59.000Z', lengthHeightCm: 85, position: 'STANDING', requestId: randomUUID() })
+    await importRelease()
+    const recalculated = await recalculateVisit(doctor, created.id, before.id, { requestId: randomUUID() })
+    expect(recalculated.results.find(result => result.indicator === WhoIndicator.HEIGHT_FOR_AGE)).toMatchObject({ status: 'available', reference: { ageBasis: 'CORRECTED', referencePosition: 'RECUMBENT', adjustmentCm: 0.7, chronologicalAgeDays: 731 } })
+    expect(recalculated.results.some(result => result.indicator === WhoIndicator.WEIGHT_FOR_LENGTH)).toBe(true)
+    expect((await getVisits(doctor, created.id))[0]?.lengthHeightCm).toBe(85)
+  }, 120000)
+
+  it('recalculates the corrected-age 24-month leap boundary using the original visit position', async () => {
+    const created = await createPatient(doctor, { ...patientInput, birthDate: '2024-02-29', gestationDays: 196, correctionUntilMonths: 24 })
+    const input = { ...measurement, measuredAt: '2026-02-28T04:59:59.000Z', lengthHeightCm: 85, requestId: randomUUID() }
+    const original = await createVisit(doctor, created.id, input)
+    await importRelease()
+    const recalculated = await recalculateVisit(doctor, created.id, original.id, { requestId: randomUUID() })
+    const height = recalculated.results.find(result => result.indicator === WhoIndicator.HEIGHT_FOR_AGE)
+    expect(height).toMatchObject({ status: 'available', reference: { ageBasis: 'CORRECTED', chronologicalAgeDays: 729, referencePosition: 'RECUMBENT' } })
+    expect(recalculated.results.some(result => result.indicator === WhoIndicator.WEIGHT_FOR_LENGTH)).toBe(true)
+  }, 120000)
+
+  it('backfills historical birth date and sex on existing visits when the migration is applied', async () => {
+    const created = await createPatient(doctor, patientInput)
+    const original = await createVisit(doctor, created.id, { ...measurement, requestId: randomUUID() })
+    expect((await db.select().from(visit).where(eq(visit.id, original.id)))[0]).toMatchObject({ birthDateAtVisit: birthDate, sexAtVisit: Gender.FEMALE })
+  })
+
+  it('does not recalculate from a partial or inconsistent original result set', async () => {
+    const created = await createPatient(doctor, patientInput)
+    const original = await createVisit(doctor, created.id, { ...measurement, requestId: randomUUID() })
+    await pool.query('ALTER TABLE visit_result DISABLE TRIGGER USER')
+    try {
+      await pool.query('DELETE FROM visit_result WHERE visit_id = $1 AND indicator = $2', [original.id, WhoIndicator.BMI_FOR_AGE])
+    } finally {
+      await pool.query('ALTER TABLE visit_result ENABLE TRIGGER USER')
+    }
+    await expect(recalculateVisit(otherDoctor, created.id, original.id, { requestId: randomUUID() })).rejects.toThrow()
+    expect((await db.select().from(visitResult).where(eq(visitResult.visitId, original.id)))).toHaveLength(4)
+  })
+
+  it('never appends fabricated available results for a five-year-old or an unsealed release', async () => {
+    const created = await createPatient(doctor, { name: 'Mayor', birthDate: '2020-01-01', sex: Gender.MALE })
+    const original = await createVisit(doctor, created.id, { ...measurement, requestId: randomUUID(), measuredAt: '2025-01-01T12:00:00.000Z' })
+    await importRelease()
+    const recalculated = await recalculateVisit(doctor, created.id, original.id, { requestId: randomUUID() })
+    expect(recalculated.results.every(result => result.status === 'unavailable')).toBe(true)
+    expect(JSON.stringify(recalculated.results)).not.toContain('WHO_2006')
+    expect((await getVisits(doctor, created.id))[0]?.results).toHaveLength(10)
   }, 120000)
 
   it('never reclassifies an original snapshot when a newer unapproved WHO version appears', async () => {
@@ -136,6 +291,16 @@ describe('clinical patients and visits on a disposable WHO database', () => {
     expect(JSON.stringify(shareableVisit(stored))).not.toContain('Seguimiento manual')
     expect(JSON.stringify(shareableVisit(saved))).not.toContain('Confidencial clínico')
     expect(JSON.stringify(shareableVisit({ ...saved, futureConfidentialField: 'NO COMPARTIR' } as typeof saved))).not.toContain('NO COMPARTIR')
+  })
+
+  it('rejects updates and deletes of recalculated result snapshots too', async () => {
+    const created = await createPatient(doctor, patientInput)
+    const original = await createVisit(doctor, created.id, { ...measurement, requestId: randomUUID() })
+    const recalculated = await recalculateVisit(doctor, created.id, original.id, { requestId: randomUUID() })
+    const resultId = recalculated.results[0]!.id
+    await expect(pool.query('UPDATE visit_result SET parent_result_id = NULL WHERE id = $1', [resultId])).rejects.toThrow()
+    await expect(pool.query('DELETE FROM visit_result WHERE id = $1', [resultId])).rejects.toThrow()
+    expect((await db.select().from(visitResult).where(eq(visitResult.id, resultId)))[0]?.parentResultId).toBe(original.results[0]?.id)
   })
 
   it('rejects mutation or deletion of committed base measurements and result snapshots', async () => {
@@ -179,6 +344,28 @@ describe('clinical patients and visits on a disposable WHO database', () => {
     const after24 = await createVisit(doctor, premature.id, { ...measurement, requestId: randomUUID(), measuredAt: '2026-01-02T12:00:00.000Z', lengthHeightCm: 85 })
     expect(at24.results.find(result => result.indicator === WhoIndicator.HEIGHT_FOR_AGE)).toMatchObject({ status: 'available', reference: { ageBasis: 'CORRECTED', referencePosition: 'RECUMBENT' } })
     expect(after24.results.find(result => result.indicator === WhoIndicator.HEIGHT_FOR_AGE)).toMatchObject({ status: 'available', reference: { ageBasis: 'CHRONOLOGICAL', referencePosition: 'STANDING' } })
+  })
+
+  it('rejects impossible paired inputs while retaining a validated WHO extreme tail', async () => {
+    const created = await createPatient(doctor, { name: 'Paciente extremo', birthDate: '2021-01-01', sex: Gender.FEMALE })
+    await expect(createVisit(doctor, created.id, { ...measurement, requestId: randomUUID(), weightKg: 0.1, lengthHeightCm: 120 })).rejects.toThrow()
+    await importRelease()
+    const extreme = await createVisit(doctor, created.id, { ...measurement, requestId: randomUUID(), weightKg: 5, lengthHeightCm: 110, position: 'STANDING', measuredAt: '2025-12-01T12:00:00.000Z' })
+    expect(extreme.weightKg).toBe(5)
+    expect(extreme.results.find(result => result.indicator === WhoIndicator.WEIGHT_FOR_AGE)).toMatchObject({ status: 'available', percentile: null })
+  })
+
+  it('rejects implausible newborn inputs without fabricating growth values while allowing official extreme values', async () => {
+    const newborn = await createPatient(doctor, { name: 'Recién nacido', birthDate: '2024-01-01', sex: Gender.MALE })
+    for (const invalid of [
+      { weightKg: 250, lengthHeightCm: 50, headCircumferenceCm: 35 },
+      { weightKg: 3.346, lengthHeightCm: 200, headCircumferenceCm: 35 },
+      { weightKg: 3.346, lengthHeightCm: 50, headCircumferenceCm: 80 }
+    ]) await expect(createVisit(doctor, newborn.id, { ...measurement, ...invalid, measuredAt: '2024-01-01T12:00:00.000Z', requestId: randomUUID() })).rejects.toThrow()
+    expect(await db.select().from(visit).where(eq(visit.patientId, newborn.id))).toHaveLength(0)
+    await importRelease()
+    const extreme = await createVisit(doctor, newborn.id, { ...measurement, weightKg: 2.048, lengthHeightCm: 45, headCircumferenceCm: 30, measuredAt: '2024-01-01T12:00:00.000Z', requestId: randomUUID() })
+    expect(extreme.results.find(result => result.indicator === WhoIndicator.WEIGHT_FOR_AGE)).toMatchObject({ status: 'available', sex: Gender.MALE })
   })
 
   it('rejects impossible dates and measures without storing partial visits', async () => {
@@ -255,7 +442,7 @@ describe('clinical patients and visits on a disposable WHO database', () => {
     await createVisit(doctor, created.id, { ...measurement, requestId: randomUUID(), measuredAt: '2025-03-01T12:00:00.000Z', weightKg: 11 })
     const historic = (await getVisits(doctor, created.id))[1]!
     expect(historic.weightKg).toBe(9)
-    expect(historic.results).toEqual(first.results)
+    expect(historic.results.toSorted((a, b) => a.indicator.localeCompare(b.indicator))).toEqual(first.results.toSorted((a, b) => a.indicator.localeCompare(b.indicator)))
   })
 
   it('does not compute WHO 2006 at exactly the fifth local birthday', async () => {

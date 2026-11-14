@@ -8,7 +8,17 @@ image="${project}-ops"
 compose() {
   docker compose --env-file /dev/null --project-name "$project" --profile full "$@"
 }
+phase=preflight
+failure_code=COMMAND_FAILED
+fail() {
+  failure_code=$1
+  exit 1
+}
 cleanup() {
+  status=$?
+  if [ "$status" -ne 0 ]; then
+    printf 'ops-smoke failed phase=%s code=%s\n' "$phase" "$failure_code" >&2
+  fi
   compose down -v --remove-orphans >/dev/null 2>&1 || true
   docker image rm "$image" >/dev/null 2>&1 || true
   rm -f .env
@@ -31,34 +41,45 @@ if [ "${GITHUB_ACTIONS:-}" = true ]; then
   done
 fi
 
+phase=build
 docker build --target ops -t "$image" .
+phase=offline-migration
 if output=$(docker run --rm --network none --read-only -e DB_PASSWORD -e DB_HOST=127.0.0.1 -e COREPACK_HOME=/unwritable-corepack "$image" db:migrate 2>&1); then
-  exit 1
+  fail OFFLINE_UNEXPECTED_SUCCESS
 fi
 case "$output" in
-  *Corepack*|*corepack*|*EACCES*|*download*) exit 1 ;;
+  *Corepack*|*corepack*) fail OFFLINE_COREPACK ;;
 esac
 case "$output" in
-  *ECONNREFUSED*|*ENETUNREACH*|*connect*) ;;
-  *) exit 1 ;;
+  *EACCES*|*'permission denied'*) fail OFFLINE_PERMISSION ;;
 esac
+case "$output" in
+  *'about to download'*|*'Downloading the pnpm'*|*'Downloading pnpm'*) fail OFFLINE_DOWNLOAD ;;
+esac
+case "$output" in
+  *ECONNREFUSED*|*ENETUNREACH*) ;;
+  *) fail OFFLINE_NO_NETWORK_ERROR ;;
+esac
+phase=who-gate
 for approval in unset true; do
   if [ "$approval" = unset ]; then
     if output=$(docker run --rm --network none --read-only "$image" who-import import 2>&1); then
-      exit 1
+      fail WHO_GATE_UNEXPECTED_SUCCESS
     fi
   else
     if output=$(docker run --rm --network none --read-only -e WHO_ALLOW_CLINICAL_IMPORT=true "$image" who-import import 2>&1); then
-      exit 1
+      fail WHO_GATE_UNEXPECTED_SUCCESS
     fi
   fi
   case "$output" in
     *'Explicit WHO import approval required'*) ;;
-    *) exit 1 ;;
+    *) fail WHO_GATE_MISSING_APPROVAL_ERROR ;;
   esac
 done
 
+phase=compose-up
 compose up -d --build
+phase=compose-verify
 ops_id=$(compose ps -a -q ops)
 app_id=$(compose ps --status running -q app)
 [ -n "$ops_id" ] && [ -n "$app_id" ]
@@ -81,9 +102,11 @@ for attempt in $(seq 1 30); do
 done
 [ "$ready" = true ]
 
+phase=who-volume
 compose run --rm -T --no-deps --entrypoint node ops -e 'const fs = require("node:fs"); if (process.getuid() === 0) process.exit(1); fs.writeFileSync("/who-source/ci-volume-check", "ok")'
 compose run --rm -T --no-deps --entrypoint node ops -e 'const fs = require("node:fs"); if (fs.readFileSync("/who-source/ci-volume-check", "utf8") !== "ok") process.exit(1)'
 
+phase=bootstrap
 link=$(compose run --rm -T --no-deps -e BOOTSTRAP_ADMIN_USERNAME=firstadmin -e BOOTSTRAP_ADMIN_EMAIL=first@example.test ops bootstrap-admin)
 case "$link" in
   *https://clinic.example.test/invitacion/*) ;;

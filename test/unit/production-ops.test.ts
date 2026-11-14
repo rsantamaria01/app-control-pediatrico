@@ -41,6 +41,19 @@ describe('production operations', () => {
     expect(content).toMatch(/bootstrap-admin/)
   })
 
+  it('reports fixed smoke phases and failure codes without leaking captured command output', () => {
+    const content = readFileSync(new URL('../../scripts/ci-ops-smoke.sh', import.meta.url), 'utf8')
+    for (const phase of ['build', 'offline-migration', 'who-gate', 'compose-up', 'compose-verify', 'who-volume', 'bootstrap']) {
+      expect(content).toContain(`phase=${phase}`)
+    }
+    for (const code of ['OFFLINE_UNEXPECTED_SUCCESS', 'OFFLINE_COREPACK', 'OFFLINE_PERMISSION', 'OFFLINE_DOWNLOAD', 'OFFLINE_NO_NETWORK_ERROR']) {
+      expect(content).toContain(code)
+    }
+    expect(content).toMatch(/ops-smoke failed phase=%s code=%s/)
+    expect(content).not.toMatch(/(?:printf|echo)\s+[^\n]*\$output/)
+    expect(content).not.toMatch(/set -x/)
+  })
+
   it('ships migration and bootstrap inputs in an ops image without adding them to the app image', () => {
     expect(dockerfile).toMatch(/FROM node:24-alpine AS ops/)
     const ops = dockerfile.split('FROM node:24-alpine AS ops')[1]?.split('FROM node:24-alpine AS app')[0]

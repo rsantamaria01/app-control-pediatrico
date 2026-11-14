@@ -58,7 +58,12 @@ case "$output" in
 esac
 case "$output" in
   *ECONNREFUSED*|*ENETUNREACH*) ;;
-  *MODULE_NOT_FOUND*|*ERR_MODULE_NOT_FOUND*) fail OFFLINE_MODULE_NOT_FOUND ;;
+  *'docker: Error'*|*'Error response from daemon'*|*'Cannot connect to the Docker daemon'*) fail OFFLINE_DOCKER_ERROR ;;
+  *'Cannot find module'*|*MODULE_NOT_FOUND*|*ERR_MODULE_NOT_FOUND*) fail OFFLINE_MODULE_NOT_FOUND ;;
+  *'Cannot find package'*|*'Cannot resolve'*|*'Failed to resolve'*) fail OFFLINE_DEPENDENCY_ERROR ;;
+  *ENOENT*|*'No such file or directory'*) fail OFFLINE_PATH_ERROR ;;
+  *'Database credentials are missing'*|*'DATABASE_URL required'*|*'dbCredentials'*) fail OFFLINE_DB_CONFIG_ERROR ;;
+  *TypeError*) fail OFFLINE_RUNTIME_TYPE_ERROR ;;
   *'Cannot find config file'*) fail OFFLINE_MISSING_CONFIG ;;
   *EROFS*|*'Read-only file system'*) fail OFFLINE_READ_ONLY ;;
   *SyntaxError*) fail OFFLINE_SYNTAX_ERROR ;;

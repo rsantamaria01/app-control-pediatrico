@@ -62,6 +62,7 @@ test.describe('verified guardian invitation and isolated portal', () => {
       const ownId = randomUUID()
       const otherId = randomUUID()
       const email = `${randomUUID()}@example.test`
+      const phone = `09${randomUUID().replace(/\D/g, '').padEnd(8, '0').slice(0, 8)}`
       await db.insert(user).values({ id: assistantId, name: 'Asistente', email: `${assistantId}@example.test`, username })
       await db.insert(userRole).values({ userId: assistantId, role: 'ASSISTANT' })
       await db.insert(account).values({ id: randomUUID(), userId: assistantId, accountId: assistantId, providerId: 'credential', password: await hashPassword('unique assistant passphrase') })
@@ -97,7 +98,9 @@ test.describe('verified guardian invitation and isolated portal', () => {
       expect(await page.locator('body').innerText()).not.toMatch(/DO_NOT_EXPOSE|9,00 kg|Z /)
       await page.getByRole('button', { name: `Niña ${ownId.slice(0, 8)}` }).click()
       await page.getByRole('textbox', { name: 'Nombre del representante' }).fill('Representante')
-      await page.getByRole('textbox', { name: 'Correo del representante' }).fill(email)
+      await page.getByRole('textbox', { name: 'Correo del representante (para enviar invitación)' }).fill(email)
+      await page.getByRole('textbox', { name: 'Teléfono / WhatsApp (si no hay correo)' }).fill(phone)
+      await page.getByRole('textbox', { name: 'Parentesco' }).fill('Madre')
       await page.getByRole('button', { name: 'Verificar representante' }).click()
       await expect(page.getByText('Sin cuenta previa · Sin invitar')).toBeVisible()
       await page.getByRole('textbox', { name: 'Cómo verificó el vínculo' }).fill('Identificación presencial verificada')
@@ -110,7 +113,7 @@ test.describe('verified guardian invitation and isolated portal', () => {
       const [stored] = await db.select().from(setupToken).where(eq(setupToken.digest, createHash('sha256').update(token!).digest('hex')))
       expect(stored?.expiresAt.getTime() - Date.now()).toBeLessThanOrEqual(7 * 86400000)
       const [link] = await db.select().from(guardianGrant).where(eq(guardianGrant.patientId, ownId))
-      expect(link?.status).toBe('PENDING')
+      expect(link).toMatchObject({ status: 'PENDING', contactPhone: phone, relationship: 'Madre' })
       await page.context().clearCookies()
       await page.goto(`/invitacion/${token}`)
       await page.waitForLoadState('networkidle')

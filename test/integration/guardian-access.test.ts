@@ -5,7 +5,7 @@ import { drizzle } from 'drizzle-orm/node-postgres'
 import { migrate } from 'drizzle-orm/node-postgres/migrator'
 import { and, eq } from 'drizzle-orm'
 import { Pool } from 'pg'
-import { account, auditEvent, guardianGrant, patient, setupToken, user, userRole, visit, visitResult, visitText } from '../../server/db/schema'
+import { account, auditEvent, guardianDelivery, guardianGrant, guardianPhone, patient, setupToken, user, userRole, visit, visitResult, visitText } from '../../server/db/schema'
 import type { Actor } from '../../shared/types/access'
 
 const configured = process.env.TEST_DATABASE_URL
@@ -67,6 +67,7 @@ beforeAll(async () => {
   process.env.SMTP_SECURE = 'false'
   process.env.SMTP_FROM = 'test@localhost'
   process.env.NUXT_PUBLIC_SITE_URL = 'http://localhost:3000'
+  process.env.RECOVERY_QUEUE_SECRET = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
   await db.insert(patient).values([
     { id: first, name: 'Niña A', birthDate: '2024-01-01', sex: 'FEMALE', createdBy: doctor.id },
     { id: second, name: 'Niño B', birthDate: '2019-01-01', sex: 'MALE', createdBy: doctor.id }
@@ -316,6 +317,208 @@ describe('verified guardian isolation', () => {
     expect(currentLink?.status).toBe('PENDING')
     const { setupCredential } = await import('../../server/services/invitation')
     expect(await setupCredential(previousToken, 'old-guardian', 'unique passphrase for guardian')).toBe(false)
+  })
+
+  it('activates two delivered sibling grants with one setup and excludes revoked or undelivered links', async () => {
+    const { grantGuardian, revokeGuardian, getShareableChild, listShareableChildren } = await import('../../server/services/invitations')
+    const { setupCredential } = await import('../../server/services/invitation')
+    const email = `${randomUUID()}@example.test`
+    const children = [randomUUID(), randomUUID(), randomUUID(), randomUUID()]
+    await db.insert(patient).values(children.map((id, i) => ({ id, name: `Hermano ${i}`, birthDate: '2024-01-01', sex: 'MALE', createdBy: doctor.id })))
+    await grantGuardian(doctor, children[0]!, { name: 'Familia compartida', email, proof: 'Identidad presencial' })
+    const firstToken = latestToken()
+    const [owner] = await db.select({ id: user.id }).from(user).where(eq(user.email, email))
+    await grantGuardian(assistant, children[1]!, { name: 'Familia compartida', email, proof: 'Identidad presencial', confirmedGuardianId: owner!.id })
+    const secondToken = latestToken()
+    await grantGuardian(assistant, children[2]!, { name: 'Familia compartida', email, proof: 'Identidad presencial', confirmedGuardianId: owner!.id })
+    await revokeGuardian(assistant, children[2]!, owner!.id)
+    failDelivery = true
+    try {
+      await grantGuardian(doctor, children[3]!, { name: 'Familia compartida', email, proof: 'Identidad presencial', confirmedGuardianId: owner!.id })
+    } finally {
+      failDelivery = false
+    }
+    expect(await setupCredential(secondToken, `sibling-${randomUUID().slice(0, 8)}`, 'unique guardian passphrase')).toBe(true)
+    expect(await setupCredential(firstToken, `stale-${randomUUID().slice(0, 8)}`, 'another unique guardian passphrase')).toBe(false)
+    const linked = await listShareableChildren({ id: owner!.id, roles: ['PATIENT'] })
+    expect(linked.map(child => child.id).sort()).toEqual(children.slice(0, 2).sort())
+    await expect(getShareableChild({ id: owner!.id, roles: ['PATIENT'] }, children[2]!)).rejects.toThrow()
+    await expect(getShareableChild({ id: owner!.id, roles: ['PATIENT'] }, children[3]!)).rejects.toThrow()
+  })
+
+  it('does not email a link if persisting the grant fails', async () => {
+    const { grantGuardian } = await import('../../server/services/invitations')
+    const childId = randomUUID()
+    const email = `${randomUUID()}@example.test`
+    await db.insert(patient).values({ id: childId, name: 'Persistencia fallida', birthDate: '2024-01-01', sex: 'FEMALE', createdBy: doctor.id })
+    const sent = mails.length
+    await pool.query(`CREATE FUNCTION reject_guardian_insert() RETURNS trigger AS $$ BEGIN IF NEW.patient_id = '${childId}' THEN RAISE EXCEPTION 'forced grant failure'; END IF; RETURN NEW; END; $$ LANGUAGE plpgsql`)
+    await pool.query('CREATE TRIGGER forced_guardian_insert BEFORE INSERT ON guardian_grant FOR EACH ROW EXECUTE FUNCTION reject_guardian_insert()')
+    try {
+      await expect(grantGuardian(doctor, childId, { name: 'Familia fallida', email, proof: 'Identidad presencial' })).rejects.toThrow()
+      expect(mails).toHaveLength(sent)
+      expect(await db.select().from(user).where(eq(user.email, email))).toHaveLength(0)
+    } finally {
+      await pool.query('DROP TRIGGER forced_guardian_insert ON guardian_grant')
+      await pool.query('DROP FUNCTION reject_guardian_insert()')
+    }
+  })
+
+  it('keeps a previously delivered link valid if replacement SMTP rejects and records failure', async () => {
+    const { grantGuardian } = await import('../../server/services/invitations')
+    const { setupCredential, tokenDigest } = await import('../../server/services/invitation')
+    const childId = randomUUID()
+    const email = `${randomUUID()}@example.test`
+    await db.insert(patient).values({ id: childId, name: 'Reenvío fallido', birthDate: '2024-01-01', sex: 'MALE', createdBy: doctor.id })
+    await grantGuardian(doctor, childId, { name: 'Familia reenvío', email, proof: 'Identidad presencial' })
+    const original = latestToken()
+    const [owner] = await db.select({ id: user.id }).from(user).where(eq(user.email, email))
+    failDelivery = true
+    try {
+      await grantGuardian(doctor, childId, { name: 'Familia reenvío', email, proof: 'Identidad presencial', confirmedGuardianId: owner!.id })
+    } finally {
+      failDelivery = false
+    }
+    const [link] = await db.select().from(guardianGrant).where(eq(guardianGrant.patientId, childId))
+    const [oldToken] = await db.select().from(setupToken).where(eq(setupToken.digest, tokenDigest(original)))
+    expect(link).toMatchObject({ status: 'PENDING', tokenId: oldToken!.id, lastSendError: 'Error' })
+    expect(oldToken?.usedAt).toBeNull()
+    const [attempt] = await db.select().from(guardianDelivery).where(and(eq(guardianDelivery.patientId, childId), eq(guardianDelivery.state, 'FAILED')))
+    expect(attempt?.payload).toBeNull()
+    expect(await setupCredential(original, `retry-${randomUUID().slice(0, 8)}`, 'unique guardian passphrase')).toBe(true)
+  })
+
+  it('sends a committed queued invitation after a forced post-commit dispatch failure', async () => {
+    const { grantGuardian, processQueuedGuardianDeliveries } = await import('../../server/services/invitations')
+    const childId = randomUUID()
+    const email = `${randomUUID()}@example.test`
+    await db.insert(patient).values({ id: childId, name: 'Pendiente de reintento', birthDate: '2024-01-01', sex: 'MALE', createdBy: doctor.id })
+    const sent = mails.length
+    await pool.query(`CREATE FUNCTION reject_guardian_claim() RETURNS trigger AS $$ BEGIN IF NEW.patient_id = '${childId}' AND NEW.state = 'SENDING' THEN RAISE EXCEPTION 'forced claim failure'; END IF; RETURN NEW; END; $$ LANGUAGE plpgsql`)
+    await pool.query('CREATE TRIGGER forced_guardian_claim BEFORE UPDATE ON guardian_delivery FOR EACH ROW EXECUTE FUNCTION reject_guardian_claim()')
+    try {
+      await expect(grantGuardian(doctor, childId, { name: 'Familia pendiente', email, proof: 'Identidad presencial' })).rejects.toThrow()
+      expect(mails).toHaveLength(sent)
+      const [saved] = await db.select().from(guardianDelivery).where(eq(guardianDelivery.patientId, childId))
+      expect(saved?.state).toBe('QUEUED')
+      expect(saved?.payload).toBeTruthy()
+    } finally {
+      await pool.query('DROP TRIGGER forced_guardian_claim ON guardian_delivery')
+      await pool.query('DROP FUNCTION reject_guardian_claim()')
+    }
+    expect(await processQueuedGuardianDeliveries()).toBe(1)
+    expect(mails).toHaveLength(sent + 1)
+    const [link] = await db.select().from(guardianGrant).where(eq(guardianGrant.patientId, childId))
+    expect(link?.status).toBe('PENDING')
+    const { setupCredential } = await import('../../server/services/invitation')
+    const token = latestToken()
+    expect(await setupCredential(token, `recover-${randomUUID().slice(0, 8)}`, 'unique guardian passphrase')).toBe(true)
+  })
+
+  it('activates a delivered queued sibling after the guardian sets up the account from another child', async () => {
+    const { grantGuardian, processQueuedGuardianDeliveries, getShareableChild } = await import('../../server/services/invitations')
+    const { setupCredential } = await import('../../server/services/invitation')
+    const email = `${randomUUID()}@example.test`
+    const children = [randomUUID(), randomUUID()]
+    await db.insert(patient).values(children.map(id => ({ id, name: 'Hijo en cola', birthDate: '2024-01-01', sex: 'MALE', createdBy: doctor.id })))
+    await grantGuardian(doctor, children[0]!, { name: 'Familia en cola', email, proof: 'Identidad presencial' })
+    const firstToken = latestToken()
+    const [owner] = await db.select({ id: user.id }).from(user).where(eq(user.email, email))
+    await pool.query(`CREATE FUNCTION reject_queued_sibling() RETURNS trigger AS $$ BEGIN IF NEW.patient_id = '${children[1]}' AND NEW.state = 'SENDING' THEN RAISE EXCEPTION 'forced claim failure'; END IF; RETURN NEW; END; $$ LANGUAGE plpgsql`)
+    await pool.query('CREATE TRIGGER forced_sibling_claim BEFORE UPDATE ON guardian_delivery FOR EACH ROW EXECUTE FUNCTION reject_queued_sibling()')
+    try {
+      await expect(grantGuardian(doctor, children[1]!, { name: 'Familia en cola', email, proof: 'Identidad presencial', confirmedGuardianId: owner!.id })).rejects.toThrow()
+    } finally {
+      await pool.query('DROP TRIGGER forced_sibling_claim ON guardian_delivery')
+      await pool.query('DROP FUNCTION reject_queued_sibling()')
+    }
+    expect(await setupCredential(firstToken, `queued-${randomUUID().slice(0, 8)}`, 'unique guardian passphrase')).toBe(true)
+    expect(await processQueuedGuardianDeliveries()).toBe(1)
+    const [siblingJob] = await db.select().from(guardianDelivery).where(eq(guardianDelivery.patientId, children[1]!))
+    expect(siblingJob?.state).toBe('DONE')
+    const [siblingLink] = await db.select().from(guardianGrant).where(eq(guardianGrant.patientId, children[1]!))
+    expect(siblingLink?.status).toBe('ACTIVE')
+    expect((await getShareableChild({ id: owner!.id, roles: ['PATIENT'] }, children[1]!)).id).toBe(children[1])
+  })
+
+  it('never dispatches a queued link after the staff revokes its relationship', async () => {
+    const { grantGuardian, processQueuedGuardianDeliveries, revokeGuardian } = await import('../../server/services/invitations')
+    const childId = randomUUID()
+    const email = `${randomUUID()}@example.test`
+    await db.insert(patient).values({ id: childId, name: 'Vínculo revocado', birthDate: '2024-01-01', sex: 'MALE', createdBy: doctor.id })
+    await pool.query(`CREATE FUNCTION reject_guardian_claim() RETURNS trigger AS $$ BEGIN IF NEW.patient_id = '${childId}' AND NEW.state = 'SENDING' THEN RAISE EXCEPTION 'forced claim failure'; END IF; RETURN NEW; END; $$ LANGUAGE plpgsql`)
+    await pool.query('CREATE TRIGGER forced_guardian_claim BEFORE UPDATE ON guardian_delivery FOR EACH ROW EXECUTE FUNCTION reject_guardian_claim()')
+    try {
+      await expect(grantGuardian(doctor, childId, { name: 'Familia revocada', email, proof: 'Identidad presencial' })).rejects.toThrow()
+    } finally {
+      await pool.query('DROP TRIGGER forced_guardian_claim ON guardian_delivery')
+      await pool.query('DROP FUNCTION reject_guardian_claim()')
+    }
+    const [link] = await db.select().from(guardianGrant).where(eq(guardianGrant.patientId, childId))
+    await revokeGuardian(doctor, childId, link!.guardianId)
+    const sent = mails.length
+    await processQueuedGuardianDeliveries()
+    expect(mails).toHaveLength(sent)
+  })
+
+  it('recovers an interrupted delivery with its committed token and no orphaned link', async () => {
+    const { grantGuardian, processQueuedGuardianDeliveries, reconcileGuardianDeliveries } = await import('../../server/services/invitations')
+    const childId = randomUUID()
+    const email = `${randomUUID()}@example.test`
+    await db.insert(patient).values({ id: childId, name: 'Entrega interrumpida', birthDate: '2024-01-01', sex: 'FEMALE', createdBy: doctor.id })
+    const sent = mails.length
+    await pool.query(`CREATE FUNCTION reject_guardian_finish() RETURNS trigger AS $$ BEGIN IF NEW.patient_id = '${childId}' AND NEW.state = 'DONE' THEN RAISE EXCEPTION 'forced finish failure'; END IF; RETURN NEW; END; $$ LANGUAGE plpgsql`)
+    await pool.query('CREATE TRIGGER forced_guardian_finish BEFORE UPDATE ON guardian_delivery FOR EACH ROW EXECUTE FUNCTION reject_guardian_finish()')
+    try {
+      await expect(grantGuardian(doctor, childId, { name: 'Familiar en espera', email, proof: 'Identidad presencial' })).rejects.toThrow()
+      expect(mails).toHaveLength(sent + 1)
+      const [saved] = await db.select().from(guardianDelivery).where(eq(guardianDelivery.patientId, childId))
+      expect(saved).toMatchObject({ state: 'SENDING' })
+      expect(saved?.payload).toBeTruthy()
+    } finally {
+      await pool.query('DROP TRIGGER forced_guardian_finish ON guardian_delivery')
+      await pool.query('DROP FUNCTION reject_guardian_finish()')
+    }
+    expect(await reconcileGuardianDeliveries()).toBe(1)
+    expect(await processQueuedGuardianDeliveries()).toBe(1)
+    const [link] = await db.select().from(guardianGrant).where(eq(guardianGrant.patientId, childId))
+    expect(link?.status).toBe('PENDING')
+    const [stored] = await db.select().from(setupToken).where(eq(setupToken.id, link!.tokenId!))
+    expect(stored?.usedAt).toBeNull()
+    expect(mails.at(-1)).toContain('invitacion/')
+  })
+
+  it('matches a phone-only representative by normalized number only after explicit attestation, without creating email duplicates', async () => {
+    const { grantGuardian, findGuardianIdentity, getShareableChild } = await import('../../server/services/invitations')
+    const one = randomUUID()
+    const two = randomUUID()
+    await db.insert(patient).values([one, two].map(id => ({ id, name: 'Hermano por teléfono', birthDate: '2024-01-01', sex: 'MALE', createdBy: doctor.id })))
+    const phone = `09${randomUUID().replace(/\D/g, '').padEnd(8, '0').slice(0, 8)}`
+    const firstResult = await grantGuardian(assistant, one, { name: 'Padre teléfono', phone, relationship: 'Padre', proof: 'Identidad presencial verificada' })
+    expect(firstResult.status).toBe('FAILED')
+    expect(await db.select().from(guardianDelivery).where(eq(guardianDelivery.patientId, one))).toHaveLength(0)
+    const [phoneLink] = await db.select().from(guardianGrant).where(eq(guardianGrant.patientId, one))
+    expect(phoneLink).toMatchObject({ contactPhone: phone, relationship: 'Padre', status: 'FAILED', proof: 'Identidad presencial verificada' })
+    expect(await db.select().from(user).where(eq(user.id, phoneLink!.guardianId))).toHaveLength(1)
+    const match = await findGuardianIdentity(assistant, { phone: `+593${phone.slice(1)}` })
+    expect(match).toMatchObject({ name: 'Padre teléfono' })
+    expect(JSON.stringify(match)).not.toContain(phone)
+    expect(match?.maskedContact).toBe(`${phone.slice(0, 2)}***${phone.slice(-2)}`)
+    await expect(findGuardianIdentity(assistant, { phone: '123' })).rejects.toThrow()
+    await expect(findGuardianIdentity(adminActor, { phone })).rejects.toThrow()
+    await expect(grantGuardian(assistant, two, { name: 'Padre teléfono', phone, relationship: 'Padre', proof: 'Identidad presencial verificada' })).rejects.toThrow()
+    const linked = await grantGuardian(doctor, two, { name: 'Padre teléfono', phone: `+593${phone.slice(1)}`, relationship: 'Padre', proof: 'Identidad presencial verificada', confirmedGuardianId: match!.id })
+    expect(linked.status).toBe('FAILED')
+    expect((await db.select().from(guardianGrant).where(eq(guardianGrant.guardianId, match!.id)))).toHaveLength(2)
+    await expect(getShareableChild({ id: match!.id, roles: ['PATIENT'] }, one)).rejects.toThrow()
+    const email = `${randomUUID()}@example.test`
+    await grantGuardian(doctor, one, { name: 'Padre teléfono', phone, email, relationship: 'Padre', proof: 'Correo verificado presencialmente', confirmedGuardianId: match!.id })
+    expect(await db.select().from(user).where(eq(user.email, email))).toHaveLength(1)
+    await expect(grantGuardian(doctor, two, { name: 'Otro padre', phone, email: `${randomUUID()}@example.test`, relationship: 'Padre', proof: 'Identidad presencial', confirmedGuardianId: match!.id })).rejects.toThrow()
+    const stranger = randomUUID()
+    await db.insert(user).values({ id: stranger, name: 'Otro contacto', email: `${randomUUID()}@example.test` })
+    await db.insert(guardianPhone).values({ guardianId: stranger, phone: '0999999999' })
+    await expect(grantGuardian(doctor, two, { name: 'Contacto cruzado', phone: '0999999999', email, relationship: 'Padre', proof: 'Identidad presencial', confirmedGuardianId: match!.id })).rejects.toThrow()
   })
 
   it('grants an existing guardian without resetting credentials or granting any other child', async () => {

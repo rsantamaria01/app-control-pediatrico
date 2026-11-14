@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto'
-import { and, eq, gt, isNull } from 'drizzle-orm'
+import { and, eq, gt, inArray, isNull } from 'drizzle-orm'
 import { hashPassword } from 'better-auth/crypto'
 import { account, guardianGrant, setupToken, user } from '../db/schema'
 import { normalizeUsername, validatePassword } from './credentials'
@@ -31,7 +31,10 @@ export async function setupCredential(token: string, username: string, password:
     if (existing) return false
     await tx.update(user).set({ username: normalized, displayUsername: normalized, emailVerified: true }).where(eq(user.id, entry.userId))
     await tx.insert(account).values({ id: crypto.randomUUID(), userId: entry.userId, accountId: entry.userId, providerId: 'credential', password: await hashPassword(password) })
-    await tx.update(guardianGrant).set({ status: 'ACTIVE' }).where(and(eq(guardianGrant.guardianId, entry.userId), eq(guardianGrant.tokenId, entry.id), eq(guardianGrant.status, 'PENDING')))
+    const pending = await tx.select({ tokenId: guardianGrant.tokenId }).from(guardianGrant).innerJoin(setupToken, eq(guardianGrant.tokenId, setupToken.id)).where(and(eq(guardianGrant.guardianId, entry.userId), eq(guardianGrant.status, 'PENDING'), eq(setupToken.purpose, 'SETUP'), gt(setupToken.expiresAt, new Date()), isNull(setupToken.usedAt)))
+    const ids = [...new Set([entry.id, ...pending.map(row => row.tokenId).filter((id): id is string => id !== null)])]
+    await tx.update(guardianGrant).set({ status: 'ACTIVE' }).where(and(eq(guardianGrant.guardianId, entry.userId), inArray(guardianGrant.tokenId, ids), eq(guardianGrant.status, 'PENDING')))
+    await tx.update(setupToken).set({ usedAt: new Date() }).where(and(eq(setupToken.userId, entry.userId), eq(setupToken.purpose, 'SETUP'), isNull(setupToken.usedAt), inArray(setupToken.id, ids)))
     return true
   })
 }

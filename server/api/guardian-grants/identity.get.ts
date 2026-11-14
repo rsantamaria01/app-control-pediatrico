@@ -5,6 +5,6 @@ import { findGuardianIdentity } from '../../services/invitations'
 
 export default defineEventHandler(async (event) => {
   const actor = await requireCapability(event, 'GUARDIAN_GRANT')
-  const { email } = z.strictObject({ email: z.email() }).parse(getQuery(event))
-  return findGuardianIdentity(actor, email)
+  const identity = z.strictObject({ email: z.email().optional(), phone: z.string().optional() }).refine(value => Boolean(value.email || value.phone)).parse(getQuery(event))
+  return findGuardianIdentity(actor, identity)
 })

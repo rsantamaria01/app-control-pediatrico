@@ -13,9 +13,14 @@ vi.mock('../../server/services/recovery', () => ({
   reconcileRecoveryJobs: vi.fn(),
   processRecoveryJobs: vi.fn()
 }))
+vi.mock('../../server/services/invitations', () => ({
+  reconcileGuardianDeliveries: vi.fn(),
+  processQueuedGuardianDeliveries: vi.fn()
+}))
 
 const { default: recoveryPlugin } = await import('../../server/plugins/recovery-worker')
 const { acquireRecoveryWorker, reconcileRecoveryJobs, processRecoveryJobs } = await import('../../server/services/recovery')
+const { reconcileGuardianDeliveries, processQueuedGuardianDeliveries } = await import('../../server/services/invitations')
 
 describe('production operations', () => {
   it('runs an unconditional Docker ops and Compose smoke on pushes and PRs', () => {
@@ -133,6 +138,8 @@ describe('recovery worker before migrations', () => {
       await vi.advanceTimersByTimeAsync(500)
       expect(reconcileRecoveryJobs).toHaveBeenCalledTimes(2)
       expect(processRecoveryJobs).toHaveBeenCalled()
+      expect(reconcileGuardianDeliveries).toHaveBeenCalled()
+      expect(processQueuedGuardianDeliveries).toHaveBeenCalled()
       expect(logger.mock.calls[0]?.[0]).toContain('WorkerError')
     } finally {
       await hooks.hook.mock.calls[0]?.[1]()

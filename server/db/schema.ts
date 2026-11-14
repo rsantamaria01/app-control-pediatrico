@@ -120,10 +120,17 @@ export const patient = pgTable('patient', {
   check('patient_correction_ck', sql`${table.correctionUntilMonths} IN (24, 36)`)
 ])
 
+export const guardianPhone = pgTable('guardian_phone', {
+  guardianId: text('guardian_id').primaryKey().references(() => user.id, { onDelete: 'restrict' }),
+  phone: text('phone').notNull().unique()
+})
+
 export const guardianGrant = pgTable('guardian_grant', {
   patientId: text('patient_id').notNull().references(() => patient.id, { onDelete: 'restrict' }),
   guardianId: text('guardian_id').notNull().references(() => user.id, { onDelete: 'restrict' }),
   contactEmail: text('contact_email').notNull(),
+  contactPhone: text('contact_phone'),
+  relationship: text('relationship'),
   proof: text('proof').notNull(),
   verifiedBy: text('verified_by').notNull(),
   verifiedAt: timestamp('verified_at', { withTimezone: true }).notNull().defaultNow(),
@@ -136,6 +143,17 @@ export const guardianGrant = pgTable('guardian_grant', {
   index('guardian_grant_guardian_idx').on(table.guardianId, table.status),
   check('guardian_grant_status_ck', sql`${table.status} IN ('PENDING', 'ACTIVE', 'FAILED', 'REVOKED')`)
 ])
+
+export const guardianDelivery = pgTable('guardian_delivery', {
+  id: text('id').primaryKey(),
+  patientId: text('patient_id').notNull().references(() => patient.id, { onDelete: 'restrict' }),
+  guardianId: text('guardian_id').notNull().references(() => user.id, { onDelete: 'restrict' }),
+  tokenId: text('token_id').references(() => setupToken.id),
+  payload: text('payload'),
+  state: text('state').notNull().default('QUEUED'),
+  errorClass: text('error_class'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
+}, table => [index('guardian_delivery_pending_idx').on(table.state, table.createdAt)])
 
 export const visit = pgTable('clinical_visit', {
   id: text('id').primaryKey(),

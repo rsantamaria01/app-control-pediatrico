@@ -51,6 +51,8 @@ describe('production operations', () => {
     }
     for (const code of ['OFFLINE_MODULE_NOT_FOUND', 'OFFLINE_READ_ONLY', 'OFFLINE_SYNTAX_ERROR', 'OFFLINE_CONNECTION_OTHER', 'OFFLINE_RUNTIME_OTHER']) expect(content).toContain(code)
     expect(content).not.toMatch(/\*'No config path provided'\*\|/)
+    expect(content).not.toMatch(/\*"\/app\/"\*\|\*"'\.\/server\/"\*/)
+    expect(content).toContain('OFFLINE_PATH_MIGRATION_FILE')
     for (const code of ['OFFLINE_DOCKER_ERROR', 'OFFLINE_DEPENDENCY_ERROR', 'OFFLINE_PATH_APP', 'OFFLINE_PATH_TMP', 'OFFLINE_PATH_OTHER', 'OFFLINE_DB_CONFIG_ERROR', 'OFFLINE_RUNTIME_TYPE_ERROR']) expect(content).toContain(code)
     expect(content).toMatch(/ops-smoke failed phase=%s code=%s/)
     expect(content).not.toMatch(/(?:printf|echo)\s+[^\n]*\$output/)

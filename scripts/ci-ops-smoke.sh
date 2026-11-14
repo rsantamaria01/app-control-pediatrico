@@ -61,7 +61,9 @@ case "$output" in
   *'docker: Error'*|*'Error response from daemon'*|*'Cannot connect to the Docker daemon'*) fail OFFLINE_DOCKER_ERROR ;;
   *'Cannot find module'*|*MODULE_NOT_FOUND*|*ERR_MODULE_NOT_FOUND*) fail OFFLINE_MODULE_NOT_FOUND ;;
   *'Cannot find package'*|*'Cannot resolve'*|*'Failed to resolve'*) fail OFFLINE_DEPENDENCY_ERROR ;;
-  *"/app/"*|*"'./server/"*) fail OFFLINE_PATH_APP ;;
+  *'server/db/migrations/meta/_journal.json'*|*'server/db/migrations/'*) fail OFFLINE_PATH_MIGRATION_FILE ;;
+  *'scripts/database-env.mjs'*|*'scripts/ops.mjs'*|*'drizzle.config.ts'*|*'server/db/schema.ts'*) fail OFFLINE_PATH_APP ;;
+  *ENOENT*"/app/"*|*'No such file or directory'*"/app/"*) fail OFFLINE_PATH_APP ;;
   *"/tmp/"*|*"/root/"*) fail OFFLINE_PATH_TMP ;;
   *ENOENT*|*'No such file or directory'*) fail OFFLINE_PATH_OTHER ;;
   *'Database credentials are missing'*|*'DATABASE_URL required'*|*'dbCredentials'*) fail OFFLINE_DB_CONFIG_ERROR ;;

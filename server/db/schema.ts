@@ -120,6 +120,22 @@ export const patient = pgTable('patient', {
   check('patient_correction_ck', sql`${table.correctionUntilMonths} IN (24, 36)`)
 ])
 
+export const guardianGrant = pgTable('guardian_grant', {
+  patientId: text('patient_id').notNull().references(() => patient.id, { onDelete: 'restrict' }),
+  guardianId: text('guardian_id').notNull().references(() => user.id, { onDelete: 'restrict' }),
+  contactEmail: text('contact_email').notNull(),
+  proof: text('proof').notNull(),
+  verifiedBy: text('verified_by').notNull(),
+  verifiedAt: timestamp('verified_at', { withTimezone: true }).notNull().defaultNow(),
+  status: text('status').notNull(),
+  tokenId: text('token_id').references(() => setupToken.id),
+  revokedAt: timestamp('revoked_at', { withTimezone: true })
+}, table => [
+  primaryKey({ columns: [table.patientId, table.guardianId] }),
+  index('guardian_grant_guardian_idx').on(table.guardianId, table.status),
+  check('guardian_grant_status_ck', sql`${table.status} IN ('PENDING', 'ACTIVE', 'FAILED', 'REVOKED')`)
+])
+
 export const visit = pgTable('clinical_visit', {
   id: text('id').primaryKey(),
   patientId: text('patient_id').notNull().references(() => patient.id, { onDelete: 'restrict' }),

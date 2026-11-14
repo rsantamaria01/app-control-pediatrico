@@ -50,13 +50,22 @@ const dateFormat = new Intl.DateTimeFormat('es-EC', { day: 'numeric', month: 'sh
             {{ data.patient.sex === 'FEMALE' ? 'Niña' : 'Niño' }} · Nacimiento {{ data.patient.birthDate }}
           </p>
         </div>
-        <UButton
-          :to="`/pacientes/${id}/visitas/nueva`"
-          icon="i-lucide-plus"
-          size="lg"
-        >
-          Nueva visita
-        </UButton>
+        <div class="flex flex-wrap gap-2">
+          <UButton
+            to="/representantes/invitar"
+            variant="outline"
+            size="lg"
+          >
+            Invitar representante
+          </UButton>
+          <UButton
+            :to="`/pacientes/${id}/visitas/nueva`"
+            icon="i-lucide-plus"
+            size="lg"
+          >
+            Nueva visita
+          </UButton>
+        </div>
       </div>
       <UEmpty
         v-if="!latest"

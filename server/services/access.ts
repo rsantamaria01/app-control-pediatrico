@@ -31,7 +31,7 @@ export async function requireCapability(event: H3Event, capability: Capability, 
     throw createError({ statusCode: 401, statusMessage: 'Authentication required' })
   }
   const actor = await resolveActor(event)
-  const allowed = Boolean(actor && permissions[capability]?.some(role => actor.roles.includes(role)) && (capability !== 'PORTAL_READ' || !patientId))
+  const allowed = Boolean(actor && permissions[capability]?.some(role => actor.roles.includes(role)))
   await recordAudit(capability, allowed ? 'ALLOWED' : 'DENIED', session.user.id, patientId)
   if (!allowed || !actor) throw createError({ statusCode: 403, statusMessage: 'Access denied' })
   return actor

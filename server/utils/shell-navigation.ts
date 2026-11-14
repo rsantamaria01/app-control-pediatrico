@@ -9,6 +9,7 @@ const entries: Record<Role, Item[]> = {
     { label: 'Agenda', to: '/agenda' }
   ],
   ASSISTANT: [
+    { label: 'Invitaciones', to: '/representantes/invitar' },
     { label: 'Agenda', to: '/agenda' },
     { label: 'Horarios', to: '/agenda/horarios' }
   ],

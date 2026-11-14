@@ -14,6 +14,7 @@ export default defineConfig({
           SMTP_PORT: '1026',
           SMTP_SECURE: 'false',
           SMTP_FROM: 'test@localhost',
+          NUXT_PUBLIC_SITE_URL: 'http://127.0.0.1:3000',
           RECOVERY_QUEUE_SECRET: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
           REDIS_URL: process.env.REDIS_URL || 'redis://cache:6379'
         }

@@ -3,7 +3,9 @@ import type { PatientView } from '#shared/types/measurement'
 
 const { data: navigation } = await useFetch<{ label: string, to: string }[]>('/api/auth/navigation')
 const isDoctor = computed(() => Boolean(navigation.value?.some(item => item.to === '/pacientes')))
+const isParent = computed(() => Boolean(navigation.value?.some(item => item.to === '/')) && !isDoctor.value)
 const { data: patients, error, refresh } = await useFetch<PatientView[]>('/api/pacientes', { immediate: isDoctor.value, default: () => [] })
+const { data: children, error: childrenError, refresh: refreshChildren } = await useFetch<{ id: string, name: string }[]>('/api/hijos', { immediate: isParent.value, default: () => [] })
 </script>
 
 <template>
@@ -79,6 +81,43 @@ const { data: patients, error, refresh } = await useFetch<PatientView[]>('/api/p
           </li>
         </ul>
       </UCard>
+    </template>
+    <template v-else-if="isParent">
+      <h1 class="text-2xl font-semibold">
+        Mis hijos
+      </h1>
+      <UAlert
+        v-if="childrenError"
+        color="error"
+        variant="soft"
+        title="No se pudieron consultar los datos"
+        :actions="[{ label: 'Reintentar', onClick: () => refreshChildren() }]"
+      />
+      <UEmpty
+        v-else-if="!children?.length"
+        title="Aún no hay niños vinculados"
+        description="Consulte con la clínica para verificar el vínculo familiar."
+      />
+      <div
+        v-else
+        class="grid gap-4 sm:grid-cols-2"
+      >
+        <UCard
+          v-for="child in children"
+          :key="child.id"
+        >
+          <h2 class="text-lg font-semibold">
+            {{ child.name }}
+          </h2>
+          <UButton
+            :to="`/hijos/${child.id}`"
+            variant="outline"
+            class="mt-3 min-h-11"
+          >
+            Ver crecimiento
+          </UButton>
+        </UCard>
+      </div>
     </template>
     <UPageHero
       v-else

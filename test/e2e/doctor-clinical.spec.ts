@@ -159,6 +159,15 @@ test.describe('doctor clinical journey with isolated auth and WHO database', () 
       await expect(page.getByRole('heading', { name: 'Peso para la edad' })).toHaveCount(1)
       await expect(page.getByRole('heading', { name: 'Resultados recalculados · revisión médica' })).toBeVisible()
       await expect(page.getByRole('table', { name: 'Mediciones' })).toContainText('percentil')
+      if (width === 375) {
+        const layout = await page.evaluate(() => {
+          const table = document.querySelector('table[aria-label="Mediciones"]')!
+          const scroller = table.parentElement!
+          return { viewport: window.innerWidth, document: document.documentElement.scrollWidth, table: table.scrollWidth, scroller: scroller.clientWidth, scrollerContent: scroller.scrollWidth }
+        })
+        expect(layout.document, JSON.stringify(layout)).toBeLessThanOrEqual(layout.viewport + 1)
+        expect(layout.scrollerContent).toBeGreaterThan(layout.scroller)
+      }
       await expect(page.getByRole('link', { name: 'Pacientes' }).first()).toBeVisible()
       await page.getByRole('link', { name: 'Pacientes' }).first().click()
       await page.getByRole('textbox', { name: 'Buscar por nombre' }).fill(name)

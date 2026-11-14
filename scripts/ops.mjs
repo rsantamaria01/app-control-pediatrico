@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process'
 
 const [command = 'db:migrate', action] = process.argv.slice(2)
 const paths = {
-  'db:migrate': ['node_modules/drizzle-kit/bin.cjs', 'migrate'],
+  'db:migrate': ['scripts/migrate.mjs'],
   'bootstrap-admin': ['--experimental-strip-types', 'scripts/bootstrap-admin.ts'],
   'who-import': ['node_modules/tsx/dist/cli.mjs', 'scripts/import-who.ts', action]
 }
@@ -19,8 +19,7 @@ if (command === 'who-import' && action === 'import' && process.env.WHO_ALLOW_CLI
 const args = command === 'who-import' && action === 'download'
   ? paths[command]
   : ['scripts/database-env.mjs', 'node', ...paths[command]]
-const env = command === 'db:migrate' ? { ...process.env, TSX_DISABLE_CACHE: '1' } : process.env
-const child = spawn(process.execPath, args, { stdio: 'inherit', env })
+const child = spawn(process.execPath, args, { stdio: 'inherit', env: process.env })
 child.on('error', () => {
   process.stderr.write('Ops command failed to start\n')
   process.exitCode = 1

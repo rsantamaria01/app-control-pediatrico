@@ -69,6 +69,7 @@ describe('production operations', () => {
     for (const path of ['node_modules', 'drizzle.config.ts', 'server/db/schema.ts', 'server/db/migrations', 'server/services/credentials.ts', 'scripts/bootstrap-admin.ts']) expect(ops).toContain(path)
     expect(ops).toContain('ENTRYPOINT ["node", "scripts/ops.mjs"]')
     expect(ops).toContain('CMD ["db:migrate"]')
+    expect(ops).toContain('scripts/migrate.mjs')
     expect(app).toContain('/app/.output')
     expect(app).toContain('scripts/database-env.mjs')
     expect(app).not.toContain('node_modules')
@@ -93,9 +94,12 @@ describe('production operations', () => {
     expect(result.stderr).toContain('Explicit WHO import approval required')
   })
 
-  it('avoids a runtime tsx cache write during migrations', () => {
+  it('migrates through the Node PostgreSQL migrator without a runtime CLI cache', () => {
     const launcher = readFileSync(new URL('../../scripts/ops.mjs', import.meta.url), 'utf8')
-    expect(launcher).toContain('TSX_DISABLE_CACHE')
+    expect(launcher).toContain("['scripts/migrate.mjs']")
+    const migrator = readFileSync(new URL('../../scripts/migrate.mjs', import.meta.url), 'utf8')
+    expect(migrator).toContain('migrate(drizzle(pool),')
+    expect(migrator).toContain('pool.end()')
   })
 
   it('starts migrations through Node without Corepack before failing on an unreachable database', () => {

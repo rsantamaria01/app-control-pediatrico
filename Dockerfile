@@ -15,7 +15,7 @@ COPY --chown=node:node server/db/migrations ./server/db/migrations
 COPY --chown=node:node server/services/credentials.ts ./server/services/credentials.ts
 COPY --chown=node:node shared/utils/enums.ts ./shared/utils/enums.ts
 COPY --chown=node:node shared/types/who.ts ./shared/types/who.ts
-COPY --chown=node:node scripts/bootstrap-admin.ts scripts/database-env.mjs scripts/ops.mjs scripts/import-who.ts scripts/who-2006-manifest.json ./scripts/
+COPY --chown=node:node scripts/bootstrap-admin.ts scripts/database-env.mjs scripts/ops.mjs scripts/migrate.mjs scripts/import-who.ts scripts/who-2006-manifest.json ./scripts/
 COPY --chown=node:node server/services/who-import.ts ./server/services/who-import.ts
 RUN mkdir /who-source && chown node:node /who-source
 ENV WHO_SOURCE_DIR=/who-source

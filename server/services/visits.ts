@@ -41,7 +41,7 @@ export function shareableVisit(snapshot: VisitSnapshot): ShareableVisit {
   return {
     id: snapshot.id, patientId: snapshot.patientId, measuredAt: snapshot.measuredAt,
     weightKg: snapshot.weightKg, lengthHeightCm: snapshot.lengthHeightCm, position: snapshot.position,
-    headCircumferenceCm: snapshot.headCircumferenceCm,
+    headCircumferenceCm: snapshot.headCircumferenceCm, shareWithFamily: snapshot.shareWithFamily, nextControlAt: snapshot.nextControlAt,
     bmi: originals.some(result => result.indicator === WhoIndicator.BMI_FOR_AGE && result.status === 'unavailable' && result.reason === 'Verificar medidas con el profesional') ? null : snapshot.bmi,
     gestationDaysAtBirth: snapshot.gestationDaysAtBirth, authorId: snapshot.authorId,
     results: originals.map(result => result.status === 'available'
@@ -56,7 +56,7 @@ function hydrate(row: typeof visit.$inferSelect, results: (typeof visitResult.$i
     id: row.id, patientId: row.patientId, measuredAt: row.measuredAt.toISOString(),
     weightKg: Number(row.weightKg), lengthHeightCm: Number(row.lengthHeightCm),
     position: row.position as VisitSnapshot['position'], headCircumferenceCm: Number(row.headCircumferenceCm),
-    bmi: Number(row.bmi), gestationDaysAtBirth: row.gestationDaysAtBirth, authorId: row.authorId,
+    bmi: Number(row.bmi), shareWithFamily: row.shareWithFamily, nextControlAt: row.nextControlAt?.toISOString() ?? null, gestationDaysAtBirth: row.gestationDaysAtBirth, authorId: row.authorId,
     results: reviewPlausibility(results.map(result => ({ ...(result.snapshot as GrowthResult), id: result.id, indicator: result.indicator, parentResultId: result.parentResultId, recalculationId: result.recalculationId, calculatedBy: result.calculatedBy } as VisitResultSnapshot))),
     ...(text?.privateNote ? { privateNote: text.privateNote } : {}),
     ...(text?.parentAdvice ? { parentAdvice: text.parentAdvice } : {}),
@@ -106,7 +106,7 @@ export async function createVisit(actor: Actor, patientId: string, input: Measur
       id, patientId, requestId: values.requestId, requestDigest: digest, measuredAt,
       weightKg: values.weightKg.toString(), lengthHeightCm: values.lengthHeightCm.toString(),
       position: values.position, headCircumferenceCm: values.headCircumferenceCm.toString(),
-      bmi: computedBmi.toString(), gestationDaysAtBirth: person.gestationDays,
+      bmi: computedBmi.toString(), shareWithFamily: values.shareWithFamily, nextControlAt: values.nextControlAt ? new Date(values.nextControlAt) : null, gestationDaysAtBirth: person.gestationDays,
       birthDateAtVisit: person.birthDate, sexAtVisit: person.sex,
       correctionUntilMonths: person.correctionUntilMonths, authorId: actor.id
     }).onConflictDoNothing({ target: visit.requestId }).returning()

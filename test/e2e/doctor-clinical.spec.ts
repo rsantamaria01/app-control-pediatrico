@@ -153,12 +153,27 @@ test.describe('doctor clinical journey with isolated auth and WHO database', () 
       await expect(page.getByText(/Z [−+]\d+,\d{2} · percentil/).first()).toBeVisible()
       const detail = await page.request.get(`/api/pacientes/${patientId}`)
       const savedVisitId = (await detail.json()).visits[0].id as string
+      await expect(page.getByRole('button', { name: /Dejar de compartir visita/ })).toBeVisible()
+      await page.getByRole('button', { name: /Dejar de compartir visita/ }).click()
+      await expect(page.getByRole('button', { name: /Compartir visita/ })).toBeVisible()
+      expect(await page.request.get(`/api/pacientes/${patientId}/visitas/compartir`).then(response => response.json())).toMatchObject({ [savedVisitId]: false })
+      await page.reload()
+      await expect(page.getByRole('button', { name: /Compartir visita/ })).toBeVisible()
       const refreshed = await page.request.post(`/api/pacientes/${patientId}/visitas/${savedVisitId}/recalcular`, { data: { requestId: crypto.randomUUID() } })
       expect(refreshed.status()).toBe(200)
       await page.reload()
       await expect(page.getByRole('heading', { name: 'Peso para la edad' })).toHaveCount(1)
       await expect(page.getByRole('heading', { name: 'Resultados recalculados · revisión médica' })).toBeVisible()
       await expect(page.getByRole('table', { name: 'Mediciones' })).toContainText('percentil')
+      if (width === 375) {
+        const layout = await page.evaluate(() => {
+          const table = document.querySelector('table[aria-label="Mediciones"]')!
+          const scroller = table.parentElement!
+          return { viewport: window.innerWidth, document: document.documentElement.scrollWidth, table: table.scrollWidth, scroller: scroller.clientWidth, scrollerContent: scroller.scrollWidth }
+        })
+        expect(layout.document, JSON.stringify(layout)).toBeLessThanOrEqual(layout.viewport + 1)
+        expect(layout.scrollerContent).toBeGreaterThan(layout.scroller)
+      }
       await expect(page.getByRole('link', { name: 'Pacientes' }).first()).toBeVisible()
       await page.getByRole('link', { name: 'Pacientes' }).first().click()
       await page.getByRole('textbox', { name: 'Buscar por nombre' }).fill(name)

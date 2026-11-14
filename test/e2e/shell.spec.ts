@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { expect, test } from '@playwright/test'
 
 for (const width of [375, 1440]) {
@@ -41,7 +41,34 @@ test('deployment brand changes header logo and primary in both color modes witho
 })
 
 test('production worker has no document precache or offline document fallback', async () => {
-  execFileSync('pnpm', ['build'], { cwd: new URL('../..', import.meta.url), stdio: 'pipe' })
+  const root = new URL('../..', import.meta.url)
+  const locks = readdirSync(new URL('../../node_modules/.cache/nuxt/', import.meta.url)).filter(name => /^output-.*\.lock$/.test(name))
+  let stale = false
+  for (const name of locks) {
+    const { pid, command, cwd } = JSON.parse(readFileSync(new URL(`../../node_modules/.cache/nuxt/${name}`, import.meta.url), 'utf8')) as { pid: number, command: string, cwd: string }
+    if (command !== 'build' || cwd !== root.pathname.replace(/\/$/, '')) continue
+    try {
+      const status = readFileSync(`/proc/${pid}/status`, 'utf8').match(/^State:\s+(\S)/m)?.[1]
+      if (status === 'Z') stale = true
+      else if (status !== undefined) throw new Error(`Active Nuxt build lock: ${pid}`)
+      else throw new Error(`Cannot verify Nuxt build lock: ${pid}`)
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') stale = true
+      else throw error
+    }
+  }
+  if (stale) {
+    const active = readdirSync('/proc').filter(name => /^\d+$/.test(name)).some((name) => {
+      try {
+        const command = readFileSync(`/proc/${name}/cmdline`, 'utf8').replaceAll('\0', ' ')
+        return /(?:^|\s)(?:nuxt|nuxt\.mjs) build(?:\s|$)/.test(command) && readFileSync(`/proc/${name}/status`, 'utf8').match(/^State:\s+(\S)/m)?.[1] !== 'Z'
+      } catch {
+        return false
+      }
+    })
+    if (active) throw new Error('Active Nuxt build exists; cannot bypass stale lock')
+  }
+  execFileSync('pnpm', ['build'], { cwd: root, stdio: 'pipe', env: stale ? { ...process.env, NUXT_IGNORE_LOCK: '1' } : process.env })
   const worker = readFileSync(new URL('../../.output/public/sw.js', import.meta.url), 'utf8')
   const captured: Array<{ path: string, mode: string, strategy: string }> = []
   const routes = {

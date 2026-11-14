@@ -25,8 +25,11 @@ export const visitSchema = z.strictObject({
   headCircumferenceCm: z.number().finite().min(20).max(65),
   privateNote: z.string().trim().max(10000).optional(),
   parentAdvice: z.string().trim().max(10000).optional(),
-  clinicianTrend: z.string().trim().max(1000).optional()
+  clinicianTrend: z.string().trim().max(1000).optional(),
+  shareWithFamily: z.boolean().default(true),
+  nextControlAt: z.iso.datetime({ offset: true }).optional()
 }).superRefine((value, context) => {
+  if (value.nextControlAt && Date.parse(value.nextControlAt) <= Date.parse(value.measuredAt)) context.addIssue({ code: 'custom', path: ['nextControlAt'], message: 'El próximo control debe ser posterior a la visita' })
   const weightToHeight = value.weightKg / (value.lengthHeightCm / 100) ** 2
   if (weightToHeight < 2 || weightToHeight > 90) context.addIssue({ code: 'custom', path: ['weightKg'], message: 'Medidas incompatibles; verifique los datos' })
 })
@@ -44,6 +47,8 @@ export type VisitSnapshot = {
   position: 'RECUMBENT' | 'STANDING'
   headCircumferenceCm: number
   bmi: number
+  shareWithFamily: boolean
+  nextControlAt: string | null
   gestationDaysAtBirth: number | null
   authorId: string
   results: VisitResultSnapshot[]

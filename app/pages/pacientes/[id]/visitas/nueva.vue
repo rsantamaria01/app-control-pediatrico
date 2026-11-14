@@ -4,7 +4,7 @@ import type { PatientView, VisitSnapshot } from '#shared/types/measurement'
 const route = useRoute()
 const id = route.params.id as string
 const { data: patient } = await useFetch<PatientView>(`/api/pacientes/${encodeURIComponent(id)}/identidad`)
-const state = reactive({ measuredAt: '', weightKg: undefined as number | undefined, lengthHeightCm: undefined as number | undefined, position: 'RECUMBENT' as 'RECUMBENT' | 'STANDING', headCircumferenceCm: undefined as number | undefined, privateNote: '', parentAdvice: '', clinicianTrend: '' })
+const state = reactive({ measuredAt: '', weightKg: undefined as number | undefined, lengthHeightCm: undefined as number | undefined, position: 'RECUMBENT' as 'RECUMBENT' | 'STANDING', headCircumferenceCm: undefined as number | undefined, privateNote: '', parentAdvice: '', clinicianTrend: '', shareWithFamily: true, nextControlAt: '' })
 const requestId = ref(crypto.randomUUID())
 
 const error = ref('')
@@ -16,7 +16,8 @@ async function save() {
     await $fetch<VisitSnapshot>(`/api/pacientes/${encodeURIComponent(id)}/visitas`, { method: 'POST', body: {
       requestId: requestId.value, measuredAt: new Date(`${state.measuredAt}:00-05:00`).toISOString(), weightKg: state.weightKg,
       lengthHeightCm: state.lengthHeightCm, position: state.position, headCircumferenceCm: state.headCircumferenceCm,
-      privateNote: state.privateNote, parentAdvice: state.parentAdvice, clinicianTrend: state.clinicianTrend
+      privateNote: state.privateNote, parentAdvice: state.parentAdvice, clinicianTrend: state.clinicianTrend,
+      shareWithFamily: state.shareWithFamily, ...(state.nextControlAt ? { nextControlAt: new Date(`${state.nextControlAt}:00-05:00`).toISOString() } : {})
     } })
     await navigateTo(`/pacientes/${id}`)
   } catch {
@@ -149,6 +150,18 @@ async function save() {
               class="w-full"
             />
           </UFormField>
+          <UFormField label="Próximo control (si se conoce)">
+            <UInput
+              v-model="state.nextControlAt"
+              type="datetime-local"
+              class="w-full"
+            />
+          </UFormField>
+          <USwitch
+            v-model="state.shareWithFamily"
+            label="Compartir con la familia"
+            description="Incluye las medidas e indicaciones de esta visita. La nota privada nunca se comparte."
+          />
           <p class="text-sm text-muted">
             Las notas privadas y la tendencia no se comparten con la familia.
           </p>

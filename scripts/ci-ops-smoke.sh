@@ -75,6 +75,7 @@ case "$output" in
   *ETIMEDOUT*|*'timeout expired'*) fail OFFLINE_PG_TIMEOUT ;;
   *'connection refused'*|*'ECONNREFUSED'*) fail OFFLINE_PG_REFUSED ;;
   *'connect '*|*'Connection '*|*'connection '*) fail OFFLINE_CONNECTION_OTHER ;;
+  *"cause: Error:"*) fail OFFLINE_PG_ERROR_CAUSE ;;
   *'applying migrations'*) fail OFFLINE_MIGRATION_STARTED ;;
   *"Using 'pg' driver"*) fail OFFLINE_DRIVER_LOADED ;;
   *'Reading config file'*) fail OFFLINE_CONFIG_LOADED ;;

@@ -58,6 +58,7 @@ describe('production operations', () => {
     for (const code of ['OFFLINE_DOCKER_ERROR', 'OFFLINE_DEPENDENCY_ERROR', 'OFFLINE_PATH_TMP', 'OFFLINE_PATH_OTHER', 'OFFLINE_DB_CONFIG_ERROR', 'OFFLINE_RUNTIME_TYPE_ERROR']) expect(content).toContain(code)
     expect(content).toMatch(/ops-smoke failed phase=%s code=%s/)
     expect(content).not.toMatch(/(?:printf|echo)\s+[^\n]*\$output/)
+    expect(content).toContain('OFFLINE_PG_ERROR_CAUSE')
     expect(content).not.toMatch(/set -x/)
   })
 

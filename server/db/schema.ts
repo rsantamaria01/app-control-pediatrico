@@ -132,8 +132,8 @@ export const visit = pgTable('clinical_visit', {
   headCircumferenceCm: numeric('head_circumference_cm').notNull(),
   bmi: numeric('bmi').notNull(),
   gestationDaysAtBirth: integer('gestation_days_at_birth'),
-  birthDateAtVisit: text('birth_date_at_visit').notNull(),
-  sexAtVisit: text('sex_at_visit').notNull(),
+  birthDateAtVisit: text('birth_date_at_visit'),
+  sexAtVisit: text('sex_at_visit'),
   correctionUntilMonths: integer('correction_until_months').notNull(),
   authorId: text('author_id').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()

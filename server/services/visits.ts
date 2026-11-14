@@ -19,13 +19,30 @@ const indicators = [WhoIndicator.HEIGHT_FOR_AGE, WhoIndicator.WEIGHT_FOR_AGE, Wh
 
 const recalculationSchema = z.strictObject({ requestId: z.uuid() })
 
+function reviewPlausibility(results: VisitResultSnapshot[]): VisitResultSnapshot[] {
+  const flagRanges: Partial<Record<WhoIndicator, [number, number]>> = {
+    [WhoIndicator.HEIGHT_FOR_AGE]: [-6, 6],
+    [WhoIndicator.WEIGHT_FOR_AGE]: [-6, 5],
+    [WhoIndicator.WEIGHT_FOR_LENGTH]: [-5, 5],
+    [WhoIndicator.WEIGHT_FOR_HEIGHT]: [-5, 5],
+    [WhoIndicator.BMI_FOR_AGE]: [-5, 5],
+    [WhoIndicator.HEAD_CIRCUMFERENCE_FOR_AGE]: [-5, 5]
+  }
+  return results.map((result) => {
+    if (result.status !== 'available') return result
+    const [min, max] = flagRanges[result.indicator as WhoIndicator]!
+    if (result.z >= min && result.z <= max) return result
+    return { id: result.id, indicator: result.indicator, status: 'unavailable', reason: 'Verificar medidas con el profesional', parentResultId: result.parentResultId, recalculationId: result.recalculationId, calculatedBy: result.calculatedBy }
+  })
+}
+
 export function shareableVisit(snapshot: VisitSnapshot): ShareableVisit {
   return {
     id: snapshot.id, patientId: snapshot.patientId, measuredAt: snapshot.measuredAt,
     weightKg: snapshot.weightKg, lengthHeightCm: snapshot.lengthHeightCm, position: snapshot.position,
     headCircumferenceCm: snapshot.headCircumferenceCm, bmi: snapshot.bmi,
     gestationDaysAtBirth: snapshot.gestationDaysAtBirth, authorId: snapshot.authorId,
-    results: snapshot.results.map(result => result.status === 'available'
+    results: snapshot.results.filter(result => result.parentResultId === null && result.recalculationId === null).map(result => result.status === 'available'
       ? { id: result.id, indicator: result.indicator, status: result.status, sex: result.sex, z: result.z, percentile: result.percentile, classification: result.classification, reference: result.reference, parentResultId: result.parentResultId, recalculationId: result.recalculationId, calculatedBy: result.calculatedBy }
       : { id: result.id, indicator: result.indicator, status: result.status, reason: result.reason, parentResultId: result.parentResultId, recalculationId: result.recalculationId, calculatedBy: result.calculatedBy }),
     ...(snapshot.parentAdvice ? { parentAdvice: snapshot.parentAdvice } : {})
@@ -111,57 +128,68 @@ export async function createVisit(actor: Actor, patientId: string, input: Measur
       })
       const growth = calculateGrowth({ sex: person.sex as Gender, weightKg: values.weightKg, lengthHeightCm: values.lengthHeightCm, headCircumferenceCm: values.headCircumferenceCm }, selected)
       const result: VisitResultSnapshot = { ...growth, id: randomUUID(), indicator, parentResultId: null, recalculationId: null, calculatedBy: actor.id }
-      await tx.insert(visitResult).values({ id: result.id, visitId: id, indicator, snapshot: growth, calculatedBy: actor.id })
       results.push(result)
     }
+    const reviewed = reviewPlausibility(results)
+    for (const result of reviewed) await tx.insert(visitResult).values({ id: result.id, visitId: id, indicator: result.indicator, snapshot: result.status === 'available' ? { status: result.status, indicator: result.indicator, sex: result.sex, z: result.z, percentile: result.percentile, classification: result.classification, reference: result.reference } : { status: result.status, reason: result.reason }, calculatedBy: actor.id })
     await tx.insert(visitText).values({ visitId: id, privateNote: values.privateNote, parentAdvice: values.parentAdvice, clinicianTrend: values.clinicianTrend })
-    return hydrate(inserted, results.map(result => ({ id: result.id, visitId: id, indicator: result.indicator, snapshot: result, parentResultId: null, recalculationId: null, calculatedBy: actor.id, createdAt: new Date() })), { visitId: id, privateNote: values.privateNote ?? null, parentAdvice: values.parentAdvice ?? null, clinicianTrend: values.clinicianTrend ?? null })
+    return hydrate(inserted, reviewed.map(result => ({ id: result.id, visitId: id, indicator: result.indicator, snapshot: result, parentResultId: null, recalculationId: null, calculatedBy: actor.id, createdAt: new Date() })), { visitId: id, privateNote: values.privateNote ?? null, parentAdvice: values.parentAdvice ?? null, clinicianTrend: values.clinicianTrend ?? null })
   })
 }
 
 export async function recalculateVisit(actor: Actor, patientId: string, visitId: string, input: { requestId: string }): Promise<{ id: string, visitId: string, results: VisitResultSnapshot[] }> {
   const allowed = actor.roles.includes('DOCTOR')
-  await recordAudit('CLINICAL_RECALCULATE', allowed ? 'ALLOWED' : 'DENIED', actor.id, patientId)
-  if (!allowed) throw createError({ statusCode: 403, statusMessage: 'Access denied' })
+  if (!allowed) {
+    await recordAudit('CLINICAL_RECALCULATE', 'DENIED', actor.id, patientId)
+    throw createError({ statusCode: 403, statusMessage: 'Access denied' })
+  }
   const { requestId } = recalculationSchema.parse(input)
   const db = useDb()
-  const result = await db.transaction(async (tx) => {
-    const [usedForVisit] = await tx.select({ id: visit.id }).from(visit).where(eq(visit.requestId, requestId))
-    if (usedForVisit) throw createError({ statusCode: 409, statusMessage: 'Request ID already used' })
-    const [original] = await tx.select().from(visit).where(and(eq(visit.id, visitId), eq(visit.patientId, patientId))).for('update')
-    if (!original) throw createError({ statusCode: 404, statusMessage: 'Visit not found' })
-    const existing = await tx.select().from(visitResult).where(and(eq(visitResult.visitId, visitId), eq(visitResult.recalculationId, requestId))).orderBy(asc(visitResult.createdAt), asc(visitResult.id))
-    if (existing.length) {
-      const order = [...indicators, WhoIndicator.WEIGHT_FOR_LENGTH, WhoIndicator.WEIGHT_FOR_HEIGHT]
-      return { id: requestId, visitId, results: hydrate(original, existing).results.sort((a, b) => order.indexOf(a.indicator as WhoIndicator) - order.indexOf(b.indicator as WhoIndicator)) }
-    }
-    const [person] = await tx.select().from(patient).where(eq(patient.id, patientId))
-    if (!person) throw createError({ statusCode: 404, statusMessage: 'Patient not found' })
-    const prior = await tx.select().from(visitResult).where(and(eq(visitResult.visitId, visitId), isNull(visitResult.recalculationId)))
-    if (prior.length !== 5) throw createError({ statusCode: 409, statusMessage: 'Incomplete original results' })
-    if (!original.birthDateAtVisit || !original.sexAtVisit) throw createError({ statusCode: 409, statusMessage: 'Historical patient identity unavailable' })
-    const birthDate = new Date(`${original.birthDateAtVisit}T00:00:00.000Z`)
-    const measuredAt = original.measuredAt
-    const sex = original.sexAtVisit as Gender
-    const lengthHeightCm = Number(original.lengthHeightCm)
-    const weightKg = Number(original.weightKg)
-    const headCircumferenceCm = Number(original.headCircumferenceCm)
-    const position = original.position as 'RECUMBENT' | 'STANDING'
-    const selectionInput = { birthDate, measuredAt, gestationDays: original.gestationDaysAtBirth ?? undefined, correctionUntilMonths: original.correctionUntilMonths as 24 | 36, measuredLengthHeightCm: lengthHeightCm, position, sex }
-    const indicator = prior.find(row => row.indicator === WhoIndicator.WEIGHT_FOR_LENGTH || row.indicator === WhoIndicator.WEIGHT_FOR_HEIGHT)?.indicator as WhoIndicator | undefined
-    if (!indicator) throw createError({ statusCode: 409, statusMessage: 'Original size indicator missing' })
-    const indicatorsToRecalculate = [...indicators, indicator]
-    const snapshots: VisitResultSnapshot[] = []
-    for (const current of indicatorsToRecalculate) {
-      const source = prior.find(row => row.indicator === current)
-      if (!source) throw createError({ statusCode: 409, statusMessage: 'Original indicator missing' })
-      const selected = await selectReference({ ...selectionInput, indicator: current })
-      const growth = calculateGrowth({ sex, weightKg, lengthHeightCm, headCircumferenceCm }, selected)
-      const id = randomUUID()
-      await tx.insert(visitResult).values({ id, visitId, indicator: current, snapshot: growth, parentResultId: source.id, recalculationId: requestId, calculatedBy: actor.id })
-      snapshots.push({ ...growth, id, indicator: current, parentResultId: source.id, recalculationId: requestId, calculatedBy: actor.id })
-    }
-    return { id: requestId, visitId, results: snapshots }
-  })
+  let result: { id: string, visitId: string, results: VisitResultSnapshot[] }
+  try {
+    result = await db.transaction(async (tx) => {
+      const [usedForVisit] = await tx.select({ id: visit.id }).from(visit).where(eq(visit.requestId, requestId))
+      if (usedForVisit) throw createError({ statusCode: 409, statusMessage: 'Request ID already used' })
+      const [original] = await tx.select().from(visit).where(and(eq(visit.id, visitId), eq(visit.patientId, patientId))).for('update')
+      if (!original) throw createError({ statusCode: 404, statusMessage: 'Visit not found' })
+      const existing = await tx.select().from(visitResult).where(and(eq(visitResult.visitId, visitId), eq(visitResult.recalculationId, requestId))).orderBy(asc(visitResult.createdAt), asc(visitResult.id))
+      if (existing.length) {
+        const order = [...indicators, WhoIndicator.WEIGHT_FOR_LENGTH, WhoIndicator.WEIGHT_FOR_HEIGHT]
+        return { id: requestId, visitId, results: hydrate(original, existing).results.sort((a, b) => order.indexOf(a.indicator as WhoIndicator) - order.indexOf(b.indicator as WhoIndicator)) }
+      }
+      const [person] = await tx.select().from(patient).where(eq(patient.id, patientId))
+      if (!person) throw createError({ statusCode: 404, statusMessage: 'Patient not found' })
+      const prior = await tx.select().from(visitResult).where(and(eq(visitResult.visitId, visitId), isNull(visitResult.recalculationId)))
+      if (prior.length !== 5) throw createError({ statusCode: 409, statusMessage: 'Incomplete original results' })
+      if (!original.birthDateAtVisit || !original.sexAtVisit) throw createError({ statusCode: 409, statusMessage: 'Historical patient identity unavailable' })
+      const birthDate = new Date(`${original.birthDateAtVisit}T00:00:00.000Z`)
+      const measuredAt = original.measuredAt
+      const sex = original.sexAtVisit as Gender
+      const lengthHeightCm = Number(original.lengthHeightCm)
+      const weightKg = Number(original.weightKg)
+      const headCircumferenceCm = Number(original.headCircumferenceCm)
+      const position = original.position as 'RECUMBENT' | 'STANDING'
+      const selectionInput = { birthDate, measuredAt, gestationDays: original.gestationDaysAtBirth ?? undefined, correctionUntilMonths: original.correctionUntilMonths as 24 | 36, measuredLengthHeightCm: lengthHeightCm, position, sex }
+      const indicator = prior.find(row => row.indicator === WhoIndicator.WEIGHT_FOR_LENGTH || row.indicator === WhoIndicator.WEIGHT_FOR_HEIGHT)?.indicator as WhoIndicator | undefined
+      if (!indicator) throw createError({ statusCode: 409, statusMessage: 'Original size indicator missing' })
+      const indicatorsToRecalculate = [...indicators, indicator]
+      const snapshots: VisitResultSnapshot[] = []
+      for (const current of indicatorsToRecalculate) {
+        const source = prior.find(row => row.indicator === current)
+        if (!source) throw createError({ statusCode: 409, statusMessage: 'Original indicator missing' })
+        const selected = await selectReference({ ...selectionInput, indicator: current })
+        const growth = calculateGrowth({ sex, weightKg, lengthHeightCm, headCircumferenceCm }, selected)
+        const id = randomUUID()
+        snapshots.push({ ...growth, id, indicator: current, parentResultId: source.id, recalculationId: requestId, calculatedBy: actor.id })
+      }
+      const reviewed = reviewPlausibility(snapshots)
+      for (const entry of reviewed) await tx.insert(visitResult).values({ id: entry.id, visitId, indicator: entry.indicator, snapshot: entry.status === 'available' ? { status: entry.status, indicator: entry.indicator, sex: entry.sex, z: entry.z, percentile: entry.percentile, classification: entry.classification, reference: entry.reference } : { status: entry.status, reason: entry.reason }, parentResultId: entry.parentResultId, recalculationId: requestId, calculatedBy: actor.id })
+      return { id: requestId, visitId, results: reviewed }
+    })
+  } catch (error) {
+    await recordAudit('CLINICAL_RECALCULATE', 'DENIED', actor.id, patientId)
+    throw error
+  }
+  await recordAudit('CLINICAL_RECALCULATE', 'ALLOWED', actor.id, patientId)
   return result
 }

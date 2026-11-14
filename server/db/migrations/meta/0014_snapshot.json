@@ -955,13 +955,13 @@
           "name": "birth_date_at_visit",
           "type": "text",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "sex_at_visit": {
           "name": "sex_at_visit",
           "type": "text",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "correction_until_months": {
           "name": "correction_until_months",

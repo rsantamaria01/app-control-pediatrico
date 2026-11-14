@@ -192,7 +192,7 @@ describe('clinical patients and visits on a disposable WHO database', () => {
     await expect(recalculateVisit(otherDoctor, other.id, original.id, { requestId: randomUUID() })).rejects.toThrow()
     await expect(recalculateVisit(otherDoctor, created.id, randomUUID(), { requestId: randomUUID() })).rejects.toThrow()
     expect((await db.select().from(visitResult).where(eq(visitResult.visitId, original.id)))).toHaveLength(5)
-    expect((await db.select().from(auditEvent).where(eq(auditEvent.subjectId, created.id))).filter(event => event.action === 'CLINICAL_RECALCULATE' && event.outcome === 'DENIED')).toHaveLength(3)
+    expect((await db.select().from(auditEvent).where(eq(auditEvent.subjectId, created.id))).filter(event => event.action === 'CLINICAL_RECALCULATE' && event.outcome === 'DENIED')).toHaveLength(4)
   })
 
   it('uses the historical gestation and corrected-age setting when the patient record later changes', async () => {
@@ -280,6 +280,44 @@ describe('clinical patients and visits on a disposable WHO database', () => {
     expect((await db.select().from(auditEvent).where(eq(auditEvent.subjectId, created.id))).map(row => row.action)).toContain('CLINICAL_READ')
   }, 120000)
 
+  it('keeps WHO-flagged measurement values but withholds only the affected indicator from shareable output', async () => {
+    const newborn = await createPatient(doctor, { name: 'Medición para revisar', birthDate: '2024-01-01', sex: Gender.MALE })
+    await importRelease()
+    const saved = await createVisit(doctor, newborn.id, { ...measurement, weightKg: 20, lengthHeightCm: 50, headCircumferenceCm: 65, measuredAt: '2024-01-01T12:00:00.000Z', requestId: randomUUID() })
+    const shared = shareableVisit((await getVisits(doctor, newborn.id))[0]!)
+    expect(shared.weightKg).toBe(20)
+    expect(shared.results.find(result => result.indicator === WhoIndicator.WEIGHT_FOR_AGE)).toMatchObject({ status: 'unavailable', reason: 'Verificar medidas con el profesional' })
+    expect(JSON.stringify(shared)).not.toContain('Macrocefalia')
+    expect(JSON.stringify(shared)).not.toContain('Obesidad')
+    expect(saved.results.some(result => result.status === 'available')).toBe(true)
+  }, 120000)
+
+  it('never projects an unapproved result even when a caller fabricates a different result status', async () => {
+    const created = await createPatient(doctor, patientInput)
+    const original = await createVisit(doctor, created.id, { ...measurement, requestId: randomUUID() })
+    const rerun = await recalculateVisit(doctor, created.id, original.id, { requestId: randomUUID() })
+    const injected = { ...rerun.results[0]!, status: 'available', z: 1000, classification: { name: 'NO COMPARTIR', tone: 'flag' }, reference: { version: 'NO COMPARTIR' } }
+    const projected = shareableVisit({ ...original, results: [...original.results, injected] } as typeof original)
+    expect(projected.results).toHaveLength(5)
+    expect(JSON.stringify(projected)).not.toContain('NO COMPARTIR')
+  })
+
+  it('never projects unapproved recalculation results to a future guardian or PDF', async () => {
+    const created = await createPatient(doctor, patientInput)
+    const original = await createVisit(doctor, created.id, { ...measurement, requestId: randomUUID() })
+    const recalculated = await recalculateVisit(otherDoctor, created.id, original.id, { requestId: randomUUID() })
+    const stored = (await getVisits(doctor, created.id))[0]!
+    expect(stored.results).toHaveLength(10)
+    const shareable = shareableVisit(stored)
+    expect(shareable.results).toHaveLength(5)
+    expect(shareable.results.map(result => result.id).toSorted()).toEqual(original.results.map(result => result.id).toSorted())
+    expect(JSON.stringify(shareable)).not.toContain(recalculated.id)
+    expect(JSON.stringify(shareable)).not.toContain(recalculated.results[0]!.id)
+    expect(JSON.stringify(shareable)).not.toContain('Confidencial clínico')
+    expect(JSON.stringify(shareable)).not.toContain('Seguimiento manual')
+    expect(shareable.parentAdvice).toBe('Conversar en consulta')
+  })
+
   it('excludes private notes from shareable snapshots and preserves doctor-only notes', async () => {
     const created = await createPatient(doctor, patientInput)
     const saved = await createVisit(doctor, created.id, { ...measurement, requestId: randomUUID() })
@@ -346,16 +384,17 @@ describe('clinical patients and visits on a disposable WHO database', () => {
     expect(after24.results.find(result => result.indicator === WhoIndicator.HEIGHT_FOR_AGE)).toMatchObject({ status: 'available', reference: { ageBasis: 'CHRONOLOGICAL', referencePosition: 'STANDING' } })
   })
 
-  it('rejects impossible paired inputs while retaining a validated WHO extreme tail', async () => {
+  it('preserves the exact raw value of an independently validated extreme while withholding only its flagged indicator', async () => {
     const created = await createPatient(doctor, { name: 'Paciente extremo', birthDate: '2021-01-01', sex: Gender.FEMALE })
     await expect(createVisit(doctor, created.id, { ...measurement, requestId: randomUUID(), weightKg: 0.1, lengthHeightCm: 120 })).rejects.toThrow()
     await importRelease()
     const extreme = await createVisit(doctor, created.id, { ...measurement, requestId: randomUUID(), weightKg: 5, lengthHeightCm: 110, position: 'STANDING', measuredAt: '2025-12-01T12:00:00.000Z' })
     expect(extreme.weightKg).toBe(5)
-    expect(extreme.results.find(result => result.indicator === WhoIndicator.WEIGHT_FOR_AGE)).toMatchObject({ status: 'available', percentile: null })
+    expect(extreme.results.find(result => result.indicator === WhoIndicator.WEIGHT_FOR_AGE)).toMatchObject({ status: 'unavailable', reason: 'Verificar medidas con el profesional' })
+    expect(extreme.results.find(result => result.indicator === WhoIndicator.HEIGHT_FOR_AGE)?.status).toBe('available')
   })
 
-  it('rejects implausible newborn inputs without fabricating growth values while allowing official extreme values', async () => {
+  it('retains newborn measurements but withholds WHO-flagged indicators and accepts official unflagged extremes', async () => {
     const newborn = await createPatient(doctor, { name: 'Recién nacido', birthDate: '2024-01-01', sex: Gender.MALE })
     for (const invalid of [
       { weightKg: 250, lengthHeightCm: 50, headCircumferenceCm: 35 },
@@ -364,8 +403,19 @@ describe('clinical patients and visits on a disposable WHO database', () => {
     ]) await expect(createVisit(doctor, newborn.id, { ...measurement, ...invalid, measuredAt: '2024-01-01T12:00:00.000Z', requestId: randomUUID() })).rejects.toThrow()
     expect(await db.select().from(visit).where(eq(visit.patientId, newborn.id))).toHaveLength(0)
     await importRelease()
+    const implausible = await createVisit(doctor, newborn.id, { ...measurement, weightKg: 20, lengthHeightCm: 50, headCircumferenceCm: 65, measuredAt: '2024-01-01T12:00:00.000Z', requestId: randomUUID() })
+    expect(implausible.weightKg).toBe(20)
+    for (const indicator of [WhoIndicator.WEIGHT_FOR_AGE, WhoIndicator.HEAD_CIRCUMFERENCE_FOR_AGE, WhoIndicator.BMI_FOR_AGE, WhoIndicator.WEIGHT_FOR_LENGTH]) {
+      expect(implausible.results.find(result => result.indicator === indicator)).toMatchObject({ status: 'unavailable', reason: 'Verificar medidas con el profesional' })
+    }
+    expect(implausible.results.find(result => result.indicator === WhoIndicator.HEIGHT_FOR_AGE)?.status).toBe('available')
+    const again = (await getVisits(doctor, newborn.id))[0]!
+    expect(again.results.find(result => result.indicator === WhoIndicator.WEIGHT_FOR_AGE)).toMatchObject({ status: 'unavailable', reason: 'Verificar medidas con el profesional' })
+    expect(JSON.stringify(shareableVisit(again))).not.toContain('Macrocefalia')
     const extreme = await createVisit(doctor, newborn.id, { ...measurement, weightKg: 2.048, lengthHeightCm: 45, headCircumferenceCm: 30, measuredAt: '2024-01-01T12:00:00.000Z', requestId: randomUUID() })
     expect(extreme.results.find(result => result.indicator === WhoIndicator.WEIGHT_FOR_AGE)).toMatchObject({ status: 'available', sex: Gender.MALE })
+    expect(extreme.weightKg).toBe(2.048)
+    expect((await getVisits(doctor, newborn.id))[0]?.results.filter(result => result.status === 'available').length).toBeGreaterThan(0)
   })
 
   it('rejects impossible dates and measures without storing partial visits', async () => {

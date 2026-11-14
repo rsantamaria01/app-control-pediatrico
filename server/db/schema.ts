@@ -1,4 +1,4 @@
-import { bigint, boolean, check, index, integer, numeric, pgTable, primaryKey, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core'
+import { bigint, boolean, check, index, integer, jsonb, numeric, pgTable, primaryKey, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
 
 export const user = pgTable('user', {
@@ -101,6 +101,59 @@ export const rateLimit = pgTable('rateLimit', {
   key: text('key').notNull().unique(),
   count: integer('count').notNull(),
   lastRequest: bigint('lastRequest', { mode: 'number' }).notNull()
+})
+
+export const patient = pgTable('patient', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  birthDate: text('birth_date').notNull(),
+  sex: text('sex').notNull(),
+  gestationDays: integer('gestation_days'),
+  correctionUntilMonths: integer('correction_until_months').notNull().default(24),
+  birthWeightKg: numeric('birth_weight_kg'),
+  birthLengthCm: numeric('birth_length_cm'),
+  birthHeadCircumferenceCm: numeric('birth_head_circumference_cm'),
+  createdBy: text('created_by').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
+}, table => [
+  check('patient_sex_ck', sql`${table.sex} IN ('MALE', 'FEMALE')`),
+  check('patient_correction_ck', sql`${table.correctionUntilMonths} IN (24, 36)`)
+])
+
+export const visit = pgTable('clinical_visit', {
+  id: text('id').primaryKey(),
+  patientId: text('patient_id').notNull().references(() => patient.id, { onDelete: 'restrict' }),
+  requestId: text('request_id').notNull().unique(),
+  requestDigest: text('request_digest').notNull(),
+  measuredAt: timestamp('measured_at', { withTimezone: true }).notNull(),
+  weightKg: numeric('weight_kg').notNull(),
+  lengthHeightCm: numeric('length_height_cm').notNull(),
+  position: text('position').notNull(),
+  headCircumferenceCm: numeric('head_circumference_cm').notNull(),
+  bmi: numeric('bmi').notNull(),
+  gestationDaysAtBirth: integer('gestation_days_at_birth'),
+  correctionUntilMonths: integer('correction_until_months').notNull(),
+  authorId: text('author_id').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
+}, table => [
+  index('clinical_visit_patient_idx').on(table.patientId, table.measuredAt),
+  check('clinical_visit_values_ck', sql`${table.weightKg} > 0 AND ${table.lengthHeightCm} > 0 AND ${table.headCircumferenceCm} > 0 AND ${table.bmi} > 0`),
+  check('clinical_visit_position_ck', sql`${table.position} IN ('RECUMBENT', 'STANDING')`)
+])
+
+export const visitResult = pgTable('visit_result', {
+  id: text('id').primaryKey(),
+  visitId: text('visit_id').notNull().references(() => visit.id, { onDelete: 'restrict' }),
+  indicator: text('indicator').notNull(),
+  snapshot: jsonb('snapshot').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
+}, table => [index('visit_result_visit_idx').on(table.visitId)])
+
+export const visitText = pgTable('visit_text', {
+  visitId: text('visit_id').primaryKey().references(() => visit.id, { onDelete: 'restrict' }),
+  privateNote: text('private_note'),
+  parentAdvice: text('parent_advice'),
+  clinicianTrend: text('clinician_trend')
 })
 
 export const whoDataset = pgTable('who_dataset', {

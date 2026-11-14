@@ -15,17 +15,44 @@ import { Gender, WhoIndicator } from '../../shared/utils/enums'
 import type { DatasetId, VerifiedSource, WhoRow } from '../../shared/types/who'
 import { correctZ } from '../../shared/utils/zscore'
 
-const url = process.env.WHO_TEST_DATABASE_URL
-if (!url || !['/pediatrico_who_slice3_test', '/pediatrico_who_slice3_verify', '/pediatrico_who_slice3_guard', '/pediatrico_who_slice3_sealed_test'].includes(new URL(url).pathname) || url === process.env.DATABASE_URL) throw new Error('Dedicated WHO test database required')
+const configuredUrl = process.env.WHO_TEST_DATABASE_URL
+if (!configuredUrl || !['/pediatrico_who_slice3_test', '/pediatrico_who_slice3_verify', '/pediatrico_who_slice3_guard', '/pediatrico_who_slice3_sealed_test'].includes(new URL(configuredUrl).pathname) || configuredUrl === process.env.DATABASE_URL) throw new Error('Dedicated WHO test database required')
+const databaseName = `pediatrico_who_slice3_run_${randomUUID().replace(/-/g, '')}`
+const testUrl = new URL(configuredUrl)
+testUrl.pathname = `/${databaseName}`
+const url = testUrl.href
+const adminUrl = new URL(configuredUrl)
+adminUrl.pathname = '/postgres'
+const adminPool = new Pool({ connectionString: adminUrl.href })
 process.env.DATABASE_URL = url
 const pool = new Pool({ connectionString: url })
 const db = drizzle(pool)
 const datasets = new Map<string, { id: DatasetId, rows: WhoRow[] }>()
+let created = false
 
 beforeAll(async () => {
+  await adminPool.query(`CREATE DATABASE "${databaseName}"`)
+  created = true
   await migrate(db, { migrationsFolder: './server/db/migrations' })
+  expect((await db.select({ count: count() }).from(whoDataset))[0]!.count).toBe(0)
+  const entries = await Promise.all(manifest.files.map(async (file) => {
+    const bytes = await readFile(resolve('/tmp/opencode/who-2006', `${file.name}-expanded.xlsx`))
+    const source = metadata(file, bytes)
+    const rows = await parseWhoWorkbook(source, bytes)
+    datasets.set(file.name, { id: '' as DatasetId, rows })
+    return { source, rows }
+  }))
+  const ids = await importWhoRelease(entries)
+  for (const [index, file] of manifest.files.entries()) datasets.get(file.name)!.id = ids[index]!
 }, 120000)
-afterAll(async () => pool.end())
+afterAll(async () => {
+  await pool.end()
+  try {
+    if (created) await adminPool.query(`DROP DATABASE "${databaseName}"`)
+  } finally {
+    await adminPool.end()
+  }
+})
 
 function metadata(file: typeof manifest.files[number], bytes: Uint8Array): VerifiedSource {
   const indicator = file.indicator as WhoIndicator
@@ -43,15 +70,11 @@ function metadata(file: typeof manifest.files[number], bytes: Uint8Array): Verif
 }
 
 describe('pinned WHO 2006 originals', () => {
-  it('imports all six categories for both sexes with source counts and ordered SD rows', async () => {
+  it('reads all six categories for both sexes after one atomic import with source counts and ordered SD rows', async () => {
     for (const file of manifest.files) {
-      const bytes = await readFile(resolve('/tmp/opencode/who-2006', `${file.name}-expanded.xlsx`))
-      const source = metadata(file, bytes)
-      const rows = await parseWhoWorkbook(source, bytes)
+      const { id, rows } = datasets.get(file.name)!
+      const source = metadata(file, await readFile(resolve('/tmp/opencode/who-2006', `${file.name}-expanded.xlsx`)))
       expect(rows).toHaveLength(source.xUnit === 'DAY' ? 1857 : source.position === 'RECUMBENT' ? 651 : 551)
-      const existing = await db.select({ id: whoDataset.id }).from(whoDataset).where(eq(whoDataset.sha256, file.sha256))
-      const id = existing.length ? existing[0]!.id as DatasetId : await importWhoDataset(source, rows)
-      datasets.set(file.name, { id, rows })
       const returned = await getWhoRows(id, source.indicator, source.sex, source.position === null && source.indicator === WhoIndicator.HEIGHT_FOR_AGE ? 'RECUMBENT' : source.position)
       expect(returned.length).toBe(source.indicator === WhoIndicator.HEIGHT_FOR_AGE ? 731 : rows.length)
       expect(returned[0]!.sdNeg3).toBe(rows[0]!.sdNeg3)

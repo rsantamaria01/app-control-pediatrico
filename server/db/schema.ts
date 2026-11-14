@@ -148,7 +148,7 @@ export const guardianGrant = pgTable('guardian_grant', {
 }, table => [
   primaryKey({ columns: [table.patientId, table.guardianId] }),
   index('guardian_grant_guardian_idx').on(table.guardianId, table.status),
-  check('guardian_grant_status_ck', sql`${table.status} IN ('PENDING', 'ACTIVE', 'FAILED', 'REVOKED')`)
+  check('guardian_grant_status_ck', sql`${table.status} IN ('UNINVITED', 'PENDING', 'ACTIVE', 'FAILED', 'REVOKED')`)
 ])
 
 export const guardianDelivery = pgTable('guardian_delivery', {

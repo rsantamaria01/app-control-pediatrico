@@ -106,7 +106,10 @@ describe('clinical patients and visits on a disposable WHO database', () => {
     expect(first.patient).toMatchObject({ name: 'José Pérez', nationalId: '1710034065' })
     await expect(createQuickPatient(doctor, { ...input, nationalId: '1710034065' })).rejects.toMatchObject({ statusCode: 409, data: { existingPatientId: first.patient.id } })
     await expect(createQuickPatient(doctor, { ...input, givenNames: 'Jóse' })).rejects.toMatchObject({ statusCode: 409, data: { possibleMatches: expect.arrayContaining([expect.objectContaining({ id: first.patient.id })]) } })
-    const provisional = await createQuickPatient(doctor, { ...input, givenNames: 'Jóse', confirmPossibleMatches: true, hsmRecord: 'HSM 123' })
+    const { findGuardianIdentity } = await import('../../server/services/invitations')
+    const guardian = await findGuardianIdentity(doctor, { phone: contact.phone })
+    expect(guardian).not.toBeNull()
+    const provisional = await createQuickPatient(doctor, { ...input, contacts: [{ ...contact, confirmedGuardianId: guardian!.id }], givenNames: 'Jóse', confirmPossibleMatches: true, hsmRecord: 'HSM 123' })
     expect(provisional.patient.nationalId).toBeUndefined()
     expect(provisional.patient.hsmRecord).toBe('HSM 123')
     await expect(updatePatientIdentity(assistant, provisional.patient.id, '1710034065')).rejects.toThrow()
@@ -114,6 +117,8 @@ describe('clinical patients and visits on a disposable WHO database', () => {
     expect((await updatePatientBackground(doctor, provisional.patient.id, { gestationDays: 196, birthWeightKg: 2.1 })).gestationDays).toBe(196)
     expect((await getPatient(doctor, provisional.patient.id)).birthWeightKg).toBe(2.1)
     expect((await listPatients(doctor, 'jose')).some(row => row.id === first.patient.id)).toBe(true)
+    expect((await listPatients(doctor, '1710034065')).some(row => row.id === first.patient.id)).toBe(true)
+    expect((await listPatients(doctor, 'jose')).map(row => row.name)).toEqual(['Jóse Pérez', 'José Pérez'])
   })
 
   it('rejects non-doctors, invalid birth/gestation and preserves doctor-wide access with read audit', async () => {

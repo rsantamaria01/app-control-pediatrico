@@ -26,7 +26,7 @@ export const guardianContactSchema = z.strictObject({
   deferDelivery: z.boolean().optional()
 }).refine(value => Boolean(value.email || value.phone), { message: 'Email or phone required' })
 export type GuardianContact = z.input<typeof guardianContactSchema>
-export type GuardianGrant = { patientId: string, status: 'PENDING' | 'ACTIVE' | 'FAILED', email: string | null }
+export type GuardianGrant = { patientId: string, status: 'UNINVITED' | 'PENDING' | 'ACTIVE' | 'FAILED', email: string | null }
 export type FamilyVisit = { measuredAt: string, weightKg: number, lengthHeightCm: number, position: string, headCircumferenceCm: number, parentAdvice?: string, nextControlAt: string | null }
 export type FamilyChildView = { id: string, name: string, birthDate: string, visits: FamilyVisit[] }
 export type FamilyChildSummary = { id: string, name: string, birthDate: string, lastControl: FamilyVisit | null }
@@ -229,21 +229,21 @@ export async function grantGuardian(actor: Actor, patientId: string, input: Guar
     if (credentials.length && token && matched) throw createError({ statusCode: 409, statusMessage: 'Account already active' })
     const [current] = await tx.select().from(guardianGrant).where(and(eq(guardianGrant.patientId, patientId), eq(guardianGrant.guardianId, owner.id)))
     if (current?.status === 'REVOKED') throw createError({ statusCode: 409, statusMessage: 'Relationship revoked' })
-    if (!current) await tx.insert(guardianGrant).values({ patientId, guardianId: owner.id, contactEmail: contact.email ?? lockedOwner.email, contactPhone: contact.phone, relationship: contact.relationship, proof: contact.proof, verifiedBy: actor.id, status: 'FAILED' })
-    else await tx.update(guardianGrant).set({ contactPhone: contact.phone ?? current.contactPhone, relationship: contact.relationship ?? current.relationship, proof: contact.proof, verifiedBy: actor.id, verifiedAt: new Date() }).where(and(eq(guardianGrant.patientId, patientId), eq(guardianGrant.guardianId, owner.id)))
+    if (!current) await tx.insert(guardianGrant).values({ patientId, guardianId: owner.id, contactEmail: contact.email ?? lockedOwner.email, contactPhone: contact.phone, relationship: contact.relationship, proof: contact.proof, verifiedBy: actor.id, status: contact.deferDelivery || !contact.email ? 'UNINVITED' : 'FAILED' })
+    else await tx.update(guardianGrant).set({ contactEmail: contact.email ?? current.contactEmail, contactPhone: contact.phone ?? current.contactPhone, relationship: contact.relationship ?? current.relationship, proof: contact.proof, verifiedBy: actor.id, verifiedAt: new Date(), ...(deliveryId && current.status === 'UNINVITED' ? { status: 'FAILED' } : {}) }).where(and(eq(guardianGrant.patientId, patientId), eq(guardianGrant.guardianId, owner.id)))
     if (tokenId) await tx.insert(setupToken).values({ id: tokenId, userId: owner.id, digest: tokenDigest(token!), purpose: 'SETUP', expiresAt: new Date(Date.now() + 7 * 86400000) })
     if (deliveryId) await tx.insert(guardianDelivery).values({ id: deliveryId, patientId, guardianId: owner.id, tokenId, payload })
   })
   const delivery = deliveryId ? await processGuardianDelivery(deliveryId) : null
   const [stored] = await db.select({ status: guardianGrant.status }).from(guardianGrant).where(and(eq(guardianGrant.patientId, patientId), eq(guardianGrant.guardianId, id)))
   await recordAudit('GUARDIAN_GRANT', delivery === 'DONE' ? 'ALLOWED' : 'DENIED', actor.id, patientId)
-  return { patientId, email: contact.email ?? null, status: stored?.status === 'ACTIVE' ? 'ACTIVE' : stored?.status === 'PENDING' ? 'PENDING' : 'FAILED' }
+  return { patientId, email: contact.email ?? null, status: stored?.status === 'ACTIVE' ? 'ACTIVE' : stored?.status === 'PENDING' ? 'PENDING' : stored?.status === 'UNINVITED' ? 'UNINVITED' : 'FAILED' }
 }
 
 export async function revokeGuardian(actor: Actor, patientId: string, guardianId: string) {
   await staff(actor, patientId)
   const revoked = await useDb().transaction(async (tx) => {
-    const [row] = await tx.update(guardianGrant).set({ status: 'REVOKED', revokedAt: new Date() }).where(and(eq(guardianGrant.patientId, patientId), eq(guardianGrant.guardianId, guardianId), inArray(guardianGrant.status, ['ACTIVE', 'PENDING', 'FAILED']))).returning()
+    const [row] = await tx.update(guardianGrant).set({ status: 'REVOKED', revokedAt: new Date() }).where(and(eq(guardianGrant.patientId, patientId), eq(guardianGrant.guardianId, guardianId), inArray(guardianGrant.status, ['ACTIVE', 'PENDING', 'FAILED', 'UNINVITED']))).returning()
     if (row?.tokenId) await tx.update(setupToken).set({ usedAt: new Date() }).where(and(eq(setupToken.id, row.tokenId), isNull(setupToken.usedAt)))
     return Boolean(row)
   })

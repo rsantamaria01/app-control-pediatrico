@@ -32,8 +32,9 @@ const status = ref('')
 const initialPatient = useRoute().query.patient
 const pending = ref(false)
 const candidates = ref<{ id: string, name: string, guardians: { email: string, status: string, lastSendError: string | null }[] }[]>([])
+const registeredEmails = ref<string[]>([])
 function label(status: string) {
-  return status === 'ACTIVE' ? 'Activo' : status === 'PENDING' ? 'Pendiente de activación' : 'Sin invitar'
+  return status === 'ACTIVE' ? 'Activo' : status === 'PENDING' ? 'Pendiente de activación' : status === 'FAILED' ? 'Envío fallido · Reenviar invitación' : 'Sin invitar'
 }
 const error = ref(false)
 async function refresh() {
@@ -53,6 +54,7 @@ if (typeof initialPatient === 'string') {
   if (initial.value) {
     selected.value = { id: initial.value.id, name: initial.value.name }
     candidates.value = [initial.value]
+    registeredEmails.value = initial.value.guardians.map(guardian => guardian.email.toLowerCase())
   }
 }
 
@@ -63,7 +65,10 @@ async function submit() {
   try {
     const result = await $fetch<GuardianGrant>('/api/guardian-grants', { method: 'POST', body: { patientId: selected.value.id, contact: { name: contact.name, proof: contact.proof, ...(contact.email ? { email: contact.email } : {}), ...(contact.phone ? { phone: contact.phone } : {}), ...(contact.relationship ? { relationship: contact.relationship } : {}), ...(identity.value ? { confirmedGuardianId: identity.value.id } : {}) } } })
     status.value = !contact.email ? 'Vínculo registrado. Sin invitar: agregue un correo para enviar la invitación.' : result.status === 'FAILED' ? 'No se pudo entregar la invitación. Puede reintentar.' : result.status === 'ACTIVE' ? 'Acceso habilitado para la persona verificada.' : 'Invitación pendiente de aceptación.'
-    await refresh()
+    const current = await $fetch<{ id: string, name: string, guardians: typeof candidates.value[number]['guardians'] }>(`/api/guardian-grants/${selected.value.id}`)
+    candidates.value = [current, ...candidates.value.filter(child => child.id !== current.id)]
+    registeredEmails.value = current.guardians.map(guardian => guardian.email.toLowerCase())
+    if (search.value.trim().length >= 2) await refresh()
   } catch {
     status.value = 'No se pudo registrar la invitación. Inténtelo otra vez.'
   } finally {
@@ -206,7 +211,7 @@ async function submit() {
           :loading="pending"
           :disabled="!identityChecked || verifiedEmail !== `${contact.email.trim().toLowerCase()}|${contact.phone.trim()}` || Boolean(identity && !confirmed)"
         >
-          {{ !contact.email ? 'Registrar representante sin invitar' : candidates.find(child => child.id === selected?.id)?.guardians.some(guardian => guardian.email === contact.email) ? 'Reenviar invitación' : 'Registrar y enviar invitación' }}
+          {{ !contact.email ? 'Registrar representante sin invitar' : registeredEmails.includes(contact.email.trim().toLowerCase()) ? 'Reenviar invitación' : 'Registrar y enviar invitación' }}
         </UButton>
       </form>
       <p

@@ -9,7 +9,7 @@ const age = (birthDate: string) => {
   return months < 12 ? `${months} meses` : `${Math.floor(months / 12)} años ${months % 12} meses`
 }
 const weight = new Intl.NumberFormat('es-EC', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-const { data: patients, status, error, refresh } = await useFetch<PatientView[]>('/api/pacientes', { query: { q: query }, default: () => [] })
+const { data: patients, status, error, refresh } = await useFetch<PatientView[]>('/api/pacientes', { query: computed(() => ({ q: query.value })), default: () => [] })
 </script>
 
 <template>

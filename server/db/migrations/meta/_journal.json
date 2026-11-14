@@ -148,6 +148,13 @@
       "when": 1794691726583,
       "tag": "0020_even_jackpot",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1794695868657,
+      "tag": "0021_chubby_blob",
+      "breakpoints": true
     }
   ]
 }

@@ -111,9 +111,9 @@ describe('verified guardian isolation', () => {
     const phone = `09${randomUUID().replace(/\D/g, '').padEnd(8, '0').slice(0, 8)}`
     const contact = { name: 'Familia Compartida', relationship: 'Madre', phone, email, proof: 'Documento comprobado presencialmente', invite: false }
     const created = await createQuickPatient(doctor, { givenNames: 'Luz', surnames: 'Santamaría', birthDate: '2024-02-01', sex: 'FEMALE', contacts: [contact] })
-    expect(created.contacts[0]?.status).toBe('FAILED')
+    expect(created.contacts[0]?.status).toBe('UNINVITED')
     const [firstGrant] = await db.select().from(guardianGrant).where(eq(guardianGrant.patientId, created.patient.id))
-    expect(firstGrant?.status).toBe('FAILED')
+    expect(firstGrant?.status).toBe('UNINVITED')
     const identity = await findGuardianIdentity(doctor, { email, phone })
     expect(identity?.id).toBe(firstGrant?.guardianId)
     const sibling = await createQuickPatient(doctor, { givenNames: 'Sol', surnames: 'Santamaría', birthDate: '2023-02-01', sex: 'MALE', contacts: [{ ...contact, confirmedGuardianId: identity!.id }] })
@@ -128,6 +128,25 @@ describe('verified guardian isolation', () => {
     }
     expect((await db.select().from(patient).where(eq(patient.id, created.patient.id))).length).toBe(1)
     expect((await grantGuardian(doctor, created.patient.id, { name: contact.name, phone, email, relationship: 'Madre', proof: contact.proof, confirmedGuardianId: identity!.id })).status).toBe('PENDING')
+    const [invited] = await db.select().from(guardianGrant).where(eq(guardianGrant.patientId, created.patient.id))
+    expect(invited?.contactEmail).toBe(email)
+    expect((await db.select().from(guardianGrant).where(eq(guardianGrant.patientId, sibling.patient.id)))[0]?.contactEmail).toBe(email)
+    const noEmail = await createQuickPatient(doctor, { givenNames: 'Otra', surnames: 'Familia', birthDate: '2024-05-02', sex: 'MALE', contacts: [{ name: 'Sin correo', phone: `09${randomUUID().replace(/\D/g, '').padEnd(8, '0').slice(0, 8)}`, relationship: 'Padre', proof: 'Identidad verificada presencialmente', email: '', invite: false }] })
+    const [provisionalGrant] = await db.select().from(guardianGrant).where(eq(guardianGrant.patientId, noEmail.patient.id))
+    await grantGuardian(doctor, noEmail.patient.id, { name: 'Sin correo', phone: provisionalGrant!.contactPhone!, email: `${randomUUID()}@example.test`, relationship: 'Padre', proof: 'Identidad verificada presencialmente', confirmedGuardianId: provisionalGrant!.guardianId })
+    const [updated] = await db.select().from(guardianGrant).where(eq(guardianGrant.patientId, noEmail.patient.id))
+    expect(updated?.contactEmail).not.toMatch(/portal\.invalid$/)
+  })
+
+  it('does not leave provisional and failed deliveries as the same status', async () => {
+    const { createQuickPatient } = await import('../../server/services/patients')
+    const phone = `09${randomUUID().replace(/\D/g, '').padEnd(8, '0').slice(0, 8)}`
+    const child = await createQuickPatient(doctor, { givenNames: 'Nina', surnames: 'Portal', birthDate: '2024-03-02', sex: 'FEMALE', contacts: [{ name: 'Familiar Portal', relationship: 'Madre', phone, email: '', invite: false, proof: 'Identidad vista presencialmente' }] })
+    const [grant] = await db.select().from(guardianGrant).where(eq(guardianGrant.patientId, child.patient.id))
+    expect(child.contacts[0]?.status).toBe('UNINVITED')
+    expect(grant?.status).toBe('UNINVITED')
+    const { getShareableChild } = await import('../../server/services/invitations')
+    await expect(getShareableChild({ id: grant!.guardianId, roles: ['PATIENT'] }, child.patient.id)).rejects.toThrow()
   })
   it('requires proof and staff authority, exposes only assistant-safe identity and invitation status', async () => {
     const { grantGuardian, listGrantCandidates } = await import('../../server/services/invitations')
@@ -580,10 +599,10 @@ describe('verified guardian isolation', () => {
     await db.insert(patient).values([one, two].map(id => ({ id, name: 'Hermano por teléfono', birthDate: '2024-01-01', sex: 'MALE', createdBy: doctor.id })))
     const phone = `09${randomUUID().replace(/\D/g, '').padEnd(8, '0').slice(0, 8)}`
     const firstResult = await grantGuardian(assistant, one, { name: 'Padre teléfono', phone, relationship: 'Padre', proof: 'Identidad presencial verificada' })
-    expect(firstResult.status).toBe('FAILED')
+    expect(firstResult.status).toBe('UNINVITED')
     expect(await db.select().from(guardianDelivery).where(eq(guardianDelivery.patientId, one))).toHaveLength(0)
     const [phoneLink] = await db.select().from(guardianGrant).where(eq(guardianGrant.patientId, one))
-    expect(phoneLink).toMatchObject({ contactPhone: phone, relationship: 'Padre', status: 'FAILED', proof: 'Identidad presencial verificada' })
+    expect(phoneLink).toMatchObject({ contactPhone: phone, relationship: 'Padre', status: 'UNINVITED', proof: 'Identidad presencial verificada' })
     expect(await db.select().from(user).where(eq(user.id, phoneLink!.guardianId))).toHaveLength(1)
     const match = await findGuardianIdentity(assistant, { phone: `+593${phone.slice(1)}` })
     expect(match).toMatchObject({ name: 'Padre teléfono' })
@@ -593,7 +612,7 @@ describe('verified guardian isolation', () => {
     await expect(findGuardianIdentity(adminActor, { phone })).rejects.toThrow()
     await expect(grantGuardian(assistant, two, { name: 'Padre teléfono', phone, relationship: 'Padre', proof: 'Identidad presencial verificada' })).rejects.toThrow()
     const linked = await grantGuardian(doctor, two, { name: 'Padre teléfono', phone: `+593${phone.slice(1)}`, relationship: 'Padre', proof: 'Identidad presencial verificada', confirmedGuardianId: match!.id })
-    expect(linked.status).toBe('FAILED')
+    expect(linked.status).toBe('UNINVITED')
     expect((await db.select().from(guardianGrant).where(eq(guardianGrant.guardianId, match!.id)))).toHaveLength(2)
     await expect(getShareableChild({ id: match!.id, roles: ['PATIENT'] }, one)).rejects.toThrow()
     const email = `${randomUUID()}@example.test`

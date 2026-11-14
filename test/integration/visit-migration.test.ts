@@ -94,6 +94,9 @@ it('upgrades a populated immutable visit without guessing the original birth dat
   expect((await pool.query('SELECT snapshot FROM visit_result WHERE id = $1', [resultId])).rows[0].snapshot).toEqual({ status: 'unavailable', reason: 'WHO reference unavailable' })
   expect((await pool.query('SELECT birth_date, sex FROM patient WHERE id = $1', [patientId])).rows[0]).toMatchObject({ birth_date: '2024-02-01', sex: 'MALE' })
   await expect(pool.query('UPDATE clinical_visit SET weight_kg = 10 WHERE id = $1', [visitId])).rejects.toThrow('Clinical snapshots are immutable')
+  await prepareMigrations(21)
+  await writeFile(join(migrationDirectory, '0016_giant_guardian.sql'), 'ALTER TABLE "guardian_grant" ADD COLUMN "last_send_error" text;--> statement-breakpoint\nALTER TABLE "clinical_visit" ADD COLUMN "share_with_family" boolean DEFAULT true NOT NULL;--> statement-breakpoint\nALTER TABLE "clinical_visit" ADD COLUMN "next_control_at" timestamp with time zone;')
+  await migrate(drizzle(pool), { migrationsFolder: migrationDirectory })
   const { recalculateVisit } = await import('../../server/services/visits')
   await expect(recalculateVisit({ id: 'doctor', roles: ['DOCTOR'] }, patientId, visitId, { requestId: randomUUID() })).rejects.toMatchObject({ statusCode: 409 })
   const [audit] = (await pool.query('SELECT outcome FROM audit_event WHERE action = $1 AND subject_id = $2', ['CLINICAL_RECALCULATE', patientId])).rows

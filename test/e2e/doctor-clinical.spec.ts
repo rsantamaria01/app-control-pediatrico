@@ -11,7 +11,7 @@ import { importWhoRelease, parseWhoWorkbook } from '../../server/services/who-im
 import type { VerifiedSource } from '../../shared/types/who'
 import type { Gender } from '../../shared/utils/enums'
 import { WhoIndicator } from '../../shared/utils/enums'
-import { account, auditEvent, user, userRole } from '../../server/db/schema'
+import { account, auditEvent, patient, user, userRole } from '../../server/db/schema'
 
 const enabled = process.env.AUTH_E2E === '1' && process.env.CLINICAL_E2E === '1' && process.env.CLINICAL_E2E_DATABASE_URL === process.env.TEST_DATABASE_URL
 const url = process.env.TEST_DATABASE_URL
@@ -122,47 +122,103 @@ test.describe('doctor clinical journey with isolated auth and WHO database', () 
     await db.insert(userRole).values({ userId: doctorId, role: 'DOCTOR' })
     await db.insert(account).values({ id: crypto.randomUUID(), userId: doctorId, accountId: doctorId, providerId: 'credential', password: await hashPassword('quick clinical password') })
     await page.goto('/acceso')
+    await page.waitForLoadState('networkidle')
     await page.getByRole('textbox', { name: 'Usuario' }).fill(username)
     await page.getByLabel('Contraseña').fill('quick clinical password')
     await page.getByRole('button', { name: 'Ingresar' }).click()
-    const fill = async (given: string, nationalId: string, phone: string) => {
+    await expect(page).toHaveURL('/')
+    const fill = async (given: string, nationalId: string, phone: string, submit = true) => {
       await page.goto('/pacientes/nuevo')
-      await page.getByRole('textbox', { name: 'Nombres', exact: true }).fill(given)
-      await page.getByRole('textbox', { name: 'Apellidos', exact: true }).fill('Pérez')
+      await page.waitForLoadState('networkidle')
+      await page.getByRole('textbox', { name: /^Nombres/ }).fill(given)
+      await page.getByRole('textbox', { name: /^Apellidos/ }).fill('Pérez')
       await page.getByLabel('Fecha de nacimiento').fill('2024-03-01')
       if (nationalId) await page.getByRole('textbox', { name: 'Cédula / NUI' }).fill(nationalId)
       await page.getByRole('textbox', { name: 'Nombre completo' }).fill('Representante verificado')
       await page.getByRole('textbox', { name: 'Parentesco' }).fill('Madre')
       await page.getByRole('textbox', { name: 'Teléfono / WhatsApp' }).fill(phone)
       await page.getByRole('button', { name: 'Verificar representante' }).click()
-      if (await page.getByText('Sin cuenta previa').count()) await expect(page.getByText('Sin cuenta previa')).toBeVisible()
-      else {
+      await expect(page.getByText('Sin cuenta previa').or(page.getByText(/Cuenta existente:/)).first()).toBeVisible()
+      if (await page.getByText(/Cuenta existente:/).count()) {
         await expect(page.getByText(/Cuenta existente:/)).toBeVisible()
         await page.getByRole('checkbox', { name: 'Confirmo que es la misma persona' }).check()
       }
       await page.getByRole('textbox', { name: 'Cómo verificó el vínculo' }).fill('Documento verificado presencialmente')
+      if (!submit) return ''
       await page.getByRole('button', { name: 'Crear paciente' }).click()
+      await expect(page.getByRole('heading', { name: `${given} Pérez` })).toBeVisible()
+      return page.url().split('/').at(-1)!
     }
     for (const width of [375, 1440]) {
       await page.setViewportSize({ width, height: 850 })
-      const unique = crypto.randomUUID().replace(/\D/g, '').padEnd(8, '0').slice(0, 8)
+      const unique = String(Math.floor(Math.random() * 1e8)).padStart(8, '0')
       const given = `José${unique}`
-      await fill(given, '', `9${unique}`)
-      await expect(page).toHaveURL(/\/pacientes\/[a-z0-9-]+$/)
-      const firstId = page.url().split('/').at(-1)!
+      const firstId = await fill(given, '', `9${unique}`)
       await expect(page.getByText('Sin invitar').first()).toBeVisible()
-      await fill(given, '', `9${unique}`)
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true)
+      await fill(given, '', `9${unique}`, false)
+      await page.getByRole('button', { name: 'Crear paciente' }).click()
       await expect(page.getByText('Posibles pacientes existentes')).toBeVisible()
       await expect(page.getByRole('link', { name: `Abrir ficha de ${given} Pérez` })).toHaveAttribute('href', `/pacientes/${firstId}`)
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true)
       await page.getByRole('checkbox', { name: /He revisado las coincidencias/ }).check()
       await page.getByRole('button', { name: 'Crear paciente' }).click()
-      await expect(page).toHaveURL(/\/pacientes\/[a-z0-9-]+$/)
+      await expect(page.getByRole('heading', { name: `${given} Pérez` })).toBeVisible()
       expect(page.url().split('/').at(-1)).not.toBe(firstId)
       await page.goto('/pacientes')
+      await page.waitForLoadState('networkidle')
       await page.getByRole('textbox', { name: 'Buscar por nombre o identificación' }).fill(`jose${unique}`)
       await expect(page.getByRole('link', { name: new RegExp(given, 'i') }).first()).toBeVisible()
+      await page.getByRole('textbox', { name: 'Buscar por nombre o identificación' }).fill('sin-coincidencia-ninguna')
+      await expect(page.getByRole('link', { name: new RegExp(given, 'i') })).toHaveCount(0)
+      await page.getByRole('textbox', { name: 'Buscar por nombre o identificación' }).fill(`jose${unique}`)
+      await expect(page.getByRole('link', { name: new RegExp(given, 'i') }).first()).toBeVisible()
+      const rows = await page.locator('main li a[href^="/pacientes/"]').allInnerTexts()
+      expect(rows.length).toBe(2)
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true)
     }
+  })
+
+  test('duplicate cédula opens the existing chart and does not create another patient', async ({ page }) => {
+    const db = drizzle(pool)
+    const doctorId = crypto.randomUUID()
+    const username = `dedupe-${doctorId.slice(0, 8)}`
+    await db.insert(user).values({ id: doctorId, name: 'Doctora', email: `${doctorId}@example.test`, username })
+    await db.insert(userRole).values({ userId: doctorId, role: 'DOCTOR' })
+    await db.insert(account).values({ id: crypto.randomUUID(), userId: doctorId, accountId: doctorId, providerId: 'credential', password: await hashPassword('dedupe clinical password') })
+    await page.goto('/acceso')
+    await page.waitForLoadState('networkidle')
+    await page.getByRole('textbox', { name: 'Usuario' }).fill(username)
+    await page.getByLabel('Contraseña').fill('dedupe clinical password')
+    await page.getByRole('button', { name: 'Ingresar' }).click()
+    await expect(page).toHaveURL('/')
+    const existingId = crypto.randomUUID()
+    const nationalId = (() => {
+      const base = `171${String(Math.floor(Math.random() * 1e6)).padStart(6, '0')}`
+      const sum = [...base].reduce((total, digit, index) => {
+        const product = Number(digit) * (index % 2 === 0 ? 2 : 1)
+        return total + (product > 9 ? product - 9 : product)
+      }, 0)
+      return `${base}${(10 - sum % 10) % 10}`
+    })()
+    await db.insert(patient).values({ id: existingId, name: 'Paciente Ya Registrado', birthDate: '2024-01-01', sex: 'MALE', nationalId, createdBy: doctorId })
+    await page.goto('/pacientes/nuevo')
+    await page.waitForLoadState('networkidle')
+    await page.getByRole('textbox', { name: /^Nombres/ }).fill('Paciente')
+    await page.getByRole('textbox', { name: /^Apellidos/ }).fill('Duplicado')
+    await page.getByLabel('Fecha de nacimiento').fill('2024-01-01')
+    await page.getByRole('textbox', { name: 'Cédula / NUI' }).fill(nationalId)
+    const phone = `9${String(Math.floor(Math.random() * 1e8)).padStart(8, '0')}`
+    await page.getByRole('textbox', { name: 'Nombre completo' }).fill('Representante')
+    await page.getByRole('textbox', { name: 'Parentesco' }).fill('Madre')
+    await page.getByRole('textbox', { name: 'Teléfono / WhatsApp' }).fill(phone)
+    await page.getByRole('button', { name: 'Verificar representante' }).click()
+    await expect(page.getByText('Sin cuenta previa')).toBeVisible()
+    await page.getByRole('textbox', { name: 'Cómo verificó el vínculo' }).fill('Identidad verificada presencialmente')
+    await page.getByRole('button', { name: 'Crear paciente' }).click()
+    await expect(page.getByRole('link', { name: 'Abrir ficha existente' })).toHaveAttribute('href', `/pacientes/${existingId}`)
+    await page.getByRole('link', { name: 'Abrir ficha existente' }).click()
+    await expect(page.getByRole('heading', { name: 'Paciente Ya Registrado' })).toBeVisible()
   })
 
   for (const width of [375, 1024, 1440]) {
@@ -184,8 +240,8 @@ test.describe('doctor clinical journey with isolated auth and WHO database', () 
       await page.getByRole('link', { name: 'Pacientes' }).first().click()
       await page.getByRole('link', { name: 'Nuevo paciente' }).first().click()
       const name = `Paciente ${id.slice(0, 8)}`
-      await page.getByRole('textbox', { name: 'Nombres', exact: true }).fill('Paciente')
-      await page.getByRole('textbox', { name: 'Apellidos', exact: true }).fill(id.slice(0, 8))
+      await page.getByRole('textbox', { name: /^Nombres/ }).fill('Paciente')
+      await page.getByRole('textbox', { name: /^Apellidos/ }).fill(id.slice(0, 8))
       await page.getByLabel('Fecha de nacimiento').fill('2024-01-01')
       await page.getByRole('textbox', { name: 'Nombre completo' }).fill('Madre de prueba')
       await page.getByRole('textbox', { name: 'Parentesco' }).fill('Madre')
@@ -237,9 +293,10 @@ test.describe('doctor clinical journey with isolated auth and WHO database', () 
       }
       await expect(page.getByRole('link', { name: 'Pacientes' }).first()).toBeVisible()
       await page.getByRole('link', { name: 'Pacientes' }).first().click()
+      await page.waitForLoadState('networkidle')
       await page.getByRole('textbox', { name: 'Buscar por nombre o identificación' }).fill(name.toLowerCase())
-      await expect(page.getByRole('link', { name: new RegExp(name) })).toBeVisible()
-      await expect(page.getByRole('link', { name: new RegExp(name) })).toContainText('9,00 kg')
+      await expect(page.getByRole('link', { name: new RegExp(name, 'i') })).toBeVisible()
+      await expect(page.getByRole('link', { name: new RegExp(name, 'i') })).toContainText('9,00 kg')
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true)
     })
   }

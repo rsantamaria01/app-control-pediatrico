@@ -14,7 +14,7 @@ const sharing = reactive<Record<string, boolean>>({})
 const { data: sharingState } = await useFetch<Record<string, boolean>>(`/api/pacientes/${encodeURIComponent(id)}/visitas/compartir`, { immediate: isDoctor.value })
 const { data: guardianStatus } = await useFetch<{ guardians: { email: string, status: string, lastSendError: string | null }[] }>(`/api/guardian-grants/${encodeURIComponent(id)}`, { immediate: isDoctor.value })
 function guardianLabel(status: string) {
-  return status === 'ACTIVE' ? 'Activo' : status === 'PENDING' ? 'Pendiente de activación' : 'Sin invitar'
+  return status === 'ACTIVE' ? 'Activo' : status === 'PENDING' ? 'Pendiente de activación' : status === 'FAILED' ? 'Envío fallido · Reenviar invitación' : 'Sin invitar'
 }
 const shareError = ref('')
 const patientWarning = ref('')

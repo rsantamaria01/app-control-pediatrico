@@ -49,7 +49,8 @@ describe('production operations', () => {
     for (const code of ['OFFLINE_UNEXPECTED_SUCCESS', 'OFFLINE_COREPACK', 'OFFLINE_PERMISSION', 'OFFLINE_DOWNLOAD']) {
       expect(content).toContain(code)
     }
-    for (const code of ['OFFLINE_MODULE_NOT_FOUND', 'OFFLINE_MISSING_CONFIG', 'OFFLINE_SYNTAX_ERROR', 'OFFLINE_CONNECTION_OTHER', 'OFFLINE_RUNTIME_OTHER']) expect(content).toContain(code)
+    for (const code of ['OFFLINE_MODULE_NOT_FOUND', 'OFFLINE_READ_ONLY', 'OFFLINE_SYNTAX_ERROR', 'OFFLINE_CONNECTION_OTHER', 'OFFLINE_RUNTIME_OTHER']) expect(content).toContain(code)
+    expect(content).not.toMatch(/\*'No config path provided'\*\|/)
     expect(content).toMatch(/ops-smoke failed phase=%s code=%s/)
     expect(content).not.toMatch(/(?:printf|echo)\s+[^\n]*\$output/)
     expect(content).not.toMatch(/set -x/)

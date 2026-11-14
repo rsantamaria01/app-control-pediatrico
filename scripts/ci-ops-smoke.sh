@@ -59,7 +59,8 @@ esac
 case "$output" in
   *ECONNREFUSED*|*ENETUNREACH*) ;;
   *MODULE_NOT_FOUND*|*ERR_MODULE_NOT_FOUND*) fail OFFLINE_MODULE_NOT_FOUND ;;
-  *'No config path provided'*|*'Cannot find config file'*) fail OFFLINE_MISSING_CONFIG ;;
+  *'Cannot find config file'*) fail OFFLINE_MISSING_CONFIG ;;
+  *EROFS*|*'Read-only file system'*) fail OFFLINE_READ_ONLY ;;
   *SyntaxError*) fail OFFLINE_SYNTAX_ERROR ;;
   *'connect '*|*'Connection '*|*'connection '*) fail OFFLINE_CONNECTION_OTHER ;;
   *) fail OFFLINE_RUNTIME_OTHER ;;

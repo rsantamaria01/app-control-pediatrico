@@ -26,7 +26,10 @@ export async function resolveActor(event: H3Event): Promise<Actor | null> {
 
 export async function requireCapability(event: H3Event, capability: Capability, patientId?: string): Promise<Actor> {
   const session = await getUserSession(event)
-  if (!session?.user?.id) throw createError({ statusCode: 401, statusMessage: 'Authentication required' })
+  if (!session?.user?.id) {
+    await recordAudit(capability, 'DENIED', undefined, patientId)
+    throw createError({ statusCode: 401, statusMessage: 'Authentication required' })
+  }
   const actor = await resolveActor(event)
   const allowed = Boolean(actor && permissions[capability]?.some(role => actor.roles.includes(role)) && (capability !== 'PORTAL_READ' || !patientId))
   await recordAudit(capability, allowed ? 'ALLOWED' : 'DENIED', session.user.id, patientId)

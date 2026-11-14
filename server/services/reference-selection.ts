@@ -76,7 +76,7 @@ export async function selectReference(input: ReferenceInput): Promise<ReferenceS
     || !Object.values(Gender).includes(sex) || !Object.values(WhoIndicator).includes(indicator)
     || (position !== 'RECUMBENT' && position !== 'STANDING')
     || (correctionUntilMonths !== 24 && correctionUntilMonths !== 36)
-    || (gestationDays !== undefined && (!Number.isInteger(gestationDays) || gestationDays <= 0 || gestationDays > 280))
+    || (gestationDays !== undefined && (!Number.isInteger(gestationDays) || gestationDays <= 0 || gestationDays > 301))
     || (correctionUntilMonths === 36 && (gestationDays === undefined || gestationDays >= 196))
     || typeof timeZone !== 'string' || timeZone.length === 0 || timeZone.length > 128) return unavailable('Invalid reference input')
 

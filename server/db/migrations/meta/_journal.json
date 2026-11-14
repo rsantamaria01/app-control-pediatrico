@@ -85,6 +85,27 @@
       "when": 1794641135172,
       "tag": "0011_fuzzy_nextwave",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1794660381707,
+      "tag": "0012_goofy_sabretooth",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1794666332571,
+      "tag": "0013_daily_lizard",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1794668676821,
+      "tag": "0014_flawless_dust",
+      "breakpoints": true
     }
   ]
 }

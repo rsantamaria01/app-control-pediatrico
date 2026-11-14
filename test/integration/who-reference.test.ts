@@ -46,11 +46,14 @@ beforeAll(async () => {
   for (const [index, file] of manifest.files.entries()) datasets.get(file.name)!.id = ids[index]!
 }, 120000)
 afterAll(async () => {
-  await pool.end()
   try {
-    if (created) await adminPool.query(`DROP DATABASE "${databaseName}"`)
+    await pool.end()
   } finally {
-    await adminPool.end()
+    try {
+      if (created) await adminPool.query(`DROP DATABASE "${databaseName}"`)
+    } finally {
+      await adminPool.end()
+    }
   }
 })
 
@@ -174,12 +177,15 @@ describe('pinned WHO 2006 originals', () => {
   })
 
   it('keeps one imported workbook unavailable until the release is complete', async () => {
-    const admin = new Pool({ connectionString: url!.replace(/\/pediatrico_who_slice3_(?:test|verify|guard|sealed_test)$/, '/postgres') })
+    const admin = new Pool({ connectionString: adminUrl.href })
     const name = `pediatrico_who_gate_${randomUUID().replace(/-/g, '')}`
     const target = new URL(url!)
     target.pathname = `/${name}`
+    let created = false
     try {
+      expect((await admin.query('SELECT current_database() AS name')).rows[0].name).toBe('postgres')
       await admin.query(`CREATE DATABASE "${name}"`)
+      created = true
       const connection = new Pool({ connectionString: target.href })
       try {
         await migrate(drizzle(connection), { migrationsFolder: './server/db/migrations' })
@@ -205,18 +211,23 @@ describe('pinned WHO 2006 originals', () => {
         await connection.end()
       }
     } finally {
-      await admin.query(`DROP DATABASE IF EXISTS "${name}" WITH (FORCE)`)
-      await admin.end()
+      try {
+        if (created) await admin.query(`DROP DATABASE "${name}"`)
+      } finally {
+        await admin.end()
+      }
     }
   }, 120000)
 
   it('rolls back a partially imported release when a later existing dataset is unsealed', async () => {
-    const admin = new Pool({ connectionString: url!.replace(/\/pediatrico_who_slice3_(?:test|verify|guard|sealed_test)$/, '/postgres') })
+    const admin = new Pool({ connectionString: adminUrl.href })
     const name = `pediatrico_who_partial_${randomUUID().replace(/-/g, '')}`
     const target = new URL(url!)
     target.pathname = `/${name}`
+    let created = false
     try {
       await admin.query(`CREATE DATABASE "${name}"`)
+      created = true
       const connection = new Pool({ connectionString: target.href })
       try {
         await migrate(drizzle(connection), { migrationsFolder: './server/db/migrations' })
@@ -245,18 +256,23 @@ describe('pinned WHO 2006 originals', () => {
         await connection.end()
       }
     } finally {
-      await admin.query(`DROP DATABASE IF EXISTS "${name}" WITH (FORCE)`)
-      await admin.end()
+      try {
+        if (created) await admin.query(`DROP DATABASE "${name}"`)
+      } finally {
+        await admin.end()
+      }
     }
   }, 120000)
 
   it('denies a database role with INSERT privilege appending rows to an already sealed dataset', async () => {
     const role = `who_insert_${randomUUID().replace(/-/g, '')}`
     const owner = new Pool({ connectionString: url })
-    const administrator = new Pool({ connectionString: url!.replace(/\/pediatrico_who_slice3_(?:test|verify|guard|sealed_test)$/, '/postgres') })
+    const administrator = new Pool({ connectionString: adminUrl.href })
+    let roleCreated = false
     try {
       const [dataset] = (await owner.query('SELECT id FROM who_dataset WHERE indicator = $1 AND sex = $2 AND version = $3', ['WEIGHT_FOR_LENGTH', 'MALE', manifest.version])).rows
       await administrator.query(`CREATE ROLE "${role}" LOGIN`)
+      roleCreated = true
       await owner.query(`GRANT USAGE ON SCHEMA public TO "${role}"`)
       await owner.query(`GRANT INSERT ON who_reference_row TO "${role}"`)
       await owner.query(`GRANT SELECT, UPDATE ON who_dataset TO "${role}"`)
@@ -269,12 +285,20 @@ describe('pinned WHO 2006 originals', () => {
         client.release()
       }
     } finally {
-      await owner.query(`REVOKE INSERT ON who_reference_row FROM "${role}"`)
-      await owner.query(`REVOKE SELECT, UPDATE ON who_dataset FROM "${role}"`)
-      await owner.query(`REVOKE USAGE ON SCHEMA public FROM "${role}"`)
-      await administrator.query(`DROP ROLE "${role}"`)
-      await administrator.end()
-      await owner.end()
+      try {
+        if (roleCreated) {
+          await owner.query(`REVOKE INSERT ON who_reference_row FROM "${role}"`)
+          await owner.query(`REVOKE SELECT, UPDATE ON who_dataset FROM "${role}"`)
+          await owner.query(`REVOKE USAGE ON SCHEMA public FROM "${role}"`)
+          await administrator.query(`DROP ROLE "${role}"`)
+        }
+      } finally {
+        try {
+          await owner.end()
+        } finally {
+          await administrator.end()
+        }
+      }
     }
   })
 
@@ -290,13 +314,15 @@ describe('pinned WHO 2006 originals', () => {
   })
 
   it('never writes a subset when a later workbook is corrupt; retry can import the full release', async () => {
-    const admin = new Pool({ connectionString: url!.replace(/\/pediatrico_who_slice3_(?:test|verify|guard|sealed_test)$/, '/postgres') })
+    const sourceDir = await mkdtemp(join(tmpdir(), 'who-import-'))
+    const admin = new Pool({ connectionString: adminUrl.href })
     const name = `pediatrico_who_cli_${randomUUID().replace(/-/g, '')}`
     const target = new URL(url!)
     target.pathname = `/${name}`
-    const sourceDir = await mkdtemp(join(tmpdir(), 'who-import-'))
+    let created = false
     try {
       await admin.query(`CREATE DATABASE "${name}"`)
+      created = true
       const targetPool = new Pool({ connectionString: target.href })
       try {
         await migrate(drizzle(targetPool), { migrationsFolder: './server/db/migrations' })
@@ -328,9 +354,15 @@ describe('pinned WHO 2006 originals', () => {
         await verify.end()
       }
     } finally {
-      await admin.query(`DROP DATABASE IF EXISTS "${name}" WITH (FORCE)`)
-      await admin.end()
-      await rm(sourceDir, { recursive: true, force: true })
+      try {
+        if (created) await admin.query(`DROP DATABASE "${name}"`)
+      } finally {
+        try {
+          await admin.end()
+        } finally {
+          await rm(sourceDir, { recursive: true, force: true })
+        }
+      }
     }
   }, 120000)
 

@@ -1,5 +1,5 @@
 import type { ReferenceSelection } from '../../server/services/reference-selection'
-import type { GrowthResult, MeasurementInput } from '../types/clinical'
+import type { GrowthResult, GrowthMeasurementInput } from '../types/clinical'
 import { classify } from './clinical-labels'
 import { Gender, WhoIndicator } from './enums'
 import { bmi, correctZ } from './zscore'
@@ -26,7 +26,7 @@ export function formatGrowthValues(z: number, percentile: number | null): string
   return `Z ${signedZ} · percentil ${percentileValue}`
 }
 
-export function calculateGrowth(input: MeasurementInput, selectedReference: ReferenceSelection | { unavailableReason: string }): GrowthResult {
+export function calculateGrowth(input: GrowthMeasurementInput, selectedReference: ReferenceSelection | { unavailableReason: string }): GrowthResult {
   const unavailable = (reason: string): GrowthResult => ({ status: 'unavailable', reason })
   if ('unavailableReason' in selectedReference) return unavailable(selectedReference.unavailableReason)
   const ref = selectedReference

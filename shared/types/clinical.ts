@@ -2,7 +2,7 @@ import type { ReferenceSelection } from '../../server/services/reference-selecti
 import type { ClinicalLabel } from '../utils/clinical-labels'
 import type { Gender, WhoIndicator } from '../utils/enums'
 
-export type MeasurementInput = {
+export type GrowthMeasurementInput = {
   weightKg?: number
   lengthHeightCm?: number
   headCircumferenceCm?: number

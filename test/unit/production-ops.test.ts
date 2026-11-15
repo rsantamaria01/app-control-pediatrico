@@ -90,6 +90,35 @@ describe('production operations', () => {
     expect(ops).toMatch(/db:\s*\{ condition: service_healthy \}/)
   })
 
+  it('forwards the generated-password bootstrap flag through the production ops launcher', () => {
+    const result = spawnSync('node', ['scripts/ops.mjs', 'bootstrap-admin', '--generated-password'], {
+      env: { ...process.env, DB_PASSWORD: 'offline', DB_HOST: '127.0.0.1', DB_NAME: 'pediatrico_ops_offline_test', BOOTSTRAP_ADMIN_EMAIL: 'first@example.test', BOOTSTRAP_ADMIN_USERNAME: 'firstadmin', NUXT_PUBLIC_SITE_URL: undefined },
+      encoding: 'utf8', timeout: 30_000
+    })
+    expect(result.status).not.toBe(0)
+    expect(result.stderr).toMatch(/connect|ECONNREFUSED/)
+    expect(result.stderr).not.toContain('Valid bootstrap email')
+  })
+
+  it('forwards both documented admin recovery flags through the production ops launcher', () => {
+    const preload = `import childProcess from 'node:child_process'; import { syncBuiltinESMExports } from 'node:module'; import { EventEmitter } from 'node:events'; childProcess.spawn = (_node, args) => { process.stdout.write(JSON.stringify(args)); const child = new EventEmitter(); queueMicrotask(() => child.emit('exit', 0, null)); return child }; syncBuiltinESMExports()`
+    const result = spawnSync('node', ['--import', `data:text/javascript,${encodeURIComponent(preload)}`, 'scripts/ops.mjs', 'bootstrap-admin', '--generated-password', '--reset-admin'], {
+      env: { ...process.env, NODE_OPTIONS: undefined }, encoding: 'utf8', timeout: 30_000
+    })
+    expect(result.status).toBe(0)
+    expect(JSON.parse(result.stdout)).toEqual(['scripts/database-env.mjs', 'node', '--experimental-strip-types', 'scripts/bootstrap-admin.ts', '--generated-password', '--reset-admin'])
+  })
+
+  it('does not discard invalid bootstrap flags before CLI validation', () => {
+    const result = spawnSync('node', ['scripts/ops.mjs', 'bootstrap-admin', '--generated-password', '--reset-admin', '--unknown'], {
+      env: { ...process.env, DB_PASSWORD: 'offline', DB_HOST: '127.0.0.1', DB_NAME: 'pediatrico_ops_offline_test', BOOTSTRAP_ADMIN_EMAIL: 'first@example.test', BOOTSTRAP_ADMIN_USERNAME: 'firstadmin', NODE_OPTIONS: undefined },
+      encoding: 'utf8', timeout: 30_000
+    })
+    expect(result.status).not.toBe(0)
+    expect(result.stderr).toContain('Use --generated-password to create a credential')
+    expect(result.stdout).toBe('')
+  })
+
   it('rejects WHO import without explicit rights before launching database or downloading', () => {
     const result = spawnSync('node', ['scripts/ops.mjs', 'who-import', 'import'], {
       env: { ...process.env, WHO_ALLOW_CLINICAL_IMPORT: 'true', DB_PASSWORD: 'unused', WHO_SOURCE_DIR: '/nonexistent' },

@@ -3,7 +3,7 @@ import { and, desc, eq, ilike, inArray, isNull, sql } from 'drizzle-orm'
 import { createError } from 'nuxt/server'
 import { z } from 'zod'
 import type { Actor } from '../../shared/types/access'
-import { guardianDelivery, guardianGrant, guardianPhone, account, patient, setupToken, user, userRole, visit, visitSharing, visitText } from '../db/schema'
+import { guardianDelivery, guardianGrant, guardianPhone, account, patient, patientContactIntake, setupToken, user, userRole, visit, visitSharing, visitText } from '../db/schema'
 import { useDb } from '../utils/db'
 import { recordAudit } from './audit'
 import { sendLink, markEmailFailure } from './email'
@@ -18,14 +18,16 @@ export function normalizeGuardianPhone(value: string) {
 
 export const guardianContactSchema = z.strictObject({
   name: z.string().trim().min(2).max(160),
-  email: z.email().max(254).transform(value => value.toLowerCase()).optional(),
+  email: z.string().trim().pipe(z.email().max(254)).transform(value => value.toLowerCase()).optional(),
   phone: z.string().transform(normalizeGuardianPhone).optional(),
   relationship: z.string().trim().min(2).max(80).optional(),
   proof: z.string().trim().min(8).max(500),
-  confirmedGuardianId: z.uuid().optional()
+  confirmedGuardianId: z.uuid().optional(),
+  deferDelivery: z.boolean().optional(),
+  intakeId: z.uuid().optional()
 }).refine(value => Boolean(value.email || value.phone), { message: 'Email or phone required' })
 export type GuardianContact = z.input<typeof guardianContactSchema>
-export type GuardianGrant = { patientId: string, status: 'PENDING' | 'ACTIVE' | 'FAILED', email: string | null }
+export type GuardianGrant = { patientId: string, status: 'UNINVITED' | 'PENDING' | 'ACTIVE' | 'FAILED', email: string | null }
 export type FamilyVisit = { measuredAt: string, weightKg: number, lengthHeightCm: number, position: string, headCircumferenceCm: number, parentAdvice?: string, nextControlAt: string | null }
 export type FamilyChildView = { id: string, name: string, birthDate: string, visits: FamilyVisit[] }
 export type FamilyChildSummary = { id: string, name: string, birthDate: string, lastControl: FamilyVisit | null }
@@ -52,10 +54,12 @@ export async function findGuardianIdentity(actor: Actor, identity: string | { em
   if (!email && !phone) throw createError({ statusCode: 400, statusMessage: 'Contact required' })
   if (email) z.email().parse(email)
   const db = useDb()
-  const [byEmail] = email ? await db.select({ id: user.id, name: user.name, email: user.email }).from(user).where(eq(user.email, email)) : []
+  const byEmail = email ? await db.select({ id: user.id, name: user.name, email: user.email }).from(user).where(sql`lower(btrim(${user.email})) = ${email}`).limit(2) : []
+  if (byEmail.length > 1) throw createError({ statusCode: 409, statusMessage: 'Ambiguous guardian identity' })
+  const [emailOwner] = byEmail
   const [byPhone] = phone ? await db.select({ id: user.id, name: user.name, email: user.email }).from(guardianPhone).innerJoin(user, eq(user.id, guardianPhone.guardianId)).where(eq(guardianPhone.phone, phone)) : []
-  if (byEmail && byPhone && byEmail.id !== byPhone.id) throw createError({ statusCode: 409, statusMessage: 'Conflicting guardian identities' })
-  const match = byEmail ?? byPhone
+  if (emailOwner && byPhone && emailOwner.id !== byPhone.id) throw createError({ statusCode: 409, statusMessage: 'Conflicting guardian identities' })
+  const match = emailOwner ?? byPhone
   if (!match) return null
   const [local, domain] = match.email.split('@')
   const [registeredPhone] = await db.select({ phone: guardianPhone.phone }).from(guardianPhone).where(eq(guardianPhone.guardianId, match.id))
@@ -197,13 +201,16 @@ export async function grantGuardian(actor: Actor, patientId: string, input: Guar
   }
   const id = matched?.id ?? randomUUID()
   const [existingCredential] = matched ? await db.select({ id: account.id }).from(account).where(and(eq(account.userId, matched.id), eq(account.providerId, 'credential'))) : []
-  const token = contact.email && !existingCredential ? randomBytes(32).toString('base64url') : null
+  const token = contact.email && !existingCredential && !contact.deferDelivery ? randomBytes(32).toString('base64url') : null
   const tokenId = token ? randomUUID() : null
-  const deliveryId = contact.email ? randomUUID() : null
+  const deliveryId = contact.email && !contact.deferDelivery ? randomUUID() : null
   const payload = contact.email ? encryptDelivery(JSON.stringify({ email: contact.email, token })) : null
   await db.transaction(async (tx) => {
     let owner = matched ? { id: matched.id } : undefined
     if (!owner) {
+      if (contact.email) await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${contact.email}, 41422028))`)
+      const existingEmail = contact.email ? await tx.select({ id: user.id }).from(user).where(sql`lower(btrim(${user.email})) = ${contact.email}`).limit(1) : []
+      if (existingEmail.length) throw createError({ statusCode: 409, statusMessage: 'Identity changed; verify again' })
       const [created] = await tx.insert(user).values({ id, name: contact.name, email: contact.email ?? `${id}@portal.invalid` }).onConflictDoNothing({ target: user.email }).returning({ id: user.id })
       if (!created) throw createError({ statusCode: 409, statusMessage: 'Identity changed; verify again' })
       owner = created
@@ -217,7 +224,7 @@ export async function grantGuardian(actor: Actor, patientId: string, input: Guar
     const [lockedOwner] = await tx.select({ id: user.id, email: user.email }).from(user).where(eq(user.id, owner.id)).for('update')
     if (!lockedOwner) throw createError({ statusCode: 409, statusMessage: 'Guardian disappeared' })
     if (contact.email && lockedOwner.email !== contact.email) {
-      if (!lockedOwner.email.endsWith('@portal.invalid')) throw createError({ statusCode: 409, statusMessage: 'Conflicting guardian email' })
+      if (!lockedOwner.email.endsWith('@portal.invalid') && lockedOwner.email.trim().toLowerCase() !== contact.email) throw createError({ statusCode: 409, statusMessage: 'Conflicting guardian email' })
       await tx.update(user).set({ email: contact.email }).where(eq(user.id, owner.id))
     }
     const [roles, credentials] = await Promise.all([
@@ -228,21 +235,27 @@ export async function grantGuardian(actor: Actor, patientId: string, input: Guar
     if (credentials.length && token && matched) throw createError({ statusCode: 409, statusMessage: 'Account already active' })
     const [current] = await tx.select().from(guardianGrant).where(and(eq(guardianGrant.patientId, patientId), eq(guardianGrant.guardianId, owner.id)))
     if (current?.status === 'REVOKED') throw createError({ statusCode: 409, statusMessage: 'Relationship revoked' })
-    if (!current) await tx.insert(guardianGrant).values({ patientId, guardianId: owner.id, contactEmail: contact.email ?? lockedOwner.email, contactPhone: contact.phone, relationship: contact.relationship, proof: contact.proof, verifiedBy: actor.id, status: 'FAILED' })
-    else await tx.update(guardianGrant).set({ contactPhone: contact.phone ?? current.contactPhone, relationship: contact.relationship ?? current.relationship, proof: contact.proof, verifiedBy: actor.id, verifiedAt: new Date() }).where(and(eq(guardianGrant.patientId, patientId), eq(guardianGrant.guardianId, owner.id)))
+    if (!current) await tx.insert(guardianGrant).values({ patientId, guardianId: owner.id, contactEmail: contact.email ?? lockedOwner.email, contactPhone: contact.phone, relationship: contact.relationship, proof: contact.proof, verifiedBy: actor.id, status: contact.deferDelivery || !contact.email ? 'UNINVITED' : 'FAILED' })
+    else await tx.update(guardianGrant).set({ contactEmail: contact.email ?? current.contactEmail, contactPhone: contact.phone ?? current.contactPhone, relationship: contact.relationship ?? current.relationship, proof: contact.proof, verifiedBy: actor.id, verifiedAt: new Date(), ...(deliveryId && current.status === 'UNINVITED' ? { status: 'FAILED' } : {}) }).where(and(eq(guardianGrant.patientId, patientId), eq(guardianGrant.guardianId, owner.id)))
     if (tokenId) await tx.insert(setupToken).values({ id: tokenId, userId: owner.id, digest: tokenDigest(token!), purpose: 'SETUP', expiresAt: new Date(Date.now() + 7 * 86400000) })
     if (deliveryId) await tx.insert(guardianDelivery).values({ id: deliveryId, patientId, guardianId: owner.id, tokenId, payload })
+    if (contact.intakeId) {
+      const [pending] = await tx.select().from(patientContactIntake).where(and(eq(patientContactIntake.id, contact.intakeId), eq(patientContactIntake.patientId, patientId), eq(patientContactIntake.status, 'LINK_FAILED'))).for('update')
+      if (!pending || pending.name !== contact.name || pending.relationship !== contact.relationship || pending.phone !== contact.phone || (pending.email?.trim().toLowerCase() ?? null) !== (contact.email ?? null) || pending.proof !== contact.proof || pending.invite !== Boolean(contact.email && !contact.deferDelivery)) throw createError({ statusCode: 409, statusMessage: 'Pending contact changed' })
+      const [intake] = await tx.update(patientContactIntake).set({ status: 'LINKED', guardianId: owner.id, proof: '' }).where(and(eq(patientContactIntake.id, contact.intakeId), eq(patientContactIntake.patientId, patientId), eq(patientContactIntake.status, 'LINK_FAILED'))).returning({ id: patientContactIntake.id })
+      if (!intake) throw createError({ statusCode: 409, statusMessage: 'Pending contact changed' })
+    }
   })
   const delivery = deliveryId ? await processGuardianDelivery(deliveryId) : null
   const [stored] = await db.select({ status: guardianGrant.status }).from(guardianGrant).where(and(eq(guardianGrant.patientId, patientId), eq(guardianGrant.guardianId, id)))
   await recordAudit('GUARDIAN_GRANT', delivery === 'DONE' ? 'ALLOWED' : 'DENIED', actor.id, patientId)
-  return { patientId, email: contact.email ?? null, status: stored?.status === 'ACTIVE' ? 'ACTIVE' : stored?.status === 'PENDING' ? 'PENDING' : 'FAILED' }
+  return { patientId, email: contact.email ?? null, status: stored?.status === 'ACTIVE' ? 'ACTIVE' : stored?.status === 'PENDING' ? 'PENDING' : stored?.status === 'UNINVITED' ? 'UNINVITED' : 'FAILED' }
 }
 
 export async function revokeGuardian(actor: Actor, patientId: string, guardianId: string) {
   await staff(actor, patientId)
   const revoked = await useDb().transaction(async (tx) => {
-    const [row] = await tx.update(guardianGrant).set({ status: 'REVOKED', revokedAt: new Date() }).where(and(eq(guardianGrant.patientId, patientId), eq(guardianGrant.guardianId, guardianId), inArray(guardianGrant.status, ['ACTIVE', 'PENDING', 'FAILED']))).returning()
+    const [row] = await tx.update(guardianGrant).set({ status: 'REVOKED', revokedAt: new Date() }).where(and(eq(guardianGrant.patientId, patientId), eq(guardianGrant.guardianId, guardianId), inArray(guardianGrant.status, ['ACTIVE', 'PENDING', 'FAILED', 'UNINVITED']))).returning()
     if (row?.tokenId) await tx.update(setupToken).set({ usedAt: new Date() }).where(and(eq(setupToken.id, row.tokenId), isNull(setupToken.usedAt)))
     return Boolean(row)
   })

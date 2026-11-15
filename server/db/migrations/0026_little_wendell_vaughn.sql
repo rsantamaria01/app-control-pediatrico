@@ -1,0 +1,2 @@
+ALTER TABLE "guardian_grant" ADD CONSTRAINT "guardian_grant_email_canonical_ck" CHECK ("guardian_grant"."contact_email" = lower(btrim("guardian_grant"."contact_email")));--> statement-breakpoint
+ALTER TABLE "patient_contact_intake" ADD CONSTRAINT "patient_contact_email_canonical_ck" CHECK ("patient_contact_intake"."email" IS NULL OR "patient_contact_intake"."email" = lower(btrim("patient_contact_intake"."email")));

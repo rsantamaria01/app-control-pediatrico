@@ -68,6 +68,45 @@ describe('built production ops image', () => {
     }
   })
 
+  it.skipIf(!docker)('generates an admin credential through the read-only production ops image', async () => {
+    const admin = new Pool({ connectionString: adminUrl.href })
+    const name = `pediatrico_ops_password_${process.pid}_test`
+    const target = new URL(source!)
+    target.pathname = `/${name}`
+    const image = `pediatrico-ops-password-${process.pid}`
+    let created = false
+    try {
+      await admin.query(`CREATE DATABASE ${name}`)
+      created = true
+      execFileSync('docker', ['build', '--target', 'ops', '-t', image, '.'], { stdio: 'pipe', timeout: 300_000 })
+      const containerUrl = new URL(target)
+      if (containerUrl.hostname === 'db') containerUrl.hostname = 'host.docker.internal'
+      if (!['host.docker.internal', '127.0.0.1', 'localhost'].includes(containerUrl.hostname)) throw new Error('Docker integration requires a locally reachable disposable database')
+      const environment = { ...process.env, DB_PASSWORD: decodeURIComponent(containerUrl.password), DB_HOST: containerUrl.hostname, DB_NAME: name, BOOTSTRAP_ADMIN_USERNAME: 'firstadmin', BOOTSTRAP_ADMIN_EMAIL: 'first@example.test' }
+      const run = (...args: string[]) => execFileSync('docker', ['run', '--rm', '--network', 'host', '--add-host', 'host.docker.internal:host-gateway', '--read-only', '-e', 'DB_PASSWORD', '-e', 'DB_HOST', '-e', 'DB_NAME', '-e', 'BOOTSTRAP_ADMIN_USERNAME', '-e', 'BOOTSTRAP_ADMIN_EMAIL', image, ...args], { env: environment, encoding: 'utf8', timeout: 120_000 })
+      run('db:migrate')
+      const password = run('bootstrap-admin', '--generated-password')
+      expect(password).toMatch(/^[A-Za-z0-9_-]{43}\n$/)
+      const db = new Pool({ connectionString: target.href })
+      try {
+        const { verifyPassword } = await import('better-auth/crypto')
+        const result = await db.query('SELECT password FROM account WHERE provider_id = $1', ['credential'])
+        expect(result.rows).toHaveLength(1)
+        expect(await verifyPassword({ hash: result.rows[0].password, password: password.trim() })).toBe(true)
+        expect(() => run('bootstrap-admin', '--generated-password')).toThrow()
+      } finally {
+        await db.end()
+      }
+    } finally {
+      try {
+        if (created) await admin.query(`DROP DATABASE ${name} WITH (FORCE)`)
+      } finally {
+        await admin.end()
+        spawnSync('docker', ['image', 'rm', image], { stdio: 'ignore' })
+      }
+    }
+  }, 360_000)
+
   it.skipIf(!docker || !manifest.files.every(file => existsSync(resolve('/tmp/opencode/who-2006', `${file.name}-expanded.xlsx`))))('imports offline cached originals with explicit approval and leaves them unchanged on retry', async () => {
     const admin = new Pool({ connectionString: adminUrl.href })
     const image = `pediatrico-ops-who-${process.pid}`

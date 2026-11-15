@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { createServer, type Socket } from 'node:net'
-import { execFileSync } from 'node:child_process'
+import { spawnSync } from 'node:child_process'
+import { createCipheriv, randomBytes } from 'node:crypto'
 import { drizzle } from 'drizzle-orm/node-postgres'
 import { migrate } from 'drizzle-orm/node-postgres/migrator'
 import { eq } from 'drizzle-orm'
@@ -1092,27 +1093,137 @@ describe('username/password access', () => {
     expect(await consumeAccessLimit(name, '192.0.2.4', 'login')).toBe(false)
   })
 
-  it('bootstraps a single admin without any password in output', async () => {
-    const bootstrapUrl = new URL(url)
-    bootstrapUrl.pathname = '/pediatrico_auth_slice2_bootstrap_test'
-    const bootstrapPool = new Pool({ connectionString: bootstrapUrl.href })
-    const bootstrapDb = drizzle(bootstrapPool)
-    try {
-      await migrate(bootstrapDb, { migrationsFolder: './server/db/migrations' })
-      await bootstrapDb.delete(auditEvent)
-      await bootstrapDb.delete(userRole)
-      await bootstrapDb.delete(account)
-      await bootstrapDb.delete(session)
-      await bootstrapDb.delete(user)
-      await bootstrapDb.delete(bootstrapMarker)
-      const env = { ...process.env, DATABASE_URL: bootstrapUrl.href, BOOTSTRAP_ADMIN_USERNAME: 'firstadmin', BOOTSTRAP_ADMIN_EMAIL: 'first@example.test', NUXT_PUBLIC_SITE_URL: 'https://clinic.example.test' }
-      const output = execFileSync('node', ['--experimental-strip-types', 'scripts/bootstrap-admin.ts'], { env, encoding: 'utf8' })
-      expect(output).toMatch(/^https:\/\/clinic\.example\.test\/invitacion\//)
-      expect(output).not.toContain('password')
-      expect((await bootstrapDb.select().from(userRole)).map(row => row.role)).toEqual(['ADMIN'])
-      expect(() => execFileSync('node', ['--experimental-strip-types', 'scripts/bootstrap-admin.ts'], { env, stdio: 'pipe' })).toThrow()
-    } finally {
-      await bootstrapPool.end()
+  const bootstrapUrl = new URL(url)
+  bootstrapUrl.pathname = '/pediatrico_auth_slice2_bootstrap_test'
+  const bootstrapPool = new Pool({ connectionString: bootstrapUrl.href })
+  const bootstrapDb = drizzle(bootstrapPool)
+  const bootstrapEnv = { ...process.env, DATABASE_URL: bootstrapUrl.href, BOOTSTRAP_ADMIN_USERNAME: 'firstadmin', BOOTSTRAP_ADMIN_EMAIL: 'first@example.test', NUXT_PUBLIC_SITE_URL: 'https://clinic.example.test' }
+  const runBootstrap = (args: string[] = [], env = bootstrapEnv) => spawnSync('node', ['--experimental-strip-types', 'scripts/bootstrap-admin.ts', ...args], { env, encoding: 'utf8' })
+
+  beforeAll(async () => {
+    await migrate(bootstrapDb, { migrationsFolder: './server/db/migrations' })
+  })
+  beforeEach(async () => {
+    const { setupToken, recoveryJob, verification } = await import('../../server/db/schema')
+    await bootstrapDb.delete(recoveryJob)
+    await bootstrapDb.delete(setupToken)
+    await bootstrapDb.delete(verification)
+    await bootstrapDb.delete(auditEvent)
+    await bootstrapDb.delete(userRole)
+    await bootstrapDb.delete(account)
+    await bootstrapDb.delete(session)
+    await bootstrapDb.delete(user)
+    await bootstrapDb.delete(bootstrapMarker)
+  })
+  afterAll(async () => {
+    await bootstrapPool.end()
+  })
+
+  it('preserves the original one-time setup-link mode without a credential', async () => {
+    const result = runBootstrap()
+    expect(result.status).toBe(0)
+    expect(result.stdout).toMatch(/^https:\/\/clinic\.example\.test\/invitacion\/[\w-]+\n$/)
+    expect(result.stderr).toBe('')
+    expect(await bootstrapDb.select().from(account)).toHaveLength(0)
+    expect((await bootstrapDb.select().from(userRole)).map(row => row.role)).toEqual(['ADMIN'])
+    const rerun = runBootstrap()
+    expect(rerun.status).not.toBe(0)
+    expect(rerun.stdout).toBe('')
+  })
+
+  it('generates one strong password, stores only its Better Auth hash, and allows sign-in', async () => {
+    const { verifyPassword } = await import('better-auth/crypto')
+    const result = runBootstrap(['--generated-password'])
+    expect(result.status).toBe(0)
+    expect(result.stderr).toBe('')
+    expect(result.stdout).toMatch(/^[A-Za-z0-9_-]{43}\n$/)
+    const password = result.stdout.trim()
+    const [owner] = await bootstrapDb.select().from(user)
+    const [credential] = await bootstrapDb.select().from(account)
+    expect(owner).toMatchObject({ username: 'firstadmin', email: 'first@example.test' })
+    expect(credential).toMatchObject({ userId: owner!.id, accountId: owner!.id, providerId: 'credential' })
+    expect(credential!.password).not.toContain(password)
+    expect(await verifyPassword({ hash: credential!.password!, password })).toBe(true)
+    expect((await bootstrapDb.select().from(auditEvent))[0]).toMatchObject({ action: 'ADMIN_BOOTSTRAP', actorId: owner!.id })
+    expect(JSON.stringify(await bootstrapDb.select().from(auditEvent))).not.toContain(password)
+    const { drizzleAdapter } = await import('better-auth/adapters/drizzle')
+    const { username } = await import('better-auth/plugins')
+    const localAuth = betterAuth({ database: drizzleAdapter(bootstrapDb, { provider: 'pg', schema: await import('../../server/db/schema') }), emailAndPassword: { enabled: true }, plugins: [username()], baseURL: 'http://localhost:3000', secret: 'test-secret-which-is-at-least-32-characters' })
+    const response = await localAuth.handler(new Request('http://localhost:3000/api/auth/sign-in/username', { method: 'POST', headers: { 'content-type': 'application/json', 'origin': 'http://localhost:3000' }, body: JSON.stringify({ username: 'firstadmin', password }) }))
+    expect(response.status).toBe(200)
+    const rerun = runBootstrap(['--generated-password'])
+    expect(rerun.status).not.toBe(0)
+    expect(rerun.stdout).toBe('')
+    expect((await bootstrapDb.select().from(account))[0]!.password).toBe(credential!.password)
+  })
+
+  it('requires an explicit reset flag and original identity; reset revokes sessions and recovery material', async () => {
+    const { setupToken, recoveryJob, verification } = await import('../../server/db/schema')
+    const { verifyPassword } = await import('better-auth/crypto')
+    const initial = runBootstrap(['--generated-password'])
+    expect(initial.status).toBe(0)
+    const oldPassword = initial.stdout.trim()
+    const [owner] = await bootstrapDb.select().from(user)
+    const id = owner!.id
+    await bootstrapDb.insert(session).values({ id: crypto.randomUUID(), userId: id, token: crypto.randomUUID(), expiresAt: new Date(Date.now() + 3600000) })
+    const recoveryTokenId = crypto.randomUUID()
+    await bootstrapDb.insert(setupToken).values({ id: recoveryTokenId, userId: id, digest: crypto.randomUUID(), purpose: 'RECOVERY', expiresAt: new Date(Date.now() + 3600000) })
+    await bootstrapDb.insert(setupToken).values({ id: crypto.randomUUID(), userId: id, digest: crypto.randomUUID(), purpose: 'SETUP', expiresAt: new Date(Date.now() + 3600000) })
+    const queuedIdentity = (identity: string) => {
+      const nonce = randomBytes(12)
+      const cipher = createCipheriv('aes-256-gcm', Buffer.from(process.env.RECOVERY_QUEUE_SECRET!, 'hex'), nonce)
+      const encrypted = Buffer.concat([cipher.update(identity, 'utf8'), cipher.final()])
+      return Buffer.concat([nonce, cipher.getAuthTag(), encrypted]).toString('base64')
     }
+    await bootstrapDb.insert(recoveryJob).values({ id: crypto.randomUUID(), payload: queuedIdentity(owner!.email), state: 'QUEUED' })
+    await bootstrapDb.insert(recoveryJob).values({ id: crypto.randomUUID(), payload: 'queued-secret', tokenId: recoveryTokenId, deliveryPayload: 'queued-secret', state: 'SENDING' })
+    await bootstrapDb.insert(verification).values({ id: crypto.randomUUID(), identifier: owner!.email, value: 'unused-code', expiresAt: new Date(Date.now() + 3600000) })
+    const denied = runBootstrap(['--generated-password'], { ...bootstrapEnv, BOOTSTRAP_ADMIN_EMAIL: 'other@example.test' })
+    expect(denied.status).not.toBe(0)
+    expect(denied.stdout).toBe('')
+    expect(runBootstrap(['--reset-admin']).status).not.toBe(0)
+    const reset = runBootstrap(['--generated-password', '--reset-admin'])
+    expect(reset.status).toBe(0)
+    expect(reset.stderr).toBe('')
+    expect(reset.stdout).toMatch(/^[A-Za-z0-9_-]{43}\n$/)
+    const newPassword = reset.stdout.trim()
+    expect(newPassword).not.toBe(oldPassword)
+    const [credential] = await bootstrapDb.select().from(account)
+    expect(await verifyPassword({ hash: credential!.password!, password: newPassword })).toBe(true)
+    expect(await verifyPassword({ hash: credential!.password!, password: oldPassword })).toBe(false)
+    expect(await bootstrapDb.select().from(session).where(eq(session.userId, id))).toHaveLength(0)
+    expect(await bootstrapDb.select().from(setupToken).where(eq(setupToken.userId, id))).toHaveLength(0)
+    expect(await bootstrapDb.select().from(verification)).toHaveLength(0)
+    const jobs = await bootstrapDb.select().from(recoveryJob)
+    expect(jobs).toHaveLength(2)
+    for (const job of jobs) expect(job).toMatchObject({ payload: '', deliveryPayload: null, state: 'FAILED' })
+    expect((await bootstrapDb.select().from(auditEvent)).map(entry => entry.action)).toEqual(['ADMIN_BOOTSTRAP', 'ADMIN_BOOTSTRAP_RESET'])
+    expect(JSON.stringify(await bootstrapDb.select().from(auditEvent))).not.toContain(newPassword)
+  })
+
+  it('refuses reset while pending recovery cannot be safely identified', async () => {
+    const first = runBootstrap(['--generated-password'])
+    expect(first.status).toBe(0)
+    const [owner] = await bootstrapDb.select().from(user)
+    const before = (await bootstrapDb.select().from(account))[0]!.password
+    const { recoveryJob } = await import('../../server/db/schema')
+    await bootstrapDb.insert(recoveryJob).values({ id: crypto.randomUUID(), payload: 'unreadable', state: 'QUEUED' })
+    const result = runBootstrap(['--generated-password', '--reset-admin'])
+    expect(result.status).not.toBe(0)
+    expect(result.stdout).toBe('')
+    expect((await bootstrapDb.select().from(account))[0]!.password).toBe(before)
+    expect((await bootstrapDb.select().from(bootstrapMarker))[0]!.userId).toBe(owner!.id)
+  })
+
+  it('rejects reset of an unmarked admin and invalid flags without emitting secrets', async () => {
+    const id = crypto.randomUUID()
+    await bootstrapDb.insert(user).values({ id, name: 'Other', username: 'firstadmin', email: 'first@example.test' })
+    await bootstrapDb.insert(userRole).values({ userId: id, role: 'ADMIN' })
+    for (const args of [['--generated-password', '--reset-admin'], ['--unsupported'], ['--reset-admin']]) {
+      const result = runBootstrap(args)
+      expect(result.status).not.toBe(0)
+      expect(result.stdout).toBe('')
+    }
+    expect(await bootstrapDb.select().from(account)).toHaveLength(0)
   })
 })

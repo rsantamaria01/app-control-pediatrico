@@ -36,7 +36,7 @@ export const visitSchema = z.strictObject({
 
 export type PatientInput = z.input<typeof patientSchema>
 export type MeasurementInput = z.input<typeof visitSchema>
-export type PatientView = z.output<typeof patientSchema> & { id: string, createdBy: string }
+export type PatientView = z.output<typeof patientSchema> & { id: string, createdBy: string, givenNames?: string, surnames?: string, nationalId?: string, hsmRecord?: string, perinatalNotes?: string, lastWeightKg?: number }
 export type VisitResultSnapshot = { id: string, indicator: string, parentResultId: string | null, recalculationId: string | null, calculatedBy: string | null } & (GrowthResult | { status: 'unavailable', reason: string })
 export type VisitSnapshot = {
   id: string

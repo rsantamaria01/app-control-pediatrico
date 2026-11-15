@@ -11,7 +11,7 @@ export const user = pgTable('user', {
   image: text('image'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow()
-}, table => [uniqueIndex('user_username_lower_idx').on(sql`lower(${table.username})`)])
+}, table => [uniqueIndex('user_username_lower_idx').on(sql`lower(${table.username})`), uniqueIndex('user_email_canonical_idx').on(sql`lower(btrim(${table.email}))`), check('user_email_canonical_ck', sql`${table.email} = lower(btrim(${table.email}))`)])
 
 export const session = pgTable('session', {
   id: text('id').primaryKey(),
@@ -106,6 +106,11 @@ export const rateLimit = pgTable('rateLimit', {
 export const patient = pgTable('patient', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
+  givenNames: text('given_names'),
+  surnames: text('surnames'),
+  nationalId: text('national_id'),
+  hsmRecord: text('hsm_record'),
+  perinatalNotes: text('perinatal_notes'),
   birthDate: text('birth_date').notNull(),
   sex: text('sex').notNull(),
   gestationDays: integer('gestation_days'),
@@ -116,9 +121,27 @@ export const patient = pgTable('patient', {
   createdBy: text('created_by').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
 }, table => [
+  uniqueIndex('patient_national_id_idx').on(table.nationalId),
+  check('patient_national_id_ck', sql`${table.nationalId} IS NULL OR ${table.nationalId} ~ '^[0-9]{10}$'`),
   check('patient_sex_ck', sql`${table.sex} IN ('MALE', 'FEMALE')`),
   check('patient_correction_ck', sql`${table.correctionUntilMonths} IN (24, 36)`)
 ])
+
+export const patientContactIntake = pgTable('patient_contact_intake', {
+  id: text('id').primaryKey(),
+  patientId: text('patient_id').notNull().references(() => patient.id, { onDelete: 'restrict' }),
+  position: integer('position').notNull(),
+  name: text('name').notNull(),
+  relationship: text('relationship').notNull(),
+  phone: text('phone').notNull(),
+  email: text('email'),
+  proof: text('proof').notNull(),
+  invite: boolean('invite').notNull(),
+  status: text('status').notNull().default('LINK_FAILED'),
+  guardianId: text('guardian_id').references(() => user.id, { onDelete: 'restrict' }),
+  createdBy: text('created_by').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
+}, table => [index('patient_contact_intake_patient_idx').on(table.patientId, table.status), check('patient_contact_intake_status_ck', sql`${table.status} IN ('LINK_FAILED', 'LINKED')`), check('patient_contact_email_canonical_ck', sql`${table.email} IS NULL OR ${table.email} = lower(btrim(${table.email}))`)])
 
 export const guardianPhone = pgTable('guardian_phone', {
   guardianId: text('guardian_id').primaryKey().references(() => user.id, { onDelete: 'restrict' }),
@@ -141,7 +164,8 @@ export const guardianGrant = pgTable('guardian_grant', {
 }, table => [
   primaryKey({ columns: [table.patientId, table.guardianId] }),
   index('guardian_grant_guardian_idx').on(table.guardianId, table.status),
-  check('guardian_grant_status_ck', sql`${table.status} IN ('PENDING', 'ACTIVE', 'FAILED', 'REVOKED')`)
+  check('guardian_grant_status_ck', sql`${table.status} IN ('UNINVITED', 'PENDING', 'ACTIVE', 'FAILED', 'REVOKED')`),
+  check('guardian_grant_email_canonical_ck', sql`${table.contactEmail} = lower(btrim(${table.contactEmail}))`)
 ])
 
 export const guardianDelivery = pgTable('guardian_delivery', {

@@ -141,6 +141,55 @@
       "when": 1794689457302,
       "tag": "0019_guardian-legacy-privacy",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1794691726583,
+      "tag": "0020_even_jackpot",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1794695868657,
+      "tag": "0021_chubby_blob",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1794698411654,
+      "tag": "0022_quiet_stryfe",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1794698489560,
+      "tag": "0023_many_eddie_brock",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1794700798370,
+      "tag": "0024_romantic_jane_foster",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1794705315821,
+      "tag": "0025_slow_princess_powerful",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1794705369451,
+      "tag": "0026_little_wendell_vaughn",
+      "breakpoints": true
     }
   ]
 }

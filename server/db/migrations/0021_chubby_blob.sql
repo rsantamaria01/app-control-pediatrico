@@ -1,0 +1,2 @@
+ALTER TABLE "guardian_grant" DROP CONSTRAINT "guardian_grant_status_ck";--> statement-breakpoint
+ALTER TABLE "guardian_grant" ADD CONSTRAINT "guardian_grant_status_ck" CHECK ("guardian_grant"."status" IN ('UNINVITED', 'PENDING', 'ACTIVE', 'FAILED', 'REVOKED'));

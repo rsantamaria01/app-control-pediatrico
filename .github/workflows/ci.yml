@@ -82,7 +82,7 @@ jobs:
       - name: Download and verify official WHO originals
         run: |
           docker info > /dev/null
-          node --experimental-strip-types scripts/import-who.ts download
+          node --experimental-transform-types scripts/import-who.ts download
           jq -r '.files[] | "\(.sha256)  /tmp/opencode/who-2006/\(.name)-expanded.xlsx"' scripts/who-2006-manifest.json | sha256sum --check --status
 
       - name: Run all four Docker production ops cases

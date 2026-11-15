@@ -3,7 +3,7 @@ import { spawn } from 'node:child_process'
 const [command = 'db:migrate', action] = process.argv.slice(2)
 const paths = {
   'db:migrate': ['scripts/migrate.mjs'],
-  'bootstrap-admin': ['--experimental-strip-types', 'scripts/bootstrap-admin.ts'],
+  'bootstrap-admin': ['--experimental-strip-types', 'scripts/bootstrap-admin.ts', ...(action ? [action] : [])],
   'who-import': ['node_modules/tsx/dist/cli.mjs', 'scripts/import-who.ts', action]
 }
 

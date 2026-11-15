@@ -90,6 +90,16 @@ describe('production operations', () => {
     expect(ops).toMatch(/db:\s*\{ condition: service_healthy \}/)
   })
 
+  it('forwards the generated-password bootstrap flag through the production ops launcher', () => {
+    const result = spawnSync('node', ['scripts/ops.mjs', 'bootstrap-admin', '--generated-password'], {
+      env: { ...process.env, DB_PASSWORD: 'offline', DB_HOST: '127.0.0.1', DB_NAME: 'pediatrico_ops_offline_test', BOOTSTRAP_ADMIN_EMAIL: 'first@example.test', BOOTSTRAP_ADMIN_USERNAME: 'firstadmin', NUXT_PUBLIC_SITE_URL: undefined },
+      encoding: 'utf8', timeout: 30_000
+    })
+    expect(result.status).not.toBe(0)
+    expect(result.stderr).toMatch(/connect|ECONNREFUSED/)
+    expect(result.stderr).not.toContain('Valid bootstrap email')
+  })
+
   it('rejects WHO import without explicit rights before launching database or downloading', () => {
     const result = spawnSync('node', ['scripts/ops.mjs', 'who-import', 'import'], {
       env: { ...process.env, WHO_ALLOW_CLINICAL_IMPORT: 'true', DB_PASSWORD: 'unused', WHO_SOURCE_DIR: '/nonexistent' },

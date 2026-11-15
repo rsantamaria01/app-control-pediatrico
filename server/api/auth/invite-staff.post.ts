@@ -11,8 +11,8 @@ import { recordAudit } from '../../services/audit'
 
 export default defineEventHandler(async (event) => {
   const actor = await requireCapability(event, 'ADMINISTER')
-  const body = z.object({ email: z.email(), name: z.string().min(1), role: z.enum(['DOCTOR', 'ASSISTANT']) }).parse(await readBody(event))
-  const email = body.email.toLowerCase()
+  const body = z.object({ email: z.string().trim().pipe(z.email()), name: z.string().min(1), role: z.enum(['DOCTOR', 'ASSISTANT']) }).parse(await readBody(event))
+  const email = body.email.trim().toLowerCase()
   const token = randomBytes(32).toString('base64url')
   const digest = createHash('sha256').update(token).digest('hex')
   const db = useDb()
@@ -24,7 +24,9 @@ export default defineEventHandler(async (event) => {
     connected = true
     await lock.query('SELECT pg_advisory_lock(hashtextextended($1, 41422027))', [email])
     const result = await db.transaction(async (tx) => {
-      const [existing] = await tx.select().from(user).where(eq(user.email, email))
+      const existingUsers = await tx.select().from(user).where(sql`lower(btrim(${user.email})) = ${email}`).limit(2)
+      if (existingUsers.length > 1) return null
+      const [existing] = existingUsers
       let target = existing?.id
       if (existing) {
         const [credential] = await tx.select({ id: account.id }).from(account).where(and(eq(account.userId, existing.id), eq(account.providerId, 'credential')))

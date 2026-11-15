@@ -39,7 +39,7 @@ try {
       const [owner] = await tx.select().from(user).where(eq(user.id, marker.userId)).for('update')
       const [role] = await tx.select().from(userRole).where(and(eq(userRole.userId, marker.userId), eq(userRole.role, 'ADMIN'))).limit(1)
       const credentials = await tx.select().from(account).where(and(eq(account.userId, marker.userId), eq(account.providerId, 'credential')))
-      if (!owner || owner.username !== username || owner.email !== email || !role || credentials.length !== 1) throw new Error('Bootstrap admin identity or credential mismatch')
+      if (!owner || owner.username !== username || owner.email.trim().toLowerCase() !== email || !role || credentials.length !== 1) throw new Error('Bootstrap admin identity or credential mismatch')
       const tokens = await tx.select({ id: setupToken.id }).from(setupToken).where(eq(setupToken.userId, owner.id))
       const tokenIds = tokens.map(entry => entry.id)
       const pendingJobs = await tx.select().from(recoveryJob).where(inArray(recoveryJob.state, ['QUEUED', 'CLAIMED', 'SENDING']))
@@ -47,11 +47,11 @@ try {
         if (job.tokenId && tokenIds.includes(job.tokenId)) return true
         const identity = recoveryIdentity(job.payload)
         if (identity === null) throw new Error('Cannot safely identify pending recovery jobs')
-        return identity === owner.email || identity === owner.username
+        return identity.trim().toLowerCase() === owner.email.trim().toLowerCase() || identity === owner.username
       }).map(job => job.id)
       if (jobIds.length) await tx.update(recoveryJob).set({ state: 'FAILED', payload: '', deliveryPayload: null, completedAt: new Date() }).where(inArray(recoveryJob.id, jobIds))
       await tx.delete(setupToken).where(eq(setupToken.userId, owner.id))
-      await tx.delete(verification).where(inArray(verification.identifier, [owner.email, owner.username]))
+      await tx.delete(verification).where(inArray(verification.identifier, [owner.email, email, owner.username]))
       await tx.delete(session).where(eq(session.userId, owner.id))
       await tx.update(account).set({ password: await hashPassword(secret), updatedAt: new Date() }).where(eq(account.id, credentials[0]!.id))
       await tx.insert(auditEvent).values({ id: crypto.randomUUID(), actorId: owner.id, action: 'ADMIN_BOOTSTRAP_RESET', outcome: 'ALLOWED' })

@@ -176,6 +176,20 @@
       "when": 1794700798370,
       "tag": "0024_romantic_jane_foster",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1794705315821,
+      "tag": "0025_slow_princess_powerful",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1794705369451,
+      "tag": "0026_little_wendell_vaughn",
+      "breakpoints": true
     }
   ]
 }

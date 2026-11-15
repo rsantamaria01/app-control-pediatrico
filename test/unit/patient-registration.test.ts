@@ -16,6 +16,7 @@ describe('quick patient registration', () => {
 
   it('requires representatives and only allows invites with email', () => {
     expect(quickPatientSchema.parse(input).contacts[0]?.phone).toBe('0991234567')
+    expect(quickPatientSchema.parse({ ...input, contacts: [{ ...contact, email: ' Parent@Example.test ' }] }).contacts[0]?.email).toBe('parent@example.test')
     expect(() => quickPatientSchema.parse({ ...input, contacts: [] })).toThrow()
     expect(() => quickPatientSchema.parse({ ...input, contacts: [{ ...contact, invite: true }] })).toThrow()
     expect(() => quickPatientSchema.parse({ ...input, contacts: [{ ...contact, phone: '123' }] })).toThrow()

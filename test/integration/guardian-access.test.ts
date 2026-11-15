@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { randomUUID } from 'node:crypto'
 import { createServer, type Socket } from 'node:net'
+import { readFile } from 'node:fs/promises'
 import { drizzle } from 'drizzle-orm/node-postgres'
 import { migrate } from 'drizzle-orm/node-postgres/migrator'
 import { and, eq } from 'drizzle-orm'
@@ -104,6 +105,177 @@ async function seedVisit(patientId: string, shareWithFamily = true) {
 }
 
 describe('verified guardian isolation', () => {
+  it('migration canonicalizes an existing single mixed-case user, grant and intake without losing their links', async () => {
+    const id = randomUUID()
+    const child = randomUUID()
+    const intake = randomUUID()
+    const email = `${randomUUID()}@example.test`
+    const mixed = email.toUpperCase()
+    const client = await pool.connect()
+    try {
+      await client.query('BEGIN')
+      await client.query('ALTER TABLE "user" DROP CONSTRAINT user_email_canonical_ck')
+      await client.query('DROP INDEX user_email_canonical_idx')
+      await client.query('ALTER TABLE guardian_grant DROP CONSTRAINT guardian_grant_email_canonical_ck')
+      await client.query('ALTER TABLE patient_contact_intake DROP CONSTRAINT patient_contact_email_canonical_ck')
+      await client.query('INSERT INTO "user" (id, name, email) VALUES ($1,$2,$3)', [id, 'Familia existente', mixed])
+      await client.query('INSERT INTO patient (id, name, birth_date, sex, created_by) VALUES ($1,$2,$3,$4,$5)', [child, 'Niña existente', '2024-01-01', 'FEMALE', doctor.id])
+      await client.query('INSERT INTO guardian_grant (patient_id, guardian_id, contact_email, proof, verified_by, status) VALUES ($1,$2,$3,$4,$5,$6)', [child, id, mixed, 'Identidad verificada', doctor.id, 'ACTIVE'])
+      await client.query('INSERT INTO patient_contact_intake (id, patient_id, position, name, relationship, phone, email, proof, invite, status, guardian_id, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)', [intake, child, 0, 'Familia existente', 'Madre', '0991234567', mixed, '', false, 'LINKED', id, doctor.id])
+      const script = await readFile('server/db/migrations/0025_slow_princess_powerful.sql', 'utf8')
+      await client.query(script.replaceAll('--> statement-breakpoint', ''))
+      expect((await client.query('SELECT email FROM "user" WHERE id = $1', [id])).rows[0]?.email).toBe(email)
+      expect((await client.query('SELECT guardian_id, contact_email FROM guardian_grant WHERE patient_id = $1', [child])).rows[0]).toMatchObject({ guardian_id: id, contact_email: email })
+      expect((await client.query('SELECT guardian_id, email FROM patient_contact_intake WHERE id = $1', [intake])).rows[0]).toMatchObject({ guardian_id: id, email })
+      await expect(client.query('INSERT INTO "user" (id, name, email) VALUES ($1,$2,$3)', [randomUUID(), 'Duplicado', mixed])).rejects.toThrow()
+      await client.query('ROLLBACK')
+    } finally {
+      client.release()
+    }
+  })
+
+  it('migration refuses preexisting canonical collisions without deleting users or changing family grants', async () => {
+    const a = randomUUID()
+    const b = randomUUID()
+    const child = randomUUID()
+    const email = `${randomUUID()}@example.test`
+    const client = await pool.connect()
+    try {
+      await client.query('BEGIN')
+      await client.query('ALTER TABLE "user" DROP CONSTRAINT user_email_canonical_ck')
+      await client.query('DROP INDEX user_email_canonical_idx')
+      await client.query('ALTER TABLE guardian_grant DROP CONSTRAINT guardian_grant_email_canonical_ck')
+      await client.query('ALTER TABLE patient_contact_intake DROP CONSTRAINT patient_contact_email_canonical_ck')
+      await client.query('INSERT INTO "user" (id, name, email) VALUES ($1,$2,$3),($4,$5,$6)', [a, 'Familia uno', email, b, 'Familia dos', email.toUpperCase()])
+      await client.query('INSERT INTO patient (id, name, birth_date, sex, created_by) VALUES ($1,$2,$3,$4,$5)', [child, 'Niña aislada', '2024-01-01', 'FEMALE', doctor.id])
+      await client.query('INSERT INTO guardian_grant (patient_id, guardian_id, contact_email, proof, verified_by, status) VALUES ($1,$2,$3,$4,$5,$6)', [child, a, email.toUpperCase(), 'Evidencia documental', doctor.id, 'ACTIVE'])
+      const script = await readFile('server/db/migrations/0025_slow_princess_powerful.sql', 'utf8')
+      await expect(client.query(script.replaceAll('--> statement-breakpoint', ''))).rejects.toThrow('Canonical email collision')
+      await client.query('ROLLBACK')
+      expect(await db.select().from(user).where(eq(user.id, a))).toHaveLength(0)
+      expect(await db.select().from(user).where(eq(user.id, b))).toHaveLength(0)
+      expect(await db.select().from(guardianGrant).where(eq(guardianGrant.patientId, child))).toHaveLength(0)
+    } finally {
+      client.release()
+    }
+  })
+
+  it('refuses to resolve pre-migration canonical duplicates to an arbitrary family', async () => {
+    const { findGuardianIdentity } = await import('../../server/services/invitations')
+    const email = `${randomUUID()}@example.test`
+    const a = randomUUID()
+    const b = randomUUID()
+    await pool.query('ALTER TABLE "user" DROP CONSTRAINT user_email_canonical_ck')
+    await pool.query('DROP INDEX user_email_canonical_idx')
+    try {
+      await db.insert(user).values([{ id: a, name: 'Familia una', email }, { id: b, name: 'Familia otra', email: email.toUpperCase() }])
+      await expect(findGuardianIdentity(doctor, { email })).rejects.toMatchObject({ statusCode: 409 })
+    } finally {
+      await db.delete(user).where(eq(user.id, a))
+      await db.delete(user).where(eq(user.id, b))
+      await pool.query('CREATE UNIQUE INDEX user_email_canonical_idx ON "user" (lower(btrim(email)))')
+      await pool.query('ALTER TABLE "user" ADD CONSTRAINT user_email_canonical_ck CHECK (email = lower(btrim(email)))')
+    }
+  })
+
+  it('does not let mismatched case or spacing bypass guardian identity confirmation', async () => {
+    const { findGuardianIdentity, grantGuardian } = await import('../../server/services/invitations')
+    const email = `${randomUUID()}@example.test`
+    const id = randomUUID()
+    const child = randomUUID()
+    await db.insert(user).values({ id, name: 'Familia existente', email })
+    await db.insert(userRole).values({ userId: id, role: 'PATIENT' })
+    await db.insert(patient).values({ id: child, name: 'Niño aislado', birthDate: '2024-01-01', sex: 'MALE', createdBy: doctor.id })
+    expect((await findGuardianIdentity(doctor, { email: ` ${email.toUpperCase()} ` }))?.id).toBe(id)
+    await expect(grantGuardian(doctor, child, { name: 'Familia existente', email: email.toUpperCase(), proof: 'Identidad revisada presencialmente' })).rejects.toMatchObject({ statusCode: 409 })
+    expect(await db.select().from(guardianGrant).where(eq(guardianGrant.patientId, child))).toHaveLength(0)
+    const result = await grantGuardian(doctor, child, { name: 'Familia existente', email: email.toUpperCase(), confirmedGuardianId: id, proof: 'Identidad revisada presencialmente', deferDelivery: true })
+    expect(result.status).toBe('UNINVITED')
+    expect((await db.select().from(guardianGrant).where(eq(guardianGrant.patientId, child)))[0]?.guardianId).toBe(id)
+  })
+
+  it('rejects a differently cased second account at the database boundary, preserving the first guardian', async () => {
+    const email = `${randomUUID()}@example.test`
+    const id = randomUUID()
+    await db.insert(user).values({ id, name: 'Familia original', email })
+    await expect(db.insert(user).values({ id: randomUUID(), name: 'Familia distinta', email: email.toUpperCase() })).rejects.toThrow()
+    expect((await db.select({ id: user.id }).from(user).where(eq(user.id, id)))).toHaveLength(1)
+  })
+
+  it('normalizes a mixed-case quick-create email and links the confirmed existing guardian to only this child', async () => {
+    const { createQuickPatient, listPendingContacts } = await import('../../server/services/patients')
+    const { listShareableChildren } = await import('../../server/services/invitations')
+    const email = `${randomUUID()}@example.test`
+    const mixed = `  ${email.toUpperCase()}  `
+    const phone = `09${randomUUID().replace(/\D/g, '').padEnd(8, '0').slice(0, 8)}`
+    const id = randomUUID()
+    await db.insert(user).values({ id, name: 'Representante confirmado', email })
+    await db.insert(userRole).values({ userId: id, role: 'PATIENT' })
+    await db.insert(guardianPhone).values({ guardianId: id, phone })
+    const result = await createQuickPatient(doctor, { givenNames: 'Hijo', surnames: `Nuevo${randomUUID().slice(0, 8)}`, birthDate: '2024-04-01', sex: 'MALE', contacts: [{ name: 'Representante confirmado', relationship: 'Madre', phone, email: mixed, proof: 'Identidad confirmada presencialmente', confirmedGuardianId: id, invite: false }] })
+    expect(result.contacts[0]?.status).toBe('UNINVITED')
+    expect(await listPendingContacts(doctor, result.patient.id)).toEqual([])
+    const [intake] = await db.select().from(patientContactIntake).where(eq(patientContactIntake.patientId, result.patient.id))
+    const [grant] = await db.select().from(guardianGrant).where(eq(guardianGrant.patientId, result.patient.id))
+    expect(intake?.email).toBe(email)
+    expect(grant).toMatchObject({ guardianId: id, contactEmail: email, status: 'UNINVITED' })
+    expect(await db.select().from(user).where(eq(user.email, email))).toHaveLength(1)
+    expect(await listShareableChildren({ id, roles: ['PATIENT'] })).toEqual([])
+    expect(await listShareableChildren({ id: otherId, roles: ['PATIENT'] })).toEqual([])
+  })
+
+  it('retries an old mixed-case intake row using its canonical email without changing the verified family', async () => {
+    const { retryPendingContact, listPendingContacts } = await import('../../server/services/patients')
+    const email = `${randomUUID()}@example.test`
+    const guardianId = randomUUID()
+    const childId = randomUUID()
+    const intakeId = randomUUID()
+    const phone = `09${randomUUID().replace(/\D/g, '').padEnd(8, '0').slice(0, 8)}`
+    await db.insert(user).values({ id: guardianId, name: 'Representante previo', email })
+    await db.insert(userRole).values({ userId: guardianId, role: 'PATIENT' })
+    await db.insert(guardianPhone).values({ guardianId, phone })
+    await db.insert(patient).values({ id: childId, name: 'Niño con contacto previo', birthDate: '2024-01-01', sex: 'MALE', createdBy: doctor.id })
+    const client = await pool.connect()
+    try {
+      await client.query('BEGIN')
+      await client.query('ALTER TABLE patient_contact_intake DROP CONSTRAINT patient_contact_email_canonical_ck')
+      await client.query('INSERT INTO patient_contact_intake (id, patient_id, position, name, relationship, phone, email, proof, invite, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)', [intakeId, childId, 0, 'Representante previo', 'Madre', phone, email.toUpperCase(), 'Identidad previamente verificada', false, doctor.id])
+      await client.query('COMMIT')
+    } finally {
+      client.release()
+    }
+    try {
+      await expect(retryPendingContact(doctor, childId, intakeId, {})).rejects.toMatchObject({ statusCode: 409 })
+      const linked = await retryPendingContact(doctor, childId, intakeId, { confirmedGuardianId: guardianId })
+      expect(linked.status).toBe('UNINVITED')
+      expect((await db.select().from(guardianGrant).where(eq(guardianGrant.patientId, childId)))[0]?.guardianId).toBe(guardianId)
+      expect(await listPendingContacts(doctor, childId)).toEqual([])
+    } finally {
+      await pool.query('ALTER TABLE patient_contact_intake ADD CONSTRAINT patient_contact_email_canonical_ck CHECK (email IS NULL OR email = lower(btrim(email)))')
+    }
+  })
+
+  it('normalizes mixed-case email when retrying a pending contact with explicit guardian confirmation', async () => {
+    const { retryPendingContact, listPendingContacts } = await import('../../server/services/patients')
+    const email = `${randomUUID()}@example.test`
+    const mixed = `  ${email.toUpperCase()}  `
+    const phone = `09${randomUUID().replace(/\D/g, '').padEnd(8, '0').slice(0, 8)}`
+    const id = randomUUID()
+    const childId = randomUUID()
+    const intakeId = randomUUID()
+    await db.insert(user).values({ id, name: 'Familia verificada', email })
+    await db.insert(userRole).values({ userId: id, role: 'PATIENT' })
+    await db.insert(guardianPhone).values({ guardianId: id, phone })
+    await db.insert(patient).values({ id: childId, name: 'Niño pendiente', birthDate: '2024-01-01', sex: 'MALE', createdBy: doctor.id })
+    await db.insert(patientContactIntake).values({ id: intakeId, patientId: childId, position: 0, name: 'Familia verificada', relationship: 'Madre', phone, email, proof: 'Identidad verificada presencialmente', invite: false, createdBy: doctor.id })
+    await expect(retryPendingContact(doctor, childId, intakeId, { email: mixed, proof: 'Identidad revisada presencialmente' })).rejects.toMatchObject({ statusCode: 409 })
+    expect((await listPendingContacts(doctor, childId))[0]?.email).toBe(email)
+    expect(await db.select().from(guardianGrant).where(eq(guardianGrant.patientId, childId))).toHaveLength(0)
+    const result = await retryPendingContact(doctor, childId, intakeId, { confirmedGuardianId: id })
+    expect(result.status).toBe('UNINVITED')
+    expect((await db.select().from(guardianGrant).where(eq(guardianGrant.patientId, childId)))[0]).toMatchObject({ guardianId: id, contactEmail: email })
+    expect(await listPendingContacts(doctor, childId)).toEqual([])
+  })
   it('reconciles an ACTIVE guardian after a post-commit audit failure without exposing a false pending contact', async () => {
     const { createQuickPatient, listPendingContacts } = await import('../../server/services/patients')
     const { getShareableChild } = await import('../../server/services/invitations')

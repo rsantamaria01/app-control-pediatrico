@@ -11,7 +11,7 @@ export const user = pgTable('user', {
   image: text('image'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow()
-}, table => [uniqueIndex('user_username_lower_idx').on(sql`lower(${table.username})`)])
+}, table => [uniqueIndex('user_username_lower_idx').on(sql`lower(${table.username})`), uniqueIndex('user_email_canonical_idx').on(sql`lower(btrim(${table.email}))`), check('user_email_canonical_ck', sql`${table.email} = lower(btrim(${table.email}))`)])
 
 export const session = pgTable('session', {
   id: text('id').primaryKey(),
@@ -141,7 +141,7 @@ export const patientContactIntake = pgTable('patient_contact_intake', {
   guardianId: text('guardian_id').references(() => user.id, { onDelete: 'restrict' }),
   createdBy: text('created_by').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
-}, table => [index('patient_contact_intake_patient_idx').on(table.patientId, table.status), check('patient_contact_intake_status_ck', sql`${table.status} IN ('LINK_FAILED', 'LINKED')`)])
+}, table => [index('patient_contact_intake_patient_idx').on(table.patientId, table.status), check('patient_contact_intake_status_ck', sql`${table.status} IN ('LINK_FAILED', 'LINKED')`), check('patient_contact_email_canonical_ck', sql`${table.email} IS NULL OR ${table.email} = lower(btrim(${table.email}))`)])
 
 export const guardianPhone = pgTable('guardian_phone', {
   guardianId: text('guardian_id').primaryKey().references(() => user.id, { onDelete: 'restrict' }),
@@ -164,7 +164,8 @@ export const guardianGrant = pgTable('guardian_grant', {
 }, table => [
   primaryKey({ columns: [table.patientId, table.guardianId] }),
   index('guardian_grant_guardian_idx').on(table.guardianId, table.status),
-  check('guardian_grant_status_ck', sql`${table.status} IN ('UNINVITED', 'PENDING', 'ACTIVE', 'FAILED', 'REVOKED')`)
+  check('guardian_grant_status_ck', sql`${table.status} IN ('UNINVITED', 'PENDING', 'ACTIVE', 'FAILED', 'REVOKED')`),
+  check('guardian_grant_email_canonical_ck', sql`${table.contactEmail} = lower(btrim(${table.contactEmail}))`)
 ])
 
 export const guardianDelivery = pgTable('guardian_delivery', {

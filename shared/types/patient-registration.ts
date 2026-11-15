@@ -17,7 +17,7 @@ const contactSchema = z.strictObject({
   name: z.string().trim().min(2).max(160),
   relationship: z.string().trim().min(2).max(80),
   phone: z.string().regex(/^(?:\+593|0)?9\d{8}$/, 'Teléfono ecuatoriano inválido').transform(value => value.startsWith('+593') ? `0${value.slice(4)}` : value.startsWith('0') ? value : `0${value}`),
-  email: z.union([z.email().max(254), z.literal('')]).default(''),
+  email: z.string().trim().pipe(z.union([z.email().max(254).transform(value => value.toLowerCase()), z.literal('')])).default(''),
   invite: z.boolean().default(false),
   proof: z.string().trim().min(8).max(500).optional(),
   confirmedGuardianId: z.uuid().optional()

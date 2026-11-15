@@ -1,4 +1,4 @@
-import { or, eq, and, gt, isNull } from 'drizzle-orm'
+import { or, eq, and, gt, isNull, sql } from 'drizzle-orm'
 import { hashPassword } from 'better-auth/crypto'
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto'
 import { createClient } from 'redis'
@@ -50,8 +50,9 @@ async function prepareRecovery(job: typeof recoveryJob.$inferSelect) {
     const [current] = await tx.select().from(recoveryJob).where(eq(recoveryJob.id, job.id)).for('update')
     if (!current || current.state !== 'SENDING') return null
     const value = decryptIdentity(current.payload)
-    const [owner] = await tx.select({ id: user.id, email: user.email }).from(user).where(or(eq(user.username, value), eq(user.email, value))).limit(1)
-    if (!owner) return current
+    const candidates = await tx.select({ id: user.id, email: user.email }).from(user).where(or(eq(user.username, value), sql`lower(btrim(${user.email})) = ${value}`)).limit(2)
+    if (candidates.length !== 1) return current
+    const owner = candidates[0]!
     await tx.select({ id: user.id }).from(user).where(eq(user.id, owner.id)).for('update')
     const [credential] = await tx.select({ id: account.id }).from(account).where(and(eq(account.userId, owner.id), eq(account.providerId, 'credential'))).limit(1)
     if (!credential) return current
@@ -150,8 +151,9 @@ export async function processRecoveryJobs() {
   try {
     if (Date.now() - job.createdAt.getTime() <= 600000) {
       const value = decryptIdentity(job.payload)
-      const [existing] = await db.select({ id: user.id }).from(user).where(or(eq(user.username, value), eq(user.email, value))).limit(1)
-      if (existing) {
+      const candidates = await db.select({ id: user.id }).from(user).where(or(eq(user.username, value), sql`lower(btrim(${user.email})) = ${value}`)).limit(2)
+      if (candidates.length === 1) {
+        const existing = candidates[0]!
         const redis = createClient({ url: process.env.REDIS_URL })
         redis.on('error', () => {})
         try {

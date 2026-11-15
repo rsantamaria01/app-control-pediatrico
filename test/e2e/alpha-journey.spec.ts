@@ -152,9 +152,9 @@ test('production image journeys from bootstrapped admin through two children and
     expect(visibleChildren).not.toContain(otherChild)
     for (const path of [`/api/hijos/${otherChild}`, `/api/hijos/${otherChild}/crecimiento`, `/api/hijos/${otherChild}/informes/${otherReportId}/pdf`, `/api/hijos/${otherChild}/informes/${otherReportId}`, `/hijos/${otherChild}`, `/hijos/${otherChild}/crecimiento`, `/hijos/${otherChild}/informe`]) {
       const denied = await context.request.get(path)
+      expect(await denied.text(), path).not.toMatch(/ONLY_OTHER_FAMILY|PRIVATE_OTHER_FAMILY|Otra Familia|weightKg|percentile|"z"/i)
       expect(denied.status(), path).toBe(404)
       expect(denied.headers()['cache-control'], path).toContain('no-store')
-      expect(await denied.text(), path).not.toMatch(/ONLY_OTHER_FAMILY|PRIVATE_OTHER_FAMILY|Otra Familia|weightKg|percentile|"z"/i)
     }
     await page.goto(`/hijos/${second}`)
     await expect(page.getByRole('heading', { name: 'Indicaciones de Sol Prueba' })).toBeVisible()

@@ -3,6 +3,7 @@ import type { FamilyChildView } from '../../../../server/services/invitations'
 
 const id = useRoute().params.id as string
 const { data: child, error, refresh } = await useFetch<FamilyChildView>(`/api/hijos/${encodeURIComponent(id)}`)
+if (import.meta.server && error.value) throw createError({ statusCode: error.value.statusCode === 404 ? 404 : 503, statusMessage: 'No disponible' })
 const dates = new Intl.DateTimeFormat('es-EC', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'America/Guayaquil' })
 const dateTime = new Intl.DateTimeFormat('es-EC', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'America/Guayaquil' })
 const weight = new Intl.NumberFormat('es-EC', { minimumFractionDigits: 2, maximumFractionDigits: 2 })

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 const id = useRoute().params.id as string
 const { data: reports, error, refresh } = await useFetch<{ id: string, approvedAt: string }[]>(`/api/hijos/${encodeURIComponent(id)}/informe`)
+if (import.meta.server && error.value) throw createError({ statusCode: error.value.statusCode === 404 ? 404 : 503, statusMessage: 'No disponible' })
 const date = new Intl.DateTimeFormat('es-EC', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'America/Guayaquil' })
 </script>
 

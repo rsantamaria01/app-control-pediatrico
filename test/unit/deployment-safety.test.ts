@@ -29,6 +29,13 @@ describe('deployment safety', () => {
     expect(new URL(child.url).password).toBe('part%3A%40%2F%3F%23%25%20with%20space')
   })
 
+  it('does not trust an entire container bridge for the alpha reverse proxy', () => {
+    const script = readFileSync(new URL('../../scripts/ci-alpha-compose.sh', import.meta.url), 'utf8')
+    expect(script).not.toContain('AUTH_TRUSTED_PROXY_CIDR=172.16.0.0/12')
+    expect(script).toMatch(/AUTH_TRUSTED_PROXY_CIDR=.*\/32/)
+    expect(script).toContain('ALPHA_DIRECT_PEER_IP')
+  })
+
   it('forwards configured public HTTPS origin and secrets explicitly to the production image', () => {
     const app = compose.split('\n  app:\n')[1]?.split('\n  ops:\n')[0]
     expect(app).toContain('NUXT_APP_SECRET: ${NUXT_APP_SECRET:?')

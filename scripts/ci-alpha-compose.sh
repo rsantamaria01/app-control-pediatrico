@@ -16,8 +16,8 @@ export SMTP_PORT=1025
 export SMTP_FROM=checkpoint@example.test
 export SMTP_SECURE=false
 export ALPHA_PUBLIC_ORIGIN="$NUXT_PUBLIC_SITE_URL"
-export AUTH_TRUSTED_PROXY_CIDR=172.16.0.0/12
 export COMPOSE_PARALLEL_LIMIT=2
+export COMPOSE_PROJECT_NAME="$project"
 compose() {
   docker compose --env-file /dev/null --project-name "$project" --profile full "$@"
 }
@@ -45,6 +45,15 @@ compose up -d db cache storage
 phase=mailpit
 docker run -d --name "${project}-mailpit" -p 127.0.0.1:8025:8025 axllent/mailpit:v1.33.1@sha256:aef2aacc11f075ec0fb6874275ee4a421e688e11a96ebb296134d1735c7761ce >/dev/null
 docker network connect --alias mailpit "${project}_default" "${project}-mailpit"
+network_subnet=$(docker network inspect --format '{{(index .IPAM.Config 0).Subnet}}' "${project}_default")
+case "$network_subnet" in
+  *.*.*.*/24) network_prefix=${network_subnet%.*/*} ;;
+  *) exit 1 ;;
+esac
+export ALPHA_DIRECT_PEER_IP="${network_prefix}.250"
+export ALPHA_PROXY_IP="${network_prefix}.251"
+export ALPHA_COMPOSE_PROJECT="$project"
+export AUTH_TRUSTED_PROXY_CIDR="${ALPHA_PROXY_IP}/32"
 compose up -d app
 [ "$(compose exec -T db psql -U pediatrico -d "$DB_NAME" -Atqc 'SELECT count(*) FROM who_dataset')" = 0 ]
 [ "$(compose exec -T db psql -U pediatrico -d "$DB_NAME" -Atqc 'SELECT count(*) FROM drizzle.__drizzle_migrations')" -gt 0 ]
@@ -53,7 +62,7 @@ proxy_cert=$(mktemp)
 proxy_key=$(mktemp)
 openssl req -x509 -newkey rsa:2048 -nodes -keyout "$proxy_key" -out "$proxy_cert" -days 1 -subj '/CN=127.0.0.1' -addext 'subjectAltName=IP:127.0.0.1' >/dev/null 2>&1
 export NODE_EXTRA_CA_CERTS="$proxy_cert"
-docker run -d --name "${project}-proxy" --network "${project}_default" -p 127.0.0.1:3443:443 -v "$PWD/scripts/ci-alpha-proxy.conf:/etc/nginx/conf.d/default.conf:ro" -v "$proxy_cert:/etc/nginx/tls/cert.pem:ro" -v "$proxy_key:/etc/nginx/tls/key.pem:ro" nginx:1.27-alpine >/dev/null
+docker run -d --name "${project}-proxy" --network "${project}_default" --ip "$ALPHA_PROXY_IP" -p 127.0.0.1:3443:443 -v "$PWD/scripts/ci-alpha-proxy.conf:/etc/nginx/conf.d/default.conf:ro" -v "$proxy_cert:/etc/nginx/tls/cert.pem:ro" -v "$proxy_key:/etc/nginx/tls/key.pem:ro" nginx:1.27-alpine >/dev/null
 phase=ready
 ops_id=$(compose ps -a -q ops)
 app_id=$(compose ps --status running -q app)

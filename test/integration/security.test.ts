@@ -33,6 +33,6 @@ describe('production checkpoint security boundary', () => {
     expect(worker.status).toBe(200)
     const source = await worker.text()
     expect(source).toContain('NetworkOnly')
-    expect(source).not.toMatch(/(?:url|revision):"\/(?:pacientes|hijos|api)\//)
+    expect(source).not.toMatch(/url:["']\/?(?:pacientes|hijos|api)(?:\/|["'])/)
   })
 })

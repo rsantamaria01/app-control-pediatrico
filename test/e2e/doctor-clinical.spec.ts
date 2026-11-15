@@ -6,6 +6,7 @@ import { hashPassword } from 'better-auth/crypto'
 import { Pool } from 'pg'
 import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
+import { inspectVisual, inspectCanvas, inspectZoom } from './visual-evidence'
 import manifest from '../../scripts/who-2006-manifest.json' with { type: 'json' }
 import { importWhoRelease, parseWhoWorkbook } from '../../server/services/who-import'
 import type { VerifiedSource } from '../../shared/types/who'
@@ -76,13 +77,32 @@ test.describe('doctor clinical journey with isolated auth and WHO database', () 
     expect(doctorGrowth.status()).toBe(200)
     const doctorCharts = await doctorGrowth.json()
     expect(doctorCharts.charts.WEIGHT_FOR_AGE.curves).toHaveLength(7)
+    expect(doctorCharts.charts.WEIGHT_FOR_AGE.curves.map((curve: { label: string }) => curve.label)).toEqual(['−3', '−2', '−1', '0', '+1', '+2', '+3'])
+    expect(doctorCharts.charts.WEIGHT_FOR_AGE.points).toHaveLength(1)
     await doctorPage.goto(`/pacientes/${patientId}`)
     await expect(doctorPage.getByRole('heading', { name: 'Curvas de crecimiento OMS' })).toBeVisible()
     await expect(doctorPage.getByRole('button', { name: 'Restablecer zoom' })).toBeVisible()
-    await doctorPage.getByRole('button', { name: 'Ver tabla' }).click()
+    await inspectCanvas(doctorPage, 'section[aria-label="Curvas de crecimiento"]')
+    const doctorColors = await doctorPage.locator('section[aria-label="Curvas de crecimiento"] canvas').first().evaluate((element) => {
+      const canvas = element as HTMLCanvasElement
+      const data = canvas.getContext('2d')!.getImageData(0, 0, canvas.width, canvas.height).data
+      let blue = 0
+      let orange = 0
+      for (let i = 0; i < data.length; i += 4) {
+        if (data[i]! < 80 && data[i + 1]! < 140 && data[i + 2]! > 160 && data[i + 3]! > 100) blue++
+        if (data[i]! > 140 && data[i + 1]! < 130 && data[i + 2]! < 120 && data[i + 3]! > 100) orange++
+      }
+      return { blue, orange }
+    })
+    expect(doctorColors.blue, JSON.stringify(doctorColors)).toBeGreaterThan(20)
+    expect(doctorColors.orange, JSON.stringify(doctorColors)).toBeGreaterThan(20)
+    await inspectZoom(doctorPage, 'section[aria-label="Curvas de crecimiento"]')
+    await doctorPage.getByRole('button', { name: 'Ver tabla' }).focus()
+    await doctorPage.keyboard.press('Enter')
     await expect(doctorPage.getByRole('table', { name: 'Mediciones y referencias de crecimiento' })).toBeVisible()
     await doctorPage.getByRole('table', { name: 'Mediciones y referencias de crecimiento' }).locator('tr[tabindex="0"]').first().focus()
     await expect(doctorPage.getByRole('table', { name: 'Mediciones y referencias de crecimiento' }).locator('tr[tabindex="0"]').first()).toBeFocused()
+    await expect(doctorPage.getByRole('table', { name: 'Mediciones y referencias de crecimiento' })).toContainText(/Z [−+]\d+,\d{2} · percentil/)
     const recalculated = await doctorContext.request.post(`/api/pacientes/${patientId}/visitas/${visitId}/recalcular`, { data: { requestId: crypto.randomUUID() } })
     expect(recalculated.status()).toBe(200)
     const recalculatedBody = await recalculated.text()
@@ -381,11 +401,19 @@ test.describe('doctor clinical journey with isolated auth and WHO database', () 
       await page.getByRole('textbox', { name: 'Teléfono / WhatsApp' }).fill(`9${String(Math.floor(Math.random() * 1e8)).padStart(8, '0')}`)
       await page.getByRole('button', { name: 'Verificar representante' }).click()
       await expect(page.getByText('Sin cuenta previa')).toBeVisible()
+      await inspectVisual(page, 'pr15-nuevo', width, 'light')
+      await page.emulateMedia({ colorScheme: 'dark' })
+      await inspectVisual(page, 'pr15-nuevo', width, 'dark')
+      await page.emulateMedia({ colorScheme: 'light' })
       await page.getByRole('textbox', { name: 'Cómo verificó el vínculo' }).fill('Documento verificado presencialmente')
       await expect(page.getByText('Edad gestacional')).toHaveCount(0)
       await expect(page.getByText('Peso al nacer')).toHaveCount(0)
       await page.getByRole('button', { name: 'Crear paciente' }).click()
       await expect(page.getByRole('heading', { name })).toBeVisible()
+      await inspectVisual(page, 'pr15-ficha', width, 'light')
+      await page.emulateMedia({ colorScheme: 'dark' })
+      await inspectVisual(page, 'pr15-ficha', width, 'dark')
+      await page.emulateMedia({ colorScheme: 'light' })
       await expect(page.getByText('Edad gestacional sin registrar')).toBeVisible()
       const patientId = new URL(page.url()).pathname.split('/').at(-1)!
       const denied = await page.request.get(`/api/pacientes/${patientId}`, { headers: { cookie: '' } })
@@ -399,6 +427,13 @@ test.describe('doctor clinical journey with isolated auth and WHO database', () 
       await page.getByLabel('Nota privada').fill('No compartir esta nota')
       await page.getByRole('button', { name: 'Guardar visita' }).click()
       await expect(page.getByRole('table', { name: 'Mediciones' })).toContainText('9,00 kg')
+      await inspectCanvas(page, 'section[aria-label="Curvas de crecimiento"]')
+      await inspectVisual(page, 'task8-medico', width, 'light')
+      await page.emulateMedia({ colorScheme: 'dark', reducedMotion: 'reduce' })
+      await expect(page.locator('html')).toHaveClass(/dark/)
+      await inspectCanvas(page, 'section[aria-label="Curvas de crecimiento"]')
+      await inspectVisual(page, 'task8-medico', width, 'dark')
+      await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'no-preference' })
       await expect(page.getByRole('table', { name: 'Mediciones' })).not.toContainText('No compartir esta nota')
       await expect(page.getByText(/Z [−+]\d+,\d{2} · percentil/).first()).toBeVisible()
       const detail = await page.request.get(`/api/pacientes/${patientId}`)
@@ -430,6 +465,10 @@ test.describe('doctor clinical journey with isolated auth and WHO database', () 
       await page.getByRole('textbox', { name: 'Buscar por nombre o identificación' }).fill(name.toLowerCase())
       await expect(page.getByRole('link', { name: new RegExp(name, 'i') })).toBeVisible()
       await expect(page.getByRole('link', { name: new RegExp(name, 'i') })).toContainText('9,00 kg')
+      await inspectVisual(page, 'pr15-pacientes', width, 'light')
+      await page.emulateMedia({ colorScheme: 'dark' })
+      await inspectVisual(page, 'pr15-pacientes', width, 'dark')
+      await page.emulateMedia({ colorScheme: 'light' })
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true)
     })
   }

@@ -54,7 +54,8 @@ function setZoom(value: number) {
       ref="chart"
       :option="option"
       autoresize
-      class="h-80 w-full"
+      class="w-full"
+      style="height: 320px"
       aria-label="Gráfico de crecimiento; consulte la tabla para los valores"
     />
   </div>

@@ -7,6 +7,7 @@ import { hashPassword } from 'better-auth/crypto'
 import { createServer, type Socket } from 'node:net'
 import { account, guardianGrant, patient, setupToken, user, userRole, visit, visitResult, visitText } from '../../server/db/schema'
 import { eq } from 'drizzle-orm'
+import { inspectVisual, inspectCanvas, inspectZoom } from './visual-evidence'
 
 const url = process.env.TEST_DATABASE_URL
 const enabled = process.env.AUTH_E2E === '1' && process.env.CLINICAL_E2E === '1'
@@ -143,6 +144,10 @@ test.describe('verified guardian invitation and isolated portal', () => {
       await expect(page.getByRole('heading', { name: 'Mis hijos' })).toBeVisible()
       await expect(page.getByText(`${given} Mora`)).toBeVisible()
       await expect(page.getByText('Volver a consulta en febrero')).toBeVisible()
+      await inspectVisual(page, 'pr15-parent-home', width, 'light')
+      await page.emulateMedia({ colorScheme: 'dark' })
+      await inspectVisual(page, 'pr15-parent-home', width, 'dark')
+      await page.emulateMedia({ colorScheme: 'light' })
       expect(await page.locator('main').innerText()).not.toMatch(/PRIVATE_NEVER_SHOW|puntaje Z|percentil/)
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true)
       await page.context().clearCookies()
@@ -238,10 +243,48 @@ test.describe('verified guardian invitation and isolated portal', () => {
       const growth = await page.request.get(`/api/hijos/${ownId}/crecimiento`)
       expect(growth.status()).toBe(200)
       expect(await growth.text()).not.toMatch(/"z"|percentile|classification|DO_NOT_EXPOSE|HIDDEN_ADVICE/)
+      const familyCharts = await growth.json()
+      expect(familyCharts.charts.WEIGHT_FOR_AGE.points).toEqual([{ measuredAt: '2025-01-01T12:00:00.000Z', x: 366, y: 9 }])
+      expect(familyCharts.charts.WEIGHT_FOR_AGE.curves).toHaveLength(7)
+      expect(familyCharts.charts.WEIGHT_FOR_AGE.curves[0]).not.toHaveProperty('label')
+      expect(JSON.stringify(familyCharts)).not.toMatch(/2025-02-01|"y":10|"status"|"z"|percentile|classification/)
+      expect((await page.request.get(`/api/hijos/${otherId}/crecimiento`)).status()).toBe(404)
+      expect(await (await page.request.get(`/hijos/${otherId}/crecimiento`)).text()).not.toContain(`Otra ${otherId.slice(0, 8)}`)
+      expect((await page.request.get(`/api/pacientes/${ownId}/crecimiento`)).status()).toBe(403)
+      await inspectCanvas(page, 'main')
+      const familyColors = await page.locator('main canvas').first().evaluate((element) => {
+        const canvas = element as HTMLCanvasElement
+        const data = canvas.getContext('2d')!.getImageData(0, 0, canvas.width, canvas.height).data
+        let blue = 0
+        let gray = 0
+        for (let i = 0; i < data.length; i += 4) {
+          if (data[i]! < 80 && data[i + 1]! < 140 && data[i + 2]! > 160 && data[i + 3]! > 100) blue++
+          if (Math.abs(data[i]! - data[i + 1]!) < 40 && Math.abs(data[i + 1]! - data[i + 2]!) < 50 && data[i + 3]! > 100) gray++
+        }
+        return { blue, gray }
+      })
+      expect(familyColors.blue, JSON.stringify(familyColors)).toBeGreaterThan(10)
+      expect(familyColors.gray, JSON.stringify(familyColors)).toBeGreaterThan(100)
+      await inspectZoom(page, 'main')
+      await inspectVisual(page, 'task8-parent', width, 'light')
+      await page.emulateMedia({ colorScheme: 'dark', reducedMotion: 'reduce' })
+      await expect(page.locator('html')).toHaveClass(/dark/)
+      await inspectCanvas(page, 'main')
+      await inspectVisual(page, 'task8-parent', width, 'dark')
+      await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'no-preference' })
       await expect(page.getByRole('link', { name: 'Inicio' }).first()).toBeVisible()
-      await page.getByRole('button', { name: 'Ver tabla' }).click()
+      await page.getByRole('button', { name: 'Ver tabla' }).focus()
+      await page.keyboard.press('Enter')
+      await expect(page.getByRole('table', { name: 'Mediciones y referencias de crecimiento' }).first()).toContainText('9')
       expect(await page.locator('main').innerText()).not.toMatch(/percentil|Z [−+0-9]|normal|alterado/)
       await page.getByRole('button', { name: 'Ver gráfico' }).click()
+      const clientData = await page.locator('script#__NUXT_DATA__').textContent()
+      expect(clientData).toBeTruthy()
+      expect(clientData!).not.toMatch(/"(?:percentile|classification|status|z)"|DO_NOT_EXPOSE|HIDDEN_ADVICE/)
+      const ssrGrowth = await page.request.get(`/hijos/${ownId}/crecimiento`)
+      expect(ssrGrowth.headers()['cache-control']).toContain('no-store')
+      expect(await ssrGrowth.text()).not.toMatch(/"(?:percentile|classification|status|z)"|DO_NOT_EXPOSE|HIDDEN_ADVICE|"y":10/)
+      expect(await page.locator('main').innerText()).not.toMatch(/percentil|Z [−+0-9]|normal|alterado/)
       await page.goto(`/hijos/${ownId}`)
       expect(await page.locator('body').innerText()).not.toMatch(/DO_NOT_EXPOSE|Z [−+0-9]/)
       const ownApi = await page.request.get(`/api/hijos/${ownId}`)
@@ -261,6 +304,7 @@ test.describe('verified guardian invitation and isolated portal', () => {
       const ssr = await page.request.get(`/hijos/${otherId}`)
       expect(await ssr.text()).not.toContain('Otra ')
       await db.update(guardianGrant).set({ status: 'REVOKED', revokedAt: new Date() }).where(eq(guardianGrant.patientId, ownId))
+      expect((await page.request.get(`/api/hijos/${ownId}/crecimiento`)).status()).toBe(404)
       expect((await page.request.get(`/api/hijos/${ownId}`)).status()).toBe(404)
       await page.reload()
       await expect(page.getByText('No se pudo consultar esta información')).toBeVisible()

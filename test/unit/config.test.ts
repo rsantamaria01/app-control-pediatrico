@@ -23,6 +23,9 @@ describe('clinical shell configuration', () => {
       expect(nuxtConfig.routeRules[path]?.headers?.['cache-control'], path).toMatch(/no-store/)
     }
     expect(Object.values(nuxtConfig.routeRules).every(rule => rule.prerender === false)).toBe(true)
+    const nitro = { errorHandler: '/nuxt/default/error' }
+    nuxtConfig.hooks['nitro:config'](nitro)
+    expect(nitro.errorHandler).toEqual(['../server/error.ts', '/nuxt/default/error'])
   })
 
   it('keeps navigation requests network-only in the service worker', () => {

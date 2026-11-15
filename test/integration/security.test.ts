@@ -31,6 +31,9 @@ describe('production checkpoint security boundary', () => {
     const injected = await fetch(`${origin}/api/clinical/access-check`, { headers: { 'x-forwarded-for': '198.51.100.17', 'x-forwarded-proto': 'http' } })
     expect(injected.status).toBe(401)
     expect(injected.headers.get('cache-control')).toContain('no-store')
+    const missing = await fetch(`${origin}/api/hijos/00000000-0000-4000-8000-000000000000/ausente`, { headers: { accept: 'application/json' } })
+    expect(missing.status).toBe(404)
+    expect(missing.headers.get('cache-control')).toContain('no-store')
     const peer = process.env.ALPHA_DIRECT_PEER_IP
     const proxy = process.env.ALPHA_PROXY_IP
     const project = process.env.ALPHA_COMPOSE_PROJECT

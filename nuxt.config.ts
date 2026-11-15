@@ -31,6 +31,12 @@ export default defineNuxtConfig({
 
   compatibilityDate: '2026-06-30',
 
+  hooks: {
+    'nitro:config'(config) {
+      config.errorHandler = ['../server/error.ts', ...config.errorHandler ? Array.isArray(config.errorHandler) ? config.errorHandler : [config.errorHandler] : []]
+    }
+  },
+
   eslint: {
     config: {
       stylistic: {

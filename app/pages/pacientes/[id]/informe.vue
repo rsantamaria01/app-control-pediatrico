@@ -102,6 +102,11 @@ async function approve() {
           <p role="status">
             {{ approved ? 'Informe aprobado' : 'Vista previa pendiente de aprobación' }}
           </p>
+          <iframe
+            :src="`${url}/${encodeURIComponent(draft.id)}/vista-previa`"
+            title="Vista previa del PDF familiar"
+            class="h-[70vh] min-h-[480px] w-full rounded-lg border border-default"
+          />
           <div class="rounded-lg border border-default p-4 space-y-3">
             <h3 class="font-medium">
               {{ draft.content.name }}

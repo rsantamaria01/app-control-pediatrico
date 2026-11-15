@@ -233,6 +233,7 @@ export const familyReport = pgTable('family_report', {
   id: text('id').primaryKey(),
   patientId: text('patient_id').notNull().references(() => patient.id, { onDelete: 'restrict' }),
   content: jsonb('content').notNull(),
+  pdfBase64: text('pdf_base64'),
   version: integer('version').notNull(),
   createdBy: text('created_by').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

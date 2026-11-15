@@ -4,6 +4,13 @@ import { drizzle } from 'drizzle-orm/node-postgres'
 import { migrate } from 'drizzle-orm/node-postgres/migrator'
 import { Pool } from 'pg'
 import { eq } from 'drizzle-orm'
+import { readFile } from 'node:fs/promises'
+import { resolve } from 'node:path'
+import manifest from '../../scripts/who-2006-manifest.json'
+import { WhoIndicator } from '../../shared/utils/enums'
+import type { Gender } from '../../shared/utils/enums'
+import { importWhoRelease, parseWhoWorkbook } from '../../server/services/who-import'
+import type { VerifiedSource } from '../../shared/types/who'
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
 import { familyReport, guardianGrant, patient, user, visit, visitSharing, visitText } from '../../server/db/schema'
 import type { Actor } from '../../shared/types/access'
@@ -59,6 +66,25 @@ async function seedVisit(shared: boolean, note: string, advice: string) {
   return id
 }
 
+async function importRelease() {
+  const entries = await Promise.all(manifest.files.map(async (file) => {
+    const bytes = await readFile(resolve('/tmp/opencode/who-2006', `${file.name}-expanded.xlsx`))
+    const indicator = file.indicator as WhoIndicator
+    const isLength = indicator === WhoIndicator.WEIGHT_FOR_LENGTH
+    const isHeight = indicator === WhoIndicator.WEIGHT_FOR_HEIGHT
+    const source: VerifiedSource = {
+      publisher: 'WHO', standard: 'WHO_2006', version: manifest.version,
+      publicationDate: file.publicationDate, retrievedAt: manifest.retrievedAt,
+      url: file.url, sha256: file.sha256, bytes, indicator, sex: file.sex as Gender,
+      position: isLength ? 'RECUMBENT' : isHeight ? 'STANDING' : null,
+      xUnit: isLength || isHeight ? 'CM' : 'DAY', minX: isLength ? 45 : isHeight ? 65 : 0,
+      maxX: isLength ? 110 : isHeight ? 120 : 1856, step: isLength || isHeight ? 0.1 : 1
+    }
+    return { source, rows: await parseWhoWorkbook(source, bytes) }
+  }))
+  await importWhoRelease(entries)
+}
+
 async function pdfText(bytes: Buffer) {
   const task = getDocument({ data: new Uint8Array(bytes), useSystemFonts: true })
   const pdf = await task.promise
@@ -101,6 +127,81 @@ describe('approved report boundary', () => {
     await db.update(visitSharing).set({ shared: true }).where(eq(visitSharing.visitId, sharedId))
     await db.update(guardianGrant).set({ status: 'REVOKED' }).where(eq(guardianGrant.patientId, childId))
     await expect(getApprovedReport(guardian, childId, approved.id)).rejects.toMatchObject({ statusCode: 404 })
+  })
+
+  it('doctor previews identical frozen PDF bytes before approval, despite later branding changes', async () => {
+    const { previewFamilyReport, approveFamilyReport, getDoctorPreviewPdf, renderFamilyReport } = await import('../../server/services/reports')
+    await db.update(guardianGrant).set({ status: 'ACTIVE' }).where(eq(guardianGrant.patientId, childId))
+    await seedVisit(true, 'PRIVATE_PREVIEW', 'Recomendación visible antes de aprobar')
+    const draft = await previewFamilyReport(doctor, childId)
+    const before = await getDoctorPreviewPdf(doctor, childId, draft.id)
+    expect(before.subarray(0, 4).toString()).toBe('%PDF')
+    expect((await pdfText(before)).join(' ')).toContain('Recomendación visible antes de aprobar')
+    expect((await pdfText(before)).join(' ')).toContain('Nacimiento: 1 ene 2024')
+    expect((await pdfText(before)).join(' ')).not.toContain('PRIVATE_PREVIEW')
+    await expect(db.update(familyReport).set({ pdfBase64: 'ALTERED' }).where(eq(familyReport.id, draft.id))).rejects.toBeDefined()
+    await expect(renderFamilyReport(guardian, childId, draft.id)).rejects.toMatchObject({ statusCode: 404 })
+    const priorBrand = process.env.NUXT_PUBLIC_CLINIC_PRIMARY
+    try {
+      process.env.NUXT_PUBLIC_CLINIC_PRIMARY = 'violet'
+      const approved = await approveFamilyReport(doctor, draft.id)
+      process.env.NUXT_PUBLIC_CLINIC_PRIMARY = 'rose'
+      expect(await renderFamilyReport(guardian, childId, approved.id)).toEqual(before)
+      expect(await getDoctorPreviewPdf(doctor, childId, draft.id)).toEqual(before)
+      const laterVisit = await seedVisit(true, 'PRIVATE_AFTER', 'Otra indicación posterior')
+      expect(await renderFamilyReport(guardian, childId, approved.id)).toEqual(before)
+      await db.insert(visitSharing).values({ visitId: laterVisit, shared: false, changedBy: doctor.id })
+      expect(await renderFamilyReport(guardian, childId, approved.id)).toEqual(before)
+      await expect(db.update(familyReport).set({ pdfBase64: 'ALTERED' }).where(eq(familyReport.id, draft.id))).rejects.toBeDefined()
+    } finally {
+      if (priorBrand === undefined) delete process.env.NUXT_PUBLIC_CLINIC_PRIMARY
+      else process.env.NUXT_PUBLIC_CLINIC_PRIMARY = priorBrand
+    }
+  })
+
+  it('uses immutable visit age and position provenance for every shared point after patient background changes', async () => {
+    const { previewFamilyReport } = await import('../../server/services/reports')
+    await importRelease()
+    const historicalId = randomUUID()
+    const birthday = '2024-01-01'
+    await db.insert(patient).values({ id: historicalId, name: 'Niña prematura', birthDate: birthday, sex: 'FEMALE', gestationDays: 252, correctionUntilMonths: 24, createdBy: doctor.id })
+    const early = randomUUID()
+    const later = randomUUID()
+    await db.insert(visit).values([
+      { id: early, patientId: historicalId, requestId: randomUUID(), requestDigest: 'fixture', measuredAt: new Date('2025-01-01T12:00:00Z'), weightKg: '9', lengthHeightCm: '75', position: 'RECUMBENT', headCircumferenceCm: '45', bmi: '16', gestationDaysAtBirth: 252, birthDateAtVisit: birthday, sexAtVisit: 'FEMALE', correctionUntilMonths: 24, authorId: doctor.id },
+      { id: later, patientId: historicalId, requestId: randomUUID(), requestDigest: 'fixture', measuredAt: new Date('2026-01-02T12:00:00Z'), weightKg: '12', lengthHeightCm: '88', position: 'STANDING', headCircumferenceCm: '48', bmi: '15', gestationDaysAtBirth: 252, birthDateAtVisit: birthday, sexAtVisit: 'FEMALE', correctionUntilMonths: 24, authorId: doctor.id }
+    ])
+    await db.update(patient).set({ gestationDays: 280, birthDate: '2024-02-01' }).where(eq(patient.id, historicalId))
+    const sameTime = randomUUID()
+    await db.insert(visit).values({ id: sameTime, patientId: historicalId, requestId: randomUUID(), requestDigest: 'fixture', measuredAt: new Date('2026-01-02T12:00:00Z'), weightKg: '12.5', lengthHeightCm: '89', position: 'RECUMBENT', headCircumferenceCm: '48', bmi: '15', gestationDaysAtBirth: 252, birthDateAtVisit: birthday, sexAtVisit: 'FEMALE', correctionUntilMonths: 24, authorId: doctor.id })
+    const report = await previewFamilyReport(doctor, historicalId)
+    const lengthPanels = report.content.charts.HEIGHT_FOR_AGE
+    expect(lengthPanels).toHaveLength(2)
+    expect(lengthPanels?.flatMap(panel => panel.points.map(point => point.x))).toContain(338)
+    expect(lengthPanels?.flatMap(panel => panel.points.map(point => point.x))).toContain(732)
+    expect(lengthPanels?.flatMap(panel => panel.points.map(point => point.y))).toContain(75)
+    expect(lengthPanels?.flatMap(panel => panel.points.map(point => point.y))).toContain(88)
+    const pages = await pdfText(await (await import('../../server/services/reports')).getDoctorPreviewPdf(doctor, historicalId, report.id))
+    expect(pages.join(' ')).toContain('Longitud acostada')
+    expect(pages.join(' ')).toContain('Talla de pie')
+    expect(pages.join(' ')).toMatch(/Edad de referencia|edad de referencia/)
+    expect(pages.join(' ')).not.toMatch(/−3|\+3|Puntuación Z|percentil/i)
+  }, 120000)
+
+  it('doctor curves identify all seven reference lines while family curves expose only neutral scaled axes', async () => {
+    const { renderDoctorReport, previewFamilyReport, getDoctorPreviewPdf } = await import('../../server/services/reports')
+    await importRelease()
+    const clinicalPatient = randomUUID()
+    await db.insert(patient).values({ id: clinicalPatient, name: 'Niña de curvas', birthDate: '2024-01-01', sex: 'FEMALE', createdBy: doctor.id })
+    const { createVisit } = await import('../../server/services/visits')
+    await createVisit(doctor, clinicalPatient, { requestId: randomUUID(), measuredAt: '2025-01-01T12:00:00Z', weightKg: 9, lengthHeightCm: 75, position: 'RECUMBENT', headCircumferenceCm: 45 })
+    const clinical = await pdfText(await renderDoctorReport(doctor, clinicalPatient, false))
+    const draft = await previewFamilyReport(doctor, clinicalPatient)
+    expect(draft.content.charts.HEIGHT_FOR_AGE).toHaveLength(1)
+    const family = await pdfText(await getDoctorPreviewPdf(doctor, clinicalPatient, draft.id))
+    expect(clinical.join(' ')).toMatch(/−3.*−2.*−1.*0.*\+1.*\+2.*\+3/s)
+    expect(family.join(' ')).toMatch(/Edad de referencia.*días/s)
+    expect(family.join(' ')).not.toMatch(/−3|\+3|percentil|Puntuación Z/i)
   })
 
   it('paginates long shared advice without dropping its end or adding private data', async () => {

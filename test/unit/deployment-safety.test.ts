@@ -86,6 +86,14 @@ describe('deployment safety', () => {
     }
   })
 
+  it('ignores forged direct-peer IP headers at the Nitro request boundary', async () => {
+    const { applyAuthPeerAddress } = await import('../../server/services/auth-peer')
+    const request = { node: { req: { socket: { remoteAddress: '172.20.4.253' }, headers: { 'x-forwarded-for': '198.51.100.17', 'x-real-ip': '203.0.113.77' } } } }
+    expect(applyAuthPeerAddress(request)).toBe('172.20.4.253')
+    expect(request.node.req.headers['x-real-ip']).toBe('172.20.4.253')
+    expect(request.node.req.headers['x-forwarded-for']).toBe('198.51.100.17')
+  })
+
   it('does not trust an entire container bridge for the alpha reverse proxy', () => {
     const script = readFileSync(new URL('../../scripts/ci-alpha-compose.sh', import.meta.url), 'utf8')
     expect(script).not.toContain('AUTH_TRUSTED_PROXY_CIDR=172.16.0.0/12')

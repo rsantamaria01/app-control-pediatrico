@@ -41,3 +41,51 @@ jobs:
 
       - name: Verify production ops and Compose startup
         run: sh scripts/ci-ops-smoke.sh
+
+  docker-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: pediatrico
+          POSTGRES_PASSWORD: disposable-ci-only
+          POSTGRES_DB: pediatrico_auth_slice2_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U pediatrico -d pediatrico_auth_slice2_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      TEST_DATABASE_URL: postgres://pediatrico:disposable-ci-only@127.0.0.1:5432/pediatrico_auth_slice2_test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Install node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Download and verify official WHO originals
+        run: |
+          docker info > /dev/null
+          node --experimental-strip-types scripts/import-who.ts download
+          jq -r '.files[] | "\(.sha256)  /tmp/opencode/who-2006/\(.name)-expanded.xlsx"' scripts/who-2006-manifest.json | sha256sum --check --status
+
+      - name: Run all four Docker production ops cases
+        run: |
+          pnpm exec vitest run --config vitest.integration.config.ts test/integration/production-ops.test.ts --reporter=json --outputFile=/tmp/opencode/production-ops-results.json
+          jq -e '(.numPassedTests == 4) and (.numPendingTests == 0) and (.numFailedTests == 0)' /tmp/opencode/production-ops-results.json > /dev/null

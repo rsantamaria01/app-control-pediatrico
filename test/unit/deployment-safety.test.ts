@@ -15,7 +15,7 @@ describe('deployment safety', () => {
       expect(section).not.toContain('postgres://pediatrico:${DB_PASSWORD')
       expect(section).toContain('DB_PASSWORD:')
       expect(section).toContain('DB_HOST: db')
-      expect(section).toContain('DB_NAME: pediatrico')
+      expect(section).toContain('DB_NAME: ${DB_NAME:-pediatrico}')
     }
     const result = spawnSync('node', ['scripts/database-env.mjs', 'node', '-e', 'process.stdout.write(JSON.stringify({url:process.env.DATABASE_URL,raw:process.env.DB_PASSWORD}))'], {
       cwd: root, env: { ...process.env, DB_PASSWORD: password }, encoding: 'utf8'
@@ -27,6 +27,14 @@ describe('deployment safety', () => {
     expect(child.url).not.toContain(password)
     expect(child.url).toContain('part%3A%40%2F%3F%23%25%20with%20space')
     expect(new URL(child.url).password).toBe('part%3A%40%2F%3F%23%25%20with%20space')
+  })
+
+  it('forwards configured public HTTPS origin and secrets explicitly to the production image', () => {
+    const app = compose.split('\n  app:\n')[1]?.split('\n  ops:\n')[0]
+    expect(app).toContain('NUXT_APP_SECRET: ${NUXT_APP_SECRET:?')
+    expect(app).toContain('RECOVERY_QUEUE_SECRET: ${RECOVERY_QUEUE_SECRET:?')
+    expect(app).toContain('NUXT_PUBLIC_SITE_URL: ${NUXT_PUBLIC_SITE_URL:?')
+    expect(app).toContain('AUTH_TRUSTED_PROXY_CIDR: ${AUTH_TRUSTED_PROXY_CIDR:-}')
   })
 
   it('stops the worker before streaming the backup and requires a RustFS snapshot before migrating', () => {

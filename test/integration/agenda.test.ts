@@ -61,6 +61,22 @@ describe('agenda on disposable database', () => {
     expect((await getAvailability(doctor, { from: date, to: date })).every(slot => !slot.free)).toBe(true)
   })
 
+  it('rolls back availability changes when audit storage fails', async () => {
+    const baseline = { days: [{ weekday: 1, open: '09:00', close: '10:00' }], durationMinutes: 30, blocked: [] }
+    await saveAvailability(doctor, baseline)
+    await pool.query(`CREATE FUNCTION reject_hours_audit() RETURNS trigger AS $$ BEGIN IF NEW.action = 'AVAILABILITY_UPDATE' THEN RAISE EXCEPTION 'audit unavailable'; END IF; RETURN NEW; END; $$ LANGUAGE plpgsql`)
+    await pool.query('CREATE TRIGGER reject_hours_audit BEFORE INSERT ON audit_event FOR EACH ROW EXECUTE FUNCTION reject_hours_audit()')
+    try {
+      await expect(saveAvailability(assistant, { days: [{ weekday: 1, open: '12:00', close: '14:00' }], durationMinutes: 60, blocked: [{ date, from: '12:00', to: '13:00' }] })).rejects.toThrow()
+      expect((await getAvailability(doctor, { from: date, to: date })).map(slot => slot.time)).toEqual(['09:00', '09:30'])
+      const { getAvailabilitySettings } = await import('../../server/services/availability')
+      expect(await getAvailabilitySettings(doctor)).toEqual(baseline)
+    } finally {
+      await pool.query('DROP TRIGGER reject_hours_audit ON audit_event')
+      await pool.query('DROP FUNCTION reject_hours_audit()')
+    }
+  })
+
   it('reserves atomically and never exposes clinical identity or links to assistant', async () => {
     await saveAvailability(doctor, { days: [{ weekday: 1, open: '09:00', close: '11:00' }], durationMinutes: 30, blocked: [] })
     const results = await Promise.allSettled([scheduleAppointment(doctor, input), scheduleAppointment(assistant, { date, time: '09:00', name: 'Otra persona', contact: input.contact })])
@@ -94,6 +110,28 @@ describe('agenda on disposable database', () => {
     await expect(scheduleAppointment(doctor, { date, time: '10:00', name: 'Doctor sin motivo', contact: '0998765432' })).rejects.toThrow()
   })
 
+  it('books and reschedules with a saturated one-connection pool without waiting for another connection', async () => {
+    const { useDb } = await import('../../server/utils/db')
+    const dbPool = useDb().$client
+    const priorMax = dbPool.options.max
+    dbPool.options.max = 1
+    const bookingDate = '2027-01-11'
+    try {
+      await saveAvailability(doctor, { days: [{ weekday: 1, open: '09:00', close: '11:00' }], durationMinutes: 30, blocked: [] })
+      const booked = await Promise.race([
+        scheduleAppointment(doctor, { ...input, date: bookingDate, time: '09:00' }),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('booking needs a second pool connection')), 1500))
+      ])
+      const moved = await Promise.race([
+        rescheduleAppointment(doctor, booked.id, { date: bookingDate, time: '09:30' }),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('rescheduling needs a second pool connection')), 1500))
+      ])
+      expect(moved.time).toBe('09:30')
+    } finally {
+      dbPool.options.max = priorMax
+    }
+  })
+
   it('rolls back a new appointment when its audit insert fails', async () => {
     await saveAvailability(doctor, { days: [{ weekday: 1, open: '09:00', close: '11:00' }], durationMinutes: 30, blocked: [] })
     await pool.query(`CREATE FUNCTION reject_appointment_audit() RETURNS trigger AS $$ BEGIN IF NEW.action = 'APPOINTMENT_CREATE' THEN RAISE EXCEPTION 'audit unavailable'; END IF; RETURN NEW; END; $$ LANGUAGE plpgsql`)
@@ -121,6 +159,47 @@ describe('agenda on disposable database', () => {
       await pool.query('DROP TRIGGER reject_appointment_changes ON audit_event')
       await pool.query('DROP FUNCTION reject_appointment_changes()')
     }
+  })
+
+  it('confirms a pending appointment once and records only committed transitions', async () => {
+    const { confirmAppointment, attendAppointment } = await import('../../server/services/appointments')
+    await saveAvailability(doctor, { days: [{ weekday: 1, open: '09:00', close: '11:00' }], durationMinutes: 30, blocked: [] })
+    const pending = await scheduleAppointment(assistant, { date: '2027-01-18', time: '09:00', name: 'Pendiente', contact: input.contact, status: 'PENDING' })
+    const results = await Promise.allSettled([confirmAppointment(doctor, pending.id), confirmAppointment(assistant, pending.id)])
+    expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(1)
+    expect(results.filter(result => result.status === 'rejected')).toHaveLength(1)
+    expect((await getAppointment(assistant, pending.id)).status).toBe('CONFIRMED')
+    await expect(confirmAppointment(doctor, pending.id)).rejects.toMatchObject({ statusCode: 409 })
+    expect((await db.select().from(auditEvent).where(eq(auditEvent.subjectId, pending.id))).filter(row => row.action === 'APPOINTMENT_CONFIRM')).toHaveLength(1)
+    expect((await attendAppointment(assistant, pending.id)).status).toBe('ATTENDED')
+    await expect(confirmAppointment(doctor, pending.id)).rejects.toMatchObject({ statusCode: 409 })
+  })
+
+  it('cannot confirm an appointment when its audit fails', async () => {
+    const { confirmAppointment } = await import('../../server/services/appointments')
+    await saveAvailability(doctor, { days: [{ weekday: 1, open: '09:00', close: '11:00' }], durationMinutes: 30, blocked: [] })
+    const pending = await scheduleAppointment(assistant, { date: '2027-01-25', time: '09:00', name: 'Pendiente auditable', contact: input.contact, status: 'PENDING' })
+    await pool.query(`CREATE FUNCTION reject_confirmation_audit() RETURNS trigger AS $$ BEGIN IF NEW.action = 'APPOINTMENT_CONFIRM' THEN RAISE EXCEPTION 'audit unavailable'; END IF; RETURN NEW; END; $$ LANGUAGE plpgsql`)
+    await pool.query('CREATE TRIGGER reject_confirmation_audit BEFORE INSERT ON audit_event FOR EACH ROW EXECUTE FUNCTION reject_confirmation_audit()')
+    try {
+      await expect(confirmAppointment(doctor, pending.id)).rejects.toThrow()
+      expect((await getAppointment(doctor, pending.id)).status).toBe('PENDING')
+    } finally {
+      await pool.query('DROP TRIGGER reject_confirmation_audit ON audit_event')
+      await pool.query('DROP FUNCTION reject_confirmation_audit()')
+    }
+    await cancelAppointment(assistant, pending.id)
+    await expect(confirmAppointment(doctor, pending.id)).rejects.toMatchObject({ statusCode: 409 })
+  })
+
+  it('does not attend a pending appointment before staff confirms it', async () => {
+    const { attendAppointment, confirmAppointment } = await import('../../server/services/appointments')
+    await saveAvailability(doctor, { days: [{ weekday: 1, open: '09:00', close: '11:00' }], durationMinutes: 30, blocked: [] })
+    const pending = await scheduleAppointment(assistant, { date: '2027-02-01', time: '09:00', name: 'Por confirmar', contact: input.contact, status: 'PENDING' })
+    await expect(attendAppointment(assistant, pending.id)).rejects.toMatchObject({ statusCode: 409 })
+    expect((await getAppointment(doctor, pending.id)).status).toBe('PENDING')
+    await confirmAppointment(assistant, pending.id)
+    expect((await attendAppointment(doctor, pending.id)).status).toBe('ATTENDED')
   })
 
   it('rolls back attendance on an audit failure and never attends a cancelled appointment', async () => {

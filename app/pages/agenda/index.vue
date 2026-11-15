@@ -37,8 +37,11 @@ const days = computed(() => {
 })
 function step(direction: number) {
   const date = new Date(`${selected.value}T12:00:00Z`)
-  if (vista.value === 'mes') date.setUTCMonth(date.getUTCMonth() + direction)
-  else date.setUTCDate(date.getUTCDate() + direction * (vista.value === 'semana' ? 7 : 1))
+  if (vista.value === 'mes') {
+    const target = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + direction + 1, 0, 12))
+    target.setUTCDate(Math.min(date.getUTCDate(), target.getUTCDate()))
+    date.setTime(target.getTime())
+  } else date.setUTCDate(date.getUTCDate() + direction * (vista.value === 'semana' ? 7 : 1))
   selected.value = date.toISOString().slice(0, 10)
 }
 async function save() {
@@ -62,6 +65,17 @@ async function move() {
     await refreshSlots()
   } catch {
     message.value = 'No se pudo reprogramar la cita. Seleccione otra hora libre.'
+  }
+}
+async function changeStatus(action: 'confirmar' | 'atender') {
+  if (!detail.value) return
+  message.value = ''
+  try {
+    await $fetch(`/api/agenda/${detail.value.id}/${action}`, { method: 'POST' })
+    detail.value = null
+    await refresh()
+  } catch {
+    message.value = 'No se pudo actualizar el estado de la cita. Recargue la agenda y vuelva a intentarlo.'
   }
 }
 async function cancel() {
@@ -309,12 +323,29 @@ function openDetail(item: Appointment) {
           >
             Abrir ficha
           </UButton>
+          <UAlert
+            v-if="message"
+            color="error"
+            :title="message"
+          />
+          <div
+            v-if="detail.status === 'PENDING' || detail.status === 'CONFIRMED'"
+            class="flex flex-wrap gap-2"
+          >
+            <UButton
+              v-if="detail.status === 'PENDING'"
+              @click="changeStatus('confirmar')"
+            >
+              Confirmar cita
+            </UButton>
+            <UButton
+              v-if="detail.status === 'CONFIRMED'"
+              @click="changeStatus('atender')"
+            >
+              Marcar atendida
+            </UButton>
+          </div>
           <template v-if="detail.status !== 'CANCELLED' && detail.status !== 'ATTENDED'">
-            <UAlert
-              v-if="message"
-              color="error"
-              :title="message"
-            />
             <UFormField label="Reprogramar · día">
               <input
                 v-model="form.date"

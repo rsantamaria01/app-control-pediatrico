@@ -23,8 +23,8 @@ async function project(row: Row, actor: Actor): Promise<Appointment> {
   return projection(row, actor, person ? { birthDate: person.birthDate, weightKg: last?.weightKg ?? null } : undefined)
 }
 
-async function reserve(actor: Actor, date: string, time: string, existingId?: string): Promise<{ startsAt: Date, endsAt: Date }> {
-  const slots = await availableSlots({ from: date, to: date }, existingId)
+async function reserve(tx: Parameters<Parameters<ReturnType<typeof useDb>['transaction']>[0]>[0], date: string, time: string, existingId?: string): Promise<{ startsAt: Date, endsAt: Date }> {
+  const slots = await availableSlots({ from: date, to: date }, existingId, tx)
   const slot = slots.find(item => item.time === time && item.free)
   if (!slot || instant(date, time) < new Date()) throw createError({ statusCode: 409, statusMessage: 'Horario no disponible' })
   return { startsAt: instant(date, time), endsAt: new Date(instant(date, time).getTime() + slot.durationMinutes * 60000) }
@@ -40,7 +40,7 @@ export async function scheduleAppointment(actor: Actor, input: AppointmentInput)
     await tx.execute('SELECT pg_advisory_xact_lock(1130011)')
     const patientId = 'patientId' in values && typeof values.patientId === 'string' ? values.patientId : undefined
     if (patientId && !(await tx.select({ id: patient.id }).from(patient).where(eq(patient.id, patientId)))[0]) throw createError({ statusCode: 404, statusMessage: 'Patient not found' })
-    const interval = await reserve(actor, values.date, values.time)
+    const interval = await reserve(tx, values.date, values.time)
     const [inserted] = await tx.insert(appointment).values({ id: randomUUID(), ...interval, patientId, name: values.name, contact: values.contact, reason: 'reason' in values && typeof values.reason === 'string' ? values.reason : '', timeZone: zone, status: values.status, createdBy: actor.id }).returning()
     await tx.insert(auditEvent).values(audit('APPOINTMENT_CREATE', actor, inserted!.id))
     return inserted!
@@ -70,7 +70,7 @@ export async function rescheduleAppointment(actor: Actor, id: string, input: { d
     const [current] = await tx.select().from(appointment).where(eq(appointment.id, id))
     if (!current) throw createError({ statusCode: 404, statusMessage: 'Cita no encontrada' })
     if (current.status === 'CANCELLED' || current.status === 'ATTENDED') throw createError({ statusCode: 409, statusMessage: 'Cita cerrada' })
-    const interval = await reserve(actor, values.date, values.time, id)
+    const interval = await reserve(tx, values.date, values.time, id)
     const [updated] = await tx.update(appointment).set(interval).where(eq(appointment.id, id)).returning()
     await tx.insert(auditEvent).values(audit('APPOINTMENT_RESCHEDULE', actor, id))
     return updated!
@@ -92,12 +92,25 @@ export async function cancelAppointment(actor: Actor, id: string): Promise<Appoi
   return project(row, actor)
 }
 
+export async function confirmAppointment(actor: Actor, id: string): Promise<Appointment> {
+  await requireSchedule(actor)
+  const row = await useDb().transaction(async (tx) => {
+    await tx.execute('SELECT pg_advisory_xact_lock(1130011)')
+    const [current] = await tx.select().from(appointment).where(eq(appointment.id, id))
+    if (!current || current.status !== 'PENDING') throw createError({ statusCode: 409, statusMessage: 'Cita no disponible' })
+    const [updated] = await tx.update(appointment).set({ status: 'CONFIRMED' }).where(eq(appointment.id, id)).returning()
+    await tx.insert(auditEvent).values(audit('APPOINTMENT_CONFIRM', actor, id))
+    return updated!
+  })
+  return project(row, actor)
+}
+
 export async function attendAppointment(actor: Actor, id: string): Promise<Appointment> {
   await requireSchedule(actor)
   const row = await useDb().transaction(async (tx) => {
     await tx.execute('SELECT pg_advisory_xact_lock(1130011)')
     const [current] = await tx.select().from(appointment).where(eq(appointment.id, id))
-    if (!current || current.status === 'CANCELLED' || current.status === 'ATTENDED') throw createError({ statusCode: 409, statusMessage: 'Cita no disponible' })
+    if (!current || current.status !== 'CONFIRMED') throw createError({ statusCode: 409, statusMessage: 'Cita no disponible' })
     const [updated] = await tx.update(appointment).set({ status: 'ATTENDED' }).where(eq(appointment.id, id)).returning()
     await tx.insert(auditEvent).values(audit('APPOINTMENT_ATTEND', actor, id))
     return updated!

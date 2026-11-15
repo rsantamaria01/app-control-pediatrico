@@ -3,7 +3,7 @@ import { gte, lte, and, ne } from 'drizzle-orm'
 import { createError } from 'nuxt/server'
 import type { Actor } from '../../shared/types/access'
 import { availabilitySchema, dateRangeSchema, type AvailabilityInput, type DateRange, type Slot } from '../../shared/types/scheduling'
-import { appointment, blockedHour, clinicSchedule, openingHour } from '../db/schema'
+import { appointment, auditEvent, blockedHour, clinicSchedule, openingHour } from '../db/schema'
 import { useDb } from '../utils/db'
 import { recordAudit } from './audit'
 
@@ -38,18 +38,17 @@ export async function saveAvailability(actor: Actor, input: AvailabilityInput): 
     if (values.days.length) await tx.insert(openingHour).values(values.days)
     await tx.delete(blockedHour)
     if (values.blocked.length) await tx.insert(blockedHour).values(values.blocked.map(block => ({ id: randomUUID(), ...block })))
+    await tx.insert(auditEvent).values({ id: randomUUID(), action: 'AVAILABILITY_UPDATE', outcome: 'ALLOWED', actorId: actor.id })
   })
-  await recordAudit('AVAILABILITY_UPDATE', 'ALLOWED', actor.id)
   return values
 }
 
-export async function availableSlots(range: DateRange, excluding?: string): Promise<Slot[]> {
+export async function availableSlots(range: DateRange, excluding?: string, db: Pick<ReturnType<typeof useDb>, 'select'> = useDb()): Promise<Slot[]> {
   const values = dateRangeSchema.parse(range)
-  const db = useDb()
-  const [settings, days, blocks, reservations] = await Promise.all([
-    db.select().from(clinicSchedule), db.select().from(openingHour), db.select().from(blockedHour).where(and(gte(blockedHour.date, values.from), lte(blockedHour.date, values.to))),
-    db.select({ startsAt: appointment.startsAt, endsAt: appointment.endsAt }).from(appointment).where(and(gte(appointment.startsAt, instant(values.from, '00:00')), lte(appointment.startsAt, instant(values.to, '23:59')), ne(appointment.status, 'CANCELLED'), ...(excluding ? [ne(appointment.id, excluding)] : [])))
-  ])
+  const settings = await db.select().from(clinicSchedule)
+  const days = await db.select().from(openingHour)
+  const blocks = await db.select().from(blockedHour).where(and(gte(blockedHour.date, values.from), lte(blockedHour.date, values.to)))
+  const reservations = await db.select({ startsAt: appointment.startsAt, endsAt: appointment.endsAt }).from(appointment).where(and(gte(appointment.startsAt, instant(values.from, '00:00')), lte(appointment.startsAt, instant(values.to, '23:59')), ne(appointment.status, 'CANCELLED'), ...(excluding ? [ne(appointment.id, excluding)] : [])))
   const durationMinutes = settings[0]?.durationMinutes ?? 30
   const slots: Slot[] = []
   for (let day = Date.parse(`${values.from}T00:00:00Z`); day <= Date.parse(`${values.to}T00:00:00Z`); day += 86400000) {

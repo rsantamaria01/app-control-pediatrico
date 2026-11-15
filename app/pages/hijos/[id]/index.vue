@@ -28,6 +28,13 @@ const size = new Intl.NumberFormat('es-EC', { minimumFractionDigits: 1, maximumF
       <h1 class="text-2xl font-semibold">
         Indicaciones de {{ child.name }}
       </h1>
+      <UButton
+        :to="`/hijos/${id}/crecimiento`"
+        variant="outline"
+        class="min-h-11"
+      >
+        Crecimiento
+      </UButton>
       <UEmpty
         v-if="!child.visits.length"
         title="Aún no hay controles compartidos"

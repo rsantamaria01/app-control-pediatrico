@@ -509,6 +509,22 @@ describe('verified guardian isolation', () => {
     expect((await db.select().from(auditEvent).where(and(eq(auditEvent.actorId, otherId), eq(auditEvent.action, 'PORTAL_READ')))).some(row => row.outcome === 'DENIED')).toBe(true)
   })
 
+  it('serves family growth only for ACTIVE linked child and doctor-shared visits, without clinical snapshots', async () => {
+    const { getFamilyGrowth } = await import('../../server/services/growth-charts')
+    const [grant] = await db.select().from(guardianGrant).where(eq(guardianGrant.patientId, first))
+    const guardian: Actor = { id: grant!.guardianId, roles: ['PATIENT'] }
+    const own = await getFamilyGrowth(guardian, first)
+    expect(own.charts).toEqual({})
+    expect(own.name).toBe('Niña A')
+    expect(JSON.stringify(own)).not.toMatch(/"z"|percentile|classification|status|privateNote|clinicianTrend|authorId/)
+    await expect(getFamilyGrowth(guardian, second)).rejects.toThrow()
+    await expect(getFamilyGrowth(assistant, first)).rejects.toThrow()
+    await expect(getFamilyGrowth(adminActor, first)).rejects.toThrow()
+    const hidden = await seedVisit(first, false)
+    const after = await getFamilyGrowth(guardian, first)
+    expect(JSON.stringify(after)).not.toContain(hidden)
+  })
+
   it('leaves failed delivery pending, retries independently and revokes a relationship immediately', async () => {
     const { grantGuardian, revokeGuardian, getShareableChild } = await import('../../server/services/invitations')
     failDelivery = true

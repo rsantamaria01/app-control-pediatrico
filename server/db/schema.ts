@@ -138,6 +138,7 @@ export const patientContactIntake = pgTable('patient_contact_intake', {
   proof: text('proof').notNull(),
   invite: boolean('invite').notNull(),
   status: text('status').notNull().default('LINK_FAILED'),
+  guardianId: text('guardian_id').references(() => user.id, { onDelete: 'restrict' }),
   createdBy: text('created_by').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
 }, table => [index('patient_contact_intake_patient_idx').on(table.patientId, table.status), check('patient_contact_intake_status_ck', sql`${table.status} IN ('LINK_FAILED', 'LINKED')`)])

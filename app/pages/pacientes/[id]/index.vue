@@ -45,7 +45,7 @@ async function retryContact(contact: { id: string, name: string, relationship: s
     return
   }
   try {
-    const result = await $fetch<{ status: string }>(`/api/pacientes/${encodeURIComponent(id)}/contactos-pendientes/${encodeURIComponent(contact.id)}`, { method: 'POST', body: { ...(contactMatches[contact.id] ? { confirmedGuardianId: contactMatches[contact.id]!.id } : {}), ...(changed ? { name: edit.name, relationship: edit.relationship, phone: edit.phone, ...(edit.email ? { email: edit.email } : {}), proof: edit.proof } : {}) } })
+    const result = await $fetch<{ status: string }>(`/api/pacientes/${encodeURIComponent(id)}/contactos-pendientes/${encodeURIComponent(contact.id)}`, { method: 'POST', body: { ...(contactMatches[contact.id] ? { confirmedGuardianId: contactMatches[contact.id]!.id } : {}), ...(changed ? { name: edit.name, relationship: edit.relationship, phone: edit.phone, email: edit.email, proof: edit.proof } : {}) } })
     await refreshPendingContacts()
     if (result.status === 'FAILED') contactErrors[contact.id] = 'Vínculo registrado, pero falló el correo. Reenvíe la invitación desde Acceso familiar.'
   } catch {

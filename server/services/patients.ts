@@ -3,7 +3,7 @@ import { createError } from 'nuxt/server'
 import type { Actor } from '../../shared/types/access'
 import { patientSchema, type PatientInput, type PatientView } from '../../shared/types/measurement'
 import { ecuadorIdSchema, normalizePatientName, quickPatientSchema, type QuickPatientInput } from '../../shared/types/patient-registration'
-import { patient, patientContactIntake, visit } from '../db/schema'
+import { guardianGrant, patient, patientContactIntake, visit } from '../db/schema'
 import { findGuardianIdentity, grantGuardian } from './invitations'
 import { useDb } from '../utils/db'
 import { recordAudit } from './audit'
@@ -96,14 +96,23 @@ export async function createQuickPatient(actor: Actor, input: QuickPatientInput)
   for (const [index, contact] of values.contacts.entries()) {
     const intake = intakes[index]!
     try {
-      const result = await grantGuardian(actor, row.id, { name: contact.name, relationship: contact.relationship, phone: contact.phone, ...(contact.email ? { email: contact.email } : {}), deferDelivery: !contact.invite, proof: contact.proof!, ...(contact.confirmedGuardianId ? { confirmedGuardianId: contact.confirmedGuardianId } : {}) })
-      await db.update(patientContactIntake).set({ status: 'LINKED', proof: '' }).where(eq(patientContactIntake.id, intake.id))
+      const result = await grantGuardian(actor, row.id, { name: contact.name, relationship: contact.relationship, phone: contact.phone, ...(contact.email ? { email: contact.email } : {}), deferDelivery: !contact.invite, proof: contact.proof!, intakeId: intake.id, ...(contact.confirmedGuardianId ? { confirmedGuardianId: contact.confirmedGuardianId } : {}) })
       contacts.push(result)
     } catch {
-      contacts.push({ status: 'LINK_FAILED' as const, email: contact.email || null })
+      const linked = await linkedIntakeStatus(row.id, intake.id)
+      contacts.push(linked ?? { status: 'LINK_FAILED' as const, email: contact.email || null })
     }
   }
   return { patient: toView(row), contacts }
+}
+
+async function linkedIntakeStatus(patientId: string, intakeId: string) {
+  const db = useDb()
+  const [linked] = await db.select({ guardianId: patientContactIntake.guardianId }).from(patientContactIntake).where(and(eq(patientContactIntake.id, intakeId), eq(patientContactIntake.patientId, patientId), eq(patientContactIntake.status, 'LINKED')))
+  if (!linked?.guardianId) return null
+  const [grant] = await db.select({ status: guardianGrant.status, email: guardianGrant.contactEmail }).from(guardianGrant).where(and(eq(guardianGrant.patientId, patientId), eq(guardianGrant.guardianId, linked.guardianId)))
+  if (!grant) throw createError({ statusCode: 503, statusMessage: 'Grant state unavailable' })
+  return { status: grant.status, email: grant.email.endsWith('@portal.invalid') ? null : grant.email }
 }
 
 export async function listPendingContacts(actor: Actor, patientId: string) {
@@ -123,13 +132,20 @@ export async function retryPendingContact(actor: Actor, patientId: string, intak
   if (changed && (!confirmation.proof || confirmation.proof.trim().length < 8)) throw createError({ statusCode: 400, statusMessage: 'Verifique nuevamente el vínculo' })
   const details = {
     name: confirmation.name ?? row.name, relationship: confirmation.relationship ?? row.relationship,
-    phone: confirmation.phone ?? row.phone, email: confirmation.email ?? row.email ?? '', proof: confirmation.proof ?? row.proof
+    phone: confirmation.phone ?? row.phone, email: confirmation.email === undefined ? row.email ?? '' : confirmation.email, proof: confirmation.proof ?? row.proof
   }
-  const matched = await findGuardianIdentity(actor, { email: details.email || undefined, phone: details.phone })
+  const normalized = quickPatientSchema.shape.contacts.element.safeParse({ ...details, invite: Boolean(row.invite && details.email) })
+  if (!normalized.success) throw createError({ statusCode: 400, statusMessage: 'Contacto inválido' })
+  await db.update(patientContactIntake).set({ name: normalized.data.name, relationship: normalized.data.relationship, phone: normalized.data.phone, email: normalized.data.email || null, proof: normalized.data.proof!, invite: Boolean(row.invite && normalized.data.email) }).where(and(eq(patientContactIntake.id, intakeId), eq(patientContactIntake.status, 'LINK_FAILED')))
+  const matched = await findGuardianIdentity(actor, { email: normalized.data.email || undefined, phone: normalized.data.phone })
   if (matched?.id !== confirmation.confirmedGuardianId || (!matched && confirmation.confirmedGuardianId)) throw createError({ statusCode: 409, statusMessage: 'Confirme la identidad del representante' })
-  const result = await grantGuardian(actor, patientId, { name: details.name, phone: details.phone, relationship: details.relationship, proof: details.proof, ...(details.email ? { email: details.email } : {}), deferDelivery: !row.invite, ...(confirmation.confirmedGuardianId ? { confirmedGuardianId: confirmation.confirmedGuardianId } : {}) })
-  await db.update(patientContactIntake).set({ status: 'LINKED', proof: '' }).where(and(eq(patientContactIntake.id, intakeId), eq(patientContactIntake.status, 'LINK_FAILED')))
-  return result
+  try {
+    return await grantGuardian(actor, patientId, { name: normalized.data.name, phone: normalized.data.phone, relationship: normalized.data.relationship, proof: normalized.data.proof!, ...(normalized.data.email ? { email: normalized.data.email } : {}), deferDelivery: !normalized.data.invite, intakeId, ...(confirmation.confirmedGuardianId ? { confirmedGuardianId: confirmation.confirmedGuardianId } : {}) })
+  } catch (error) {
+    const linked = await linkedIntakeStatus(patientId, intakeId)
+    if (linked) return { patientId, ...linked }
+    throw error
+  }
 }
 
 export async function updatePatientIdentity(actor: Actor, id: string, nationalId: string) {

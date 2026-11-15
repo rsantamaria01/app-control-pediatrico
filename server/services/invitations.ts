@@ -3,7 +3,7 @@ import { and, desc, eq, ilike, inArray, isNull, sql } from 'drizzle-orm'
 import { createError } from 'nuxt/server'
 import { z } from 'zod'
 import type { Actor } from '../../shared/types/access'
-import { guardianDelivery, guardianGrant, guardianPhone, account, patient, setupToken, user, userRole, visit, visitSharing, visitText } from '../db/schema'
+import { guardianDelivery, guardianGrant, guardianPhone, account, patient, patientContactIntake, setupToken, user, userRole, visit, visitSharing, visitText } from '../db/schema'
 import { useDb } from '../utils/db'
 import { recordAudit } from './audit'
 import { sendLink, markEmailFailure } from './email'
@@ -23,7 +23,8 @@ export const guardianContactSchema = z.strictObject({
   relationship: z.string().trim().min(2).max(80).optional(),
   proof: z.string().trim().min(8).max(500),
   confirmedGuardianId: z.uuid().optional(),
-  deferDelivery: z.boolean().optional()
+  deferDelivery: z.boolean().optional(),
+  intakeId: z.uuid().optional()
 }).refine(value => Boolean(value.email || value.phone), { message: 'Email or phone required' })
 export type GuardianContact = z.input<typeof guardianContactSchema>
 export type GuardianGrant = { patientId: string, status: 'UNINVITED' | 'PENDING' | 'ACTIVE' | 'FAILED', email: string | null }
@@ -233,6 +234,12 @@ export async function grantGuardian(actor: Actor, patientId: string, input: Guar
     else await tx.update(guardianGrant).set({ contactEmail: contact.email ?? current.contactEmail, contactPhone: contact.phone ?? current.contactPhone, relationship: contact.relationship ?? current.relationship, proof: contact.proof, verifiedBy: actor.id, verifiedAt: new Date(), ...(deliveryId && current.status === 'UNINVITED' ? { status: 'FAILED' } : {}) }).where(and(eq(guardianGrant.patientId, patientId), eq(guardianGrant.guardianId, owner.id)))
     if (tokenId) await tx.insert(setupToken).values({ id: tokenId, userId: owner.id, digest: tokenDigest(token!), purpose: 'SETUP', expiresAt: new Date(Date.now() + 7 * 86400000) })
     if (deliveryId) await tx.insert(guardianDelivery).values({ id: deliveryId, patientId, guardianId: owner.id, tokenId, payload })
+    if (contact.intakeId) {
+      const [pending] = await tx.select().from(patientContactIntake).where(and(eq(patientContactIntake.id, contact.intakeId), eq(patientContactIntake.patientId, patientId), eq(patientContactIntake.status, 'LINK_FAILED'))).for('update')
+      if (!pending || pending.name !== contact.name || pending.relationship !== contact.relationship || pending.phone !== contact.phone || (pending.email ?? null) !== (contact.email ?? null) || pending.proof !== contact.proof || pending.invite !== Boolean(contact.email && !contact.deferDelivery)) throw createError({ statusCode: 409, statusMessage: 'Pending contact changed' })
+      const [intake] = await tx.update(patientContactIntake).set({ status: 'LINKED', guardianId: owner.id, proof: '' }).where(and(eq(patientContactIntake.id, contact.intakeId), eq(patientContactIntake.patientId, patientId), eq(patientContactIntake.status, 'LINK_FAILED'))).returning({ id: patientContactIntake.id })
+      if (!intake) throw createError({ statusCode: 409, statusMessage: 'Pending contact changed' })
+    }
   })
   const delivery = deliveryId ? await processGuardianDelivery(deliveryId) : null
   const [stored] = await db.select({ status: guardianGrant.status }).from(guardianGrant).where(and(eq(guardianGrant.patientId, patientId), eq(guardianGrant.guardianId, id)))

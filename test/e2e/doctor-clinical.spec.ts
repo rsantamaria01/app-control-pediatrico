@@ -11,7 +11,7 @@ import { importWhoRelease, parseWhoWorkbook } from '../../server/services/who-im
 import type { VerifiedSource } from '../../shared/types/who'
 import type { Gender } from '../../shared/utils/enums'
 import { WhoIndicator } from '../../shared/utils/enums'
-import { account, auditEvent, patient, patientContactIntake, user, userRole, visit } from '../../server/db/schema'
+import { account, auditEvent, guardianGrant, patient, patientContactIntake, user, userRole, visit } from '../../server/db/schema'
 
 const enabled = process.env.AUTH_E2E === '1' && process.env.CLINICAL_E2E === '1' && process.env.CLINICAL_E2E_DATABASE_URL === process.env.TEST_DATABASE_URL
 const url = process.env.TEST_DATABASE_URL
@@ -227,6 +227,42 @@ test.describe('doctor clinical journey with isolated auth and WHO database', () 
     await assistantPage.waitForLoadState('networkidle')
     expect((await assistantPage.request.get(`/api/pacientes/${childId}/contactos-pendientes`)).status()).toBe(401)
     await assistantContext.close()
+  })
+
+  test('doctor clears stale email on pending contact and recovers by verified phone without inviting the wrong account', async ({ page }) => {
+    const db = drizzle(pool)
+    const doctorId = crypto.randomUUID()
+    const username = `clear-email-${doctorId.slice(0, 8)}`
+    const email = `${crypto.randomUUID()}@example.test`
+    const phone = `09${String(Math.floor(Math.random() * 1e8)).padStart(8, '0')}`
+    await db.insert(user).values({ id: doctorId, name: 'Doctora', email: `${doctorId}@example.test`, username })
+    await db.insert(userRole).values({ userId: doctorId, role: 'DOCTOR' })
+    await db.insert(account).values({ id: crypto.randomUUID(), userId: doctorId, accountId: doctorId, providerId: 'credential', password: await hashPassword('clinical phone recovery') })
+    const ineligibleId = crypto.randomUUID()
+    await db.insert(user).values({ id: ineligibleId, name: 'Cuenta ajena', email })
+    await db.insert(userRole).values({ userId: ineligibleId, role: 'ASSISTANT' })
+    const childId = crypto.randomUUID()
+    await db.insert(patient).values({ id: childId, name: 'Paciente con correo erróneo', birthDate: '2024-01-01', sex: 'FEMALE', createdBy: doctorId })
+    const intakeId = crypto.randomUUID()
+    await db.insert(patientContactIntake).values({ id: intakeId, patientId: childId, position: 0, name: 'Familia correcta', relationship: 'Madre', phone, email, proof: 'Identidad verificada presencialmente', invite: true, createdBy: doctorId })
+    await page.goto('/acceso')
+    await page.waitForLoadState('networkidle')
+    await page.getByRole('textbox', { name: 'Usuario' }).fill(username)
+    await page.getByLabel('Contraseña').fill('clinical phone recovery')
+    await page.getByRole('button', { name: 'Ingresar' }).click()
+    await expect(page).toHaveURL('/')
+    await page.goto(`/pacientes/${childId}`)
+    await page.waitForLoadState('networkidle')
+    await page.getByRole('textbox', { name: 'Correo del contacto' }).fill('')
+    await page.getByRole('textbox', { name: 'Cómo verificó la corrección' }).fill('Teléfono y vínculo verificados de nuevo')
+    await page.getByRole('button', { name: 'Verificar identidad de Familia correcta' }).click()
+    await expect(page.getByText('Sin cuenta previa')).toBeVisible()
+    await page.getByRole('button', { name: 'Reintentar vínculo de Familia correcta' }).click()
+    await expect(page.getByText('Familia correcta')).toHaveCount(0)
+    const [grant] = await db.select().from(guardianGrant).where(eq(guardianGrant.patientId, childId))
+    expect(grant?.guardianId).not.toBe(ineligibleId)
+    const [intake] = await db.select().from(patientContactIntake).where(eq(patientContactIntake.id, intakeId))
+    expect(intake).toMatchObject({ email: null, invite: false, status: 'LINKED' })
   })
 
   test('perinatal editor hydrates a 36-month preterm child and preserves correction when editing only notes or birth weight', async ({ page }) => {

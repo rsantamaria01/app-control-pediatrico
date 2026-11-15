@@ -169,6 +169,13 @@
       "when": 1794698489560,
       "tag": "0023_many_eddie_brock",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1794700798370,
+      "tag": "0024_romantic_jane_foster",
+      "breakpoints": true
     }
   ]
 }

@@ -5,7 +5,7 @@ import { drizzle } from 'drizzle-orm/node-postgres'
 import { migrate } from 'drizzle-orm/node-postgres/migrator'
 import { and, eq } from 'drizzle-orm'
 import { Pool } from 'pg'
-import { account, auditEvent, guardianDelivery, guardianGrant, guardianPhone, patient, setupToken, user, userRole, visit, visitResult, visitText } from '../../server/db/schema'
+import { account, auditEvent, guardianDelivery, guardianGrant, guardianPhone, patient, patientContactIntake, setupToken, user, userRole, visit, visitResult, visitText } from '../../server/db/schema'
 import type { Actor } from '../../shared/types/access'
 
 const configured = process.env.TEST_DATABASE_URL
@@ -104,6 +104,119 @@ async function seedVisit(patientId: string, shareWithFamily = true) {
 }
 
 describe('verified guardian isolation', () => {
+  it('reconciles an ACTIVE guardian after a post-commit audit failure without exposing a false pending contact', async () => {
+    const { createQuickPatient, listPendingContacts } = await import('../../server/services/patients')
+    const { getShareableChild } = await import('../../server/services/invitations')
+    const guardianId = randomUUID()
+    const email = `${randomUUID()}@example.test`
+    const phone = `09${randomUUID().replace(/\D/g, '').padEnd(8, '0').slice(0, 8)}`
+    await db.insert(user).values({ id: guardianId, name: 'Familia ya activa', email })
+    await db.insert(userRole).values({ userId: guardianId, role: 'PATIENT' })
+    await db.insert(guardianPhone).values({ guardianId, phone })
+    await db.insert(account).values({ id: randomUUID(), accountId: guardianId, userId: guardianId, providerId: 'credential', password: 'existing hashed credential' })
+    await pool.query(`CREATE FUNCTION fail_grant_audit() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.action = 'GUARDIAN_GRANT' AND NEW.actor_id = '${doctor.id}' AND NEW.outcome = 'ALLOWED' THEN RAISE EXCEPTION 'postcommit audit failure'; END IF; RETURN NEW; END $$`)
+    await pool.query('CREATE TRIGGER fail_grant_audit BEFORE INSERT ON audit_event FOR EACH ROW EXECUTE FUNCTION fail_grant_audit()')
+    try {
+      const result = await createQuickPatient(doctor, { givenNames: 'Hija', surnames: `Activa${randomUUID().slice(0, 8)}`, birthDate: '2024-06-01', sex: 'FEMALE', contacts: [{ name: 'Familia ya activa', relationship: 'Madre', phone, email, proof: 'Identidad confirmada presencialmente', invite: true, confirmedGuardianId: guardianId }] })
+      expect(result.contacts[0]?.status).toBe('ACTIVE')
+      const [grant] = await db.select().from(guardianGrant).where(eq(guardianGrant.patientId, result.patient.id))
+      expect(grant?.status).toBe('ACTIVE')
+      expect(await listPendingContacts(doctor, result.patient.id)).toEqual([])
+      expect((await getShareableChild({ id: guardianId, roles: ['PATIENT'] }, result.patient.id)).name).toBe(result.patient.name)
+    } finally {
+      await pool.query('DROP TRIGGER fail_grant_audit ON audit_event')
+      await pool.query('DROP FUNCTION fail_grant_audit()')
+    }
+  })
+
+  it('does not change a pending contact after recovery has already linked it', async () => {
+    const { retryPendingContact, listPendingContacts } = await import('../../server/services/patients')
+    const patientId = randomUUID()
+    const intakeId = randomUUID()
+    const phone = `09${randomUUID().replace(/\D/g, '').padEnd(8, '0').slice(0, 8)}`
+    await db.insert(patient).values({ id: patientId, name: 'Contacto ya vinculado', birthDate: '2024-01-01', sex: 'FEMALE', createdBy: doctor.id })
+    await db.insert(patientContactIntake).values({ id: intakeId, patientId, position: 0, name: 'Familia', relationship: 'Madre', phone, email: null, proof: 'Identidad comprobada presencialmente', invite: false, createdBy: doctor.id })
+    await retryPendingContact(doctor, patientId, intakeId, {})
+    await expect(retryPendingContact(doctor, patientId, intakeId, { email: `${randomUUID()}@example.test`, proof: 'Cambio posterior verificado' })).rejects.toMatchObject({ statusCode: 404 })
+    expect(await listPendingContacts(doctor, patientId)).toEqual([])
+  })
+
+  it('does not let assistant or unrelated guardian details mark a pending patient contact linked', async () => {
+    const { grantGuardian } = await import('../../server/services/invitations')
+    const childId = randomUUID()
+    const intakeId = randomUUID()
+    const phone = `09${randomUUID().replace(/\D/g, '').padEnd(8, '0').slice(0, 8)}`
+    await db.insert(patient).values({ id: childId, name: 'Contacto protegido', birthDate: '2024-01-01', sex: 'FEMALE', createdBy: doctor.id })
+    await db.insert(patientContactIntake).values({ id: intakeId, patientId: childId, position: 0, name: 'Madre verificada', relationship: 'Madre', phone, email: null, proof: 'Evidencia original verificada', invite: false, createdBy: doctor.id })
+    await expect(grantGuardian(adminActor, childId, { name: 'Otro familiar', relationship: 'Padre', phone: `09${randomUUID().replace(/\D/g, '').padEnd(8, '0').slice(0, 8)}`, proof: 'Identidad vista presencialmente', intakeId })).rejects.toMatchObject({ statusCode: 403 })
+    await expect(grantGuardian(doctor, childId, { name: 'Otro familiar', relationship: 'Padre', phone: `09${randomUUID().replace(/\D/g, '').padEnd(8, '0').slice(0, 8)}`, proof: 'Identidad vista presencialmente', intakeId })).rejects.toMatchObject({ statusCode: 409 })
+    expect((await db.select().from(patientContactIntake).where(eq(patientContactIntake.id, intakeId)))[0]?.status).toBe('LINK_FAILED')
+    expect(await db.select().from(guardianGrant).where(eq(guardianGrant.patientId, childId))).toHaveLength(0)
+  })
+
+  it('reconciles a committed grant after delivery processing fails and keeps pending contacts hidden', async () => {
+    const { createQuickPatient, listPendingContacts } = await import('../../server/services/patients')
+    const email = `${randomUUID()}@example.test`
+    const phone = `09${randomUUID().replace(/\D/g, '').padEnd(8, '0').slice(0, 8)}`
+    await pool.query(`CREATE FUNCTION fail_delivery_claim() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.state = 'SENDING' THEN RAISE EXCEPTION 'delivery claim failed'; END IF; RETURN NEW; END $$`)
+    await pool.query('CREATE TRIGGER fail_delivery_claim BEFORE UPDATE ON guardian_delivery FOR EACH ROW EXECUTE FUNCTION fail_delivery_claim()')
+    try {
+      const result = await createQuickPatient(doctor, { givenNames: 'Envío', surnames: `Guardado${randomUUID().slice(0, 8)}`, birthDate: '2024-06-01', sex: 'FEMALE', contacts: [{ name: 'Familia', relationship: 'Madre', phone, email, proof: 'Identidad confirmada presencialmente', invite: true }] })
+      const [grant] = await db.select().from(guardianGrant).where(eq(guardianGrant.patientId, result.patient.id))
+      expect(result.contacts[0]?.status).not.toBe('LINK_FAILED')
+      expect(grant?.status).toBe('FAILED')
+      expect(await listPendingContacts(doctor, result.patient.id)).toEqual([])
+      expect((await db.select().from(patientContactIntake).where(eq(patientContactIntake.patientId, result.patient.id)))[0]).toMatchObject({ status: 'LINKED', guardianId: grant?.guardianId })
+    } finally {
+      await pool.query('DROP TRIGGER fail_delivery_claim ON guardian_delivery')
+      await pool.query('DROP FUNCTION fail_delivery_claim()')
+    }
+  })
+
+  it('does not report a committed guardian link as failed when intake status update fails', async () => {
+    const { createQuickPatient, listPendingContacts } = await import('../../server/services/patients')
+    const phone = `09${randomUUID().replace(/\D/g, '').padEnd(8, '0').slice(0, 8)}`
+    await pool.query(`CREATE FUNCTION fail_linked_intake() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.status = 'LINKED' THEN RAISE EXCEPTION 'intake update rejected'; END IF; RETURN NEW; END $$`)
+    await pool.query(`CREATE TRIGGER fail_linked_intake BEFORE UPDATE ON patient_contact_intake FOR EACH ROW EXECUTE FUNCTION fail_linked_intake()`)
+    try {
+      const result = await createQuickPatient(doctor, { givenNames: 'Vínculo', surnames: 'Atómico', birthDate: '2024-06-01', sex: 'FEMALE', contacts: [{ name: 'Representante confirmado', relationship: 'Madre', phone, email: '', proof: 'Identidad verificada presencialmente', invite: false }] })
+      const [grant] = await db.select().from(guardianGrant).where(eq(guardianGrant.patientId, result.patient.id))
+      const pending = await listPendingContacts(doctor, result.patient.id)
+      expect(result.contacts[0]?.status).toBe('LINK_FAILED')
+      expect(pending).toHaveLength(1)
+      expect(grant).toBeUndefined()
+    } finally {
+      await pool.query('DROP TRIGGER fail_linked_intake ON patient_contact_intake')
+      await pool.query('DROP FUNCTION fail_linked_intake()')
+    }
+  })
+
+  it('clears an ineligible email, persists phone-only corrections even on failed retry, and never grants the wrong identity', async () => {
+    const { retryPendingContact, listPendingContacts } = await import('../../server/services/patients')
+    const childId = randomUUID()
+    const intakeId = randomUUID()
+    const email = `${randomUUID()}@example.test`
+    const phone = `09${randomUUID().replace(/\D/g, '').padEnd(8, '0').slice(0, 8)}`
+    await db.insert(patient).values({ id: childId, name: 'Corrección sin correo', birthDate: '2024-01-01', sex: 'FEMALE', createdBy: doctor.id })
+    const ineligible = randomUUID()
+    await db.insert(user).values({ id: ineligible, name: 'No es representante', email })
+    await db.insert(userRole).values({ userId: ineligible, role: 'ASSISTANT' })
+    await db.insert(patientContactIntake).values({ id: intakeId, patientId: childId, position: 0, name: 'Familia real', phone, email, relationship: 'Madre', proof: 'Identidad comprobada en persona', invite: true, createdBy: doctor.id })
+    await expect(retryPendingContact(doctor, childId, intakeId, { email: '', proof: 'Identidad nueva comprobada', confirmedGuardianId: ineligible })).rejects.toMatchObject({ statusCode: 409 })
+    expect((await listPendingContacts(doctor, childId))[0]).toMatchObject({ email: null, status: 'LINK_FAILED' })
+    expect(await db.select().from(guardianGrant).where(eq(guardianGrant.patientId, childId))).toHaveLength(0)
+    await expect(retryPendingContact(doctor, childId, intakeId, { confirmedGuardianId: ineligible })).rejects.toMatchObject({ statusCode: 409 })
+    expect(await db.select().from(guardianGrant).where(eq(guardianGrant.patientId, childId))).toHaveLength(0)
+    const linked = await retryPendingContact(doctor, childId, intakeId, {})
+    expect(linked.status).toBe('UNINVITED')
+    const [owner] = await db.select().from(guardianGrant).where(eq(guardianGrant.patientId, childId))
+    expect(owner?.guardianId).not.toBe(ineligible)
+    expect(owner?.contactPhone).toBe(phone)
+    expect(owner?.status).toBe('UNINVITED')
+    const [intake] = await db.select().from(patientContactIntake).where(eq(patientContactIntake.id, intakeId))
+    expect(intake).toMatchObject({ email: null, invite: false, status: 'LINKED', guardianId: owner?.guardianId })
+  })
+
   it('persists each contact when a second guardian link fails after patient insert and permits doctor-only verified recovery', async () => {
     const { createQuickPatient, listPendingContacts, retryPendingContact } = await import('../../server/services/patients')
     const phone = `09${randomUUID().replace(/\D/g, '').padEnd(8, '0').slice(0, 8)}`
@@ -394,7 +507,7 @@ describe('verified guardian isolation', () => {
   })
 
   it('does not send a stale queued invite after a newer resend was delivered', async () => {
-    const { grantGuardian, processQueuedGuardianDeliveries, processGuardianDelivery } = await import('../../server/services/invitations')
+    const { grantGuardian, processGuardianDelivery } = await import('../../server/services/invitations')
     const { setupCredential, tokenDigest } = await import('../../server/services/invitation')
     const childId = randomUUID()
     const email = `${randomUUID()}@example.test`
@@ -418,7 +531,7 @@ describe('verified guardian isolation', () => {
     await processGuardianDelivery(old!.id)
     expect((await db.select().from(guardianDelivery).where(eq(guardianDelivery.id, old!.id)))[0]?.state).toBe('CANCELLED')
     expect((await db.select().from(setupToken).where(eq(setupToken.id, old!.tokenId!)))[0]?.usedAt).toBeInstanceOf(Date)
-    expect(await processQueuedGuardianDeliveries()).toBe(0)
+    expect((await db.select().from(guardianDelivery).where(and(eq(guardianDelivery.patientId, childId), eq(guardianDelivery.state, 'QUEUED'))))).toHaveLength(0)
     expect(mails).toHaveLength(sent)
     expect((await db.select().from(guardianGrant).where(eq(guardianGrant.patientId, childId)))[0]?.tokenId).toBe(newToken!.id)
     expect((await db.select().from(setupToken).where(eq(setupToken.id, newToken!.id)))[0]?.usedAt).toBeNull()
@@ -523,7 +636,7 @@ describe('verified guardian isolation', () => {
   })
 
   it('sends a committed queued invitation after a forced post-commit dispatch failure', async () => {
-    const { grantGuardian, processQueuedGuardianDeliveries } = await import('../../server/services/invitations')
+    const { grantGuardian, processGuardianDelivery } = await import('../../server/services/invitations')
     const childId = randomUUID()
     const email = `${randomUUID()}@example.test`
     await db.insert(patient).values({ id: childId, name: 'Pendiente de reintento', birthDate: '2024-01-01', sex: 'MALE', createdBy: doctor.id })
@@ -540,7 +653,8 @@ describe('verified guardian isolation', () => {
       await pool.query('DROP TRIGGER forced_guardian_claim ON guardian_delivery')
       await pool.query('DROP FUNCTION reject_guardian_claim()')
     }
-    expect(await processQueuedGuardianDeliveries()).toBe(1)
+    const [job] = await db.select().from(guardianDelivery).where(eq(guardianDelivery.patientId, childId))
+    await processGuardianDelivery(job!.id)
     expect(mails).toHaveLength(sent + 1)
     const [link] = await db.select().from(guardianGrant).where(eq(guardianGrant.patientId, childId))
     expect(link?.status).toBe('PENDING')
@@ -550,7 +664,7 @@ describe('verified guardian isolation', () => {
   })
 
   it('activates a delivered queued sibling after the guardian sets up the account from another child', async () => {
-    const { grantGuardian, processQueuedGuardianDeliveries, getShareableChild } = await import('../../server/services/invitations')
+    const { grantGuardian, processGuardianDelivery, getShareableChild } = await import('../../server/services/invitations')
     const { setupCredential } = await import('../../server/services/invitation')
     const email = `${randomUUID()}@example.test`
     const children = [randomUUID(), randomUUID()]
@@ -567,16 +681,16 @@ describe('verified guardian isolation', () => {
       await pool.query('DROP FUNCTION reject_queued_sibling()')
     }
     expect(await setupCredential(firstToken, `queued-${randomUUID().slice(0, 8)}`, 'unique guardian passphrase')).toBe(true)
-    expect(await processQueuedGuardianDeliveries()).toBe(1)
     const [siblingJob] = await db.select().from(guardianDelivery).where(eq(guardianDelivery.patientId, children[1]!))
-    expect(siblingJob?.state).toBe('DONE')
+    await processGuardianDelivery(siblingJob!.id)
+    expect((await db.select().from(guardianDelivery).where(eq(guardianDelivery.id, siblingJob!.id)))[0]?.state).toBe('DONE')
     const [siblingLink] = await db.select().from(guardianGrant).where(eq(guardianGrant.patientId, children[1]!))
     expect(siblingLink?.status).toBe('ACTIVE')
     expect((await getShareableChild({ id: owner!.id, roles: ['PATIENT'] }, children[1]!)).id).toBe(children[1])
   })
 
   it('never dispatches a queued link after the staff revokes its relationship', async () => {
-    const { grantGuardian, processQueuedGuardianDeliveries, revokeGuardian } = await import('../../server/services/invitations')
+    const { grantGuardian, processGuardianDelivery, revokeGuardian } = await import('../../server/services/invitations')
     const childId = randomUUID()
     const email = `${randomUUID()}@example.test`
     await db.insert(patient).values({ id: childId, name: 'Vínculo revocado', birthDate: '2024-01-01', sex: 'MALE', createdBy: doctor.id })
@@ -591,12 +705,13 @@ describe('verified guardian isolation', () => {
     const [link] = await db.select().from(guardianGrant).where(eq(guardianGrant.patientId, childId))
     await revokeGuardian(doctor, childId, link!.guardianId)
     const sent = mails.length
-    await processQueuedGuardianDeliveries()
+    const [job] = await db.select().from(guardianDelivery).where(eq(guardianDelivery.patientId, childId))
+    await processGuardianDelivery(job!.id)
     expect(mails).toHaveLength(sent)
   })
 
   it('recovers an interrupted delivery with its committed token and no orphaned link', async () => {
-    const { grantGuardian, processQueuedGuardianDeliveries, reconcileGuardianDeliveries } = await import('../../server/services/invitations')
+    const { grantGuardian, processGuardianDelivery, reconcileGuardianDeliveries } = await import('../../server/services/invitations')
     const childId = randomUUID()
     const email = `${randomUUID()}@example.test`
     await db.insert(patient).values({ id: childId, name: 'Entrega interrumpida', birthDate: '2024-01-01', sex: 'FEMALE', createdBy: doctor.id })
@@ -614,7 +729,8 @@ describe('verified guardian isolation', () => {
       await pool.query('DROP FUNCTION reject_guardian_finish()')
     }
     expect(await reconcileGuardianDeliveries()).toBe(1)
-    expect(await processQueuedGuardianDeliveries()).toBe(1)
+    const [queuedJob] = await db.select().from(guardianDelivery).where(eq(guardianDelivery.patientId, childId))
+    await processGuardianDelivery(queuedJob!.id)
     const [link] = await db.select().from(guardianGrant).where(eq(guardianGrant.patientId, childId))
     expect(link?.status).toBe('PENDING')
     const [stored] = await db.select().from(setupToken).where(eq(setupToken.id, link!.tokenId!))

@@ -46,8 +46,13 @@ phase=mailpit
 docker run -d --name "${project}-mailpit" -p 127.0.0.1:8025:8025 axllent/mailpit:v1.33.1@sha256:aef2aacc11f075ec0fb6874275ee4a421e688e11a96ebb296134d1735c7761ce >/dev/null
 docker network connect --alias mailpit "${project}_default" "${project}-mailpit"
 network_subnet=$(docker network inspect --format '{{(index .IPAM.Config 0).Subnet}}' "${project}_default")
+network_gateway=$(docker network inspect --format '{{(index .IPAM.Config 0).Gateway}}' "${project}_default")
 case "$network_subnet" in
-  *.*.*.*/24) network_prefix=${network_subnet%.*/*} ;;
+  *.*.*.0/24) ;;
+  *) exit 1 ;;
+esac
+case "$network_gateway" in
+  *.*.*.*) network_prefix=${network_gateway%.*} ;;
   *) exit 1 ;;
 esac
 export ALPHA_DIRECT_PEER_IP="${network_prefix}.250"

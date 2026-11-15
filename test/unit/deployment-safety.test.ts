@@ -34,6 +34,8 @@ describe('deployment safety', () => {
     expect(script).not.toContain('AUTH_TRUSTED_PROXY_CIDR=172.16.0.0/12')
     expect(script).toMatch(/AUTH_TRUSTED_PROXY_CIDR=.*\/32/)
     expect(script).toContain('ALPHA_DIRECT_PEER_IP')
+    expect(script).toContain('index .IPAM.Config 0).Gateway')
+    expect(script).not.toContain('network_subnet%.*/*')
   })
 
   it('forwards configured public HTTPS origin and secrets explicitly to the production image', () => {

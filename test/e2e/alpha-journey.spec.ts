@@ -167,11 +167,16 @@ test('production image journeys from bootstrapped admin through two children and
     expect(await familyGrowth.text()).not.toMatch(/percentile|"z"|HIDDEN_ADVICE/)
     await page.goto(`/hijos/${first}/crecimiento`)
     await expect(page.locator('main canvas').first()).toBeVisible()
-    await expect.poll(async () => page.evaluate(async () => {
-      await navigator.serviceWorker.ready
-      return Boolean(navigator.serviceWorker.controller)
-    }), { timeout: 15000 }).toBe(true)
+    const registration = await page.evaluate(async () => {
+      const worker = await navigator.serviceWorker.ready
+      return { scope: worker.scope, scriptURL: worker.active?.scriptURL, state: worker.active?.state }
+    })
+    expect(registration.scope).toBe(`${origin}/`)
+    expect(registration.scriptURL).toBe(`${origin}/sw.js`)
+    expect(['activating', 'activated']).toContain(registration.state)
+    await expect.poll(async () => page.evaluate(async () => (await navigator.serviceWorker.getRegistration())?.active?.state), { timeout: 30000 }).toBe('activated')
     await page.goto(`/hijos/${first}`)
+    expect(await page.evaluate(() => navigator.serviceWorker.controller?.scriptURL)).toBe(`${origin}/sw.js`)
     await expect(page.getByText('Regresar en febrero')).toBeVisible()
     const throughWorker = await page.evaluate(async (id) => {
       const response = await fetch(`/api/hijos/${id}`)

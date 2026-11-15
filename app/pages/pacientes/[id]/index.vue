@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import type { PatientView, VisitSnapshot } from '#shared/types/measurement'
+import type { ChartView } from '#shared/utils/chart-data'
 import { ecuadorIdSchema } from '#shared/types/patient-registration'
 import { formatGrowthValues } from '#shared/utils/growth-result'
-import type { WhoIndicator } from '#shared/utils/enums'
+import { WhoIndicator } from '#shared/utils/enums'
 
 const route = useRoute()
 const id = route.params.id as string
@@ -10,6 +11,10 @@ const { data, error, refresh } = await useFetch<{ patient: PatientView, visits: 
 const { data: navigation } = await useFetch<{ to: string }[]>('/api/auth/navigation')
 const isDoctor = computed(() => navigation.value?.some(item => item.to === '/pacientes') ?? false)
 const latest = computed(() => data.value?.visits[0])
+const { data: growth } = await useFetch<{ charts: Partial<Record<WhoIndicator, ChartView>> }>(`/api/pacientes/${encodeURIComponent(id)}/crecimiento`, { immediate: isDoctor.value })
+const chartIndicator = ref<WhoIndicator>(WhoIndicator.WEIGHT_FOR_AGE)
+const showGrowthTable = ref(false)
+const chartIndicators = [WhoIndicator.WEIGHT_FOR_AGE, WhoIndicator.HEIGHT_FOR_AGE, WhoIndicator.HEAD_CIRCUMFERENCE_FOR_AGE, WhoIndicator.BMI_FOR_AGE, WhoIndicator.WEIGHT_FOR_LENGTH, WhoIndicator.WEIGHT_FOR_HEIGHT]
 const sharing = reactive<Record<string, boolean>>({})
 const { data: sharingState } = await useFetch<Record<string, boolean>>(`/api/pacientes/${encodeURIComponent(id)}/visitas/compartir`, { immediate: isDoctor.value })
 const { data: guardianStatus } = await useFetch<{ guardians: { email: string, status: string, lastSendError: string | null }[] }>(`/api/guardian-grants/${encodeURIComponent(id)}`, { immediate: isDoctor.value })
@@ -530,6 +535,40 @@ const dateFormat = new Intl.DateTimeFormat('es-EC', { day: 'numeric', month: 'sh
                 </li>
               </ul>
             </div>
+          </UCard>
+        </section>
+        <section class="space-y-3" aria-label="Curvas de crecimiento">
+          <h2 class="text-lg font-semibold">
+            Curvas de crecimiento OMS
+          </h2>
+          <div class="flex flex-wrap gap-2" role="group" aria-label="Indicador de crecimiento">
+            <UButton
+              v-for="indicator in chartIndicators"
+              :key="indicator"
+              variant="outline"
+              class="min-h-11"
+              :aria-pressed="chartIndicator === indicator"
+              @click="chartIndicator = indicator"
+            >
+              {{ labels[indicator] }}
+            </UButton>
+          </div>
+          <UButton
+            variant="outline"
+            class="min-h-11"
+            :aria-pressed="showGrowthTable"
+            @click="showGrowthTable = !showGrowthTable"
+          >
+            {{ showGrowthTable ? 'Ver gráfico' : 'Ver tabla' }}
+          </UButton>
+          <UCard v-if="growth?.charts[chartIndicator]">
+            <GrowthTable v-if="showGrowthTable" :view="growth.charts[chartIndicator]!" />
+            <GrowthChart v-else :view="growth.charts[chartIndicator]!" />
+          </UCard>
+          <UCard v-else>
+            <p class="text-muted">
+              Referencia OMS no disponible.
+            </p>
           </UCard>
         </section>
         <section class="space-y-3">

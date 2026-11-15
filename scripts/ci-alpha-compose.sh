@@ -27,7 +27,7 @@ proxy_key=
 cleanup() {
   status=$?
   if [ "$status" -ne 0 ]; then printf 'alpha checkpoint failed phase=%s\n' "$phase" >&2; fi
-  docker rm -f "${project}-proxy" "${project}-mailpit" >/dev/null 2>&1 || true
+  docker rm -f "${project}-proxy" "${project}-mailpit" "${project}-pgtest" >/dev/null 2>&1 || true
   compose down -v --remove-orphans >/dev/null 2>&1 || true
   if [ -n "$proxy_cert" ]; then rm -f "$proxy_cert"; fi
   if [ -n "$proxy_key" ]; then rm -f "$proxy_key"; fi
@@ -91,6 +91,14 @@ node --experimental-transform-types scripts/import-who.ts download >/dev/null
 node --input-type=module -e 'import {readFileSync} from "node:fs"; import {createHash} from "node:crypto"; const manifest=JSON.parse(readFileSync("scripts/who-2006-manifest.json")); for(const file of manifest.files){const bytes=readFileSync(`/tmp/opencode/who-2006/${file.name}-expanded.xlsx`); if(createHash("sha256").update(bytes).digest("hex")!==file.sha256) throw Error(`WHO source mismatch: ${file.name}`)}'
 docker run --rm --network "${project}_default" -v "$PWD:/app" -v /tmp/opencode/who-2006:/tmp/opencode/who-2006:ro -w /app -e DB_NAME -e DB_PASSWORD -e DB_HOST=db node:24-alpine node --experimental-transform-types scripts/ci-alpha-fixture.ts
 [ "$(compose exec -T db psql -U pediatrico -d "$DB_NAME" -Atqc 'SELECT count(*) FROM who_dataset')" = 12 ]
+phase=clinical-integration
+compose exec -T db createdb -U pediatrico pediatrico_who_slice3_test
+[ "$(compose exec -T db psql -U pediatrico -d pediatrico_who_slice3_test -Atqc 'SELECT current_database()')" = pediatrico_who_slice3_test ]
+docker run -d --name "${project}-pgtest" --network "${project}_default" -p 127.0.0.1:5433:5432 node:24-alpine node -e 'const net = require("node:net"); net.createServer(peer => { const db = net.connect(5432, "db"); peer.pipe(db); db.pipe(peer); peer.on("error", () => db.destroy()); db.on("error", () => peer.destroy()) }).listen(5432, "0.0.0.0")' >/dev/null
+export WHO_TEST_DATABASE_URL="postgres://pediatrico:${DB_PASSWORD}@127.0.0.1:5433/pediatrico_who_slice3_test"
+node --input-type=module -e 'import pg from "pg"; const pool = new pg.Pool({connectionString: process.env.WHO_TEST_DATABASE_URL, connectionTimeoutMillis: 5000}); try { const result = await pool.query("select current_database() as name"); if(result.rows[0]?.name !== "pediatrico_who_slice3_test") process.exitCode = 1 } finally { await pool.end() }'
+pnpm exec vitest run --config vitest.integration.config.ts test/integration/who-reference.test.ts test/integration/reference-selection.test.ts --reporter=json --outputFile=/tmp/opencode/alpha-who-integration.json
+node --input-type=module -e 'import {readFileSync} from "node:fs"; const result=JSON.parse(readFileSync("/tmp/opencode/alpha-who-integration.json")); if(result.numPassedTests < 20 || result.numPendingTests !== 0 || result.numFailedTests !== 0 || result.numFailedTestSuites !== 0 || result.testResults.length !== 2) process.exit(1); for(const name of ["who-reference.test.ts", "reference-selection.test.ts"]) if(!result.testResults.some(file=>file.name.endsWith(name) && file.status === "passed")) process.exit(1); console.log(`WHO/Anthro isolated integration: ${result.numPassedTests} passed, 0 skipped`)'
 phase=journey
 ALPHA_COMPOSE_E2E=1 pnpm exec playwright test test/e2e/alpha-journey.spec.ts --workers=1
 phase=security

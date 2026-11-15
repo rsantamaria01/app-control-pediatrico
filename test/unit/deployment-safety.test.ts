@@ -46,6 +46,15 @@ describe('deployment safety', () => {
     expect(app).toContain('AUTH_TRUSTED_PROXY_CIDR: ${AUTH_TRUSTED_PROXY_CIDR:-}')
   })
 
+  it('runs independent WHO Anthro comparisons against isolated checkpoint database without skips', () => {
+    const script = readFileSync(new URL('../../scripts/ci-alpha-compose.sh', import.meta.url), 'utf8')
+    expect(script).toContain('WHO_TEST_DATABASE_URL=')
+    expect(script).toContain('who-reference.test.ts')
+    expect(script).toContain('reference-selection.test.ts')
+    expect(script).toContain('numPendingTests')
+    expect(script).toContain('numFailedTests')
+  })
+
   it('stops the worker before streaming the backup and requires a RustFS snapshot before migrating', () => {
     const dir = mkdtempSync(join(tmpdir(), 'pediatric-ops-'))
     try {

@@ -4,6 +4,7 @@ import { INDICATOR_LABEL, WhoIndicator } from '#shared/utils/enums'
 
 const id = useRoute().params.id as string
 const { data, error, refresh } = await useFetch<{ name: string, charts: Partial<Record<WhoIndicator, FamilyChartView>> }>(`/api/hijos/${encodeURIComponent(id)}/crecimiento`)
+if (import.meta.server && error.value) throw createError({ statusCode: error.value.statusCode === 404 ? 404 : 503, statusMessage: 'No disponible' })
 const indicators = [WhoIndicator.WEIGHT_FOR_AGE, WhoIndicator.HEIGHT_FOR_AGE, WhoIndicator.HEAD_CIRCUMFERENCE_FOR_AGE]
 const showTable = ref(false)
 </script>

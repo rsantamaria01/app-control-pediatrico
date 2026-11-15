@@ -12,14 +12,22 @@ services:
     environment:
       DB_PASSWORD: ${DB_PASSWORD:-pediatrico}
       DB_HOST: db
-      DB_NAME: pediatrico
+      DB_NAME: ${DB_NAME:-pediatrico}
+      NUXT_APP_SECRET: ${NUXT_APP_SECRET:?NUXT_APP_SECRET is required}
+      RECOVERY_QUEUE_SECRET: ${RECOVERY_QUEUE_SECRET:?RECOVERY_QUEUE_SECRET is required}
+      NUXT_PUBLIC_SITE_URL: ${NUXT_PUBLIC_SITE_URL:?NUXT_PUBLIC_SITE_URL is required}
       REDIS_URL: redis://cache:6379
       S3_ENDPOINT: http://storage:9000
       S3_BUCKET: pediatrico
       S3_ACCESS_KEY: ${S3_ACCESS_KEY:-pediatrico}
       S3_SECRET_KEY: ${S3_SECRET_KEY:-pediatrico-dev-secret}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      SMTP_SECURE: ${SMTP_SECURE:-}
+      AUTH_TRUSTED_PROXY_CIDR: ${AUTH_TRUSTED_PROXY_CIDR:-}
     ports:
-      - "3000:3000"
+      - "${APP_BIND_ADDRESS:-0.0.0.0}:3000:3000"
     depends_on:
       db: { condition: service_healthy }
       cache: { condition: service_healthy }
@@ -40,7 +48,10 @@ services:
     environment:
       DB_PASSWORD: ${DB_PASSWORD:-pediatrico}
       DB_HOST: db
-      DB_NAME: pediatrico
+      DB_NAME: ${DB_NAME:-pediatrico}
+      NUXT_APP_SECRET: ${NUXT_APP_SECRET:?NUXT_APP_SECRET is required}
+      RECOVERY_QUEUE_SECRET: ${RECOVERY_QUEUE_SECRET:?RECOVERY_QUEUE_SECRET is required}
+      NUXT_PUBLIC_SITE_URL: ${NUXT_PUBLIC_SITE_URL:?NUXT_PUBLIC_SITE_URL is required}
     depends_on:
       db: { condition: service_healthy }
 
@@ -48,13 +59,13 @@ services:
     image: postgres:18-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_DB: pediatrico
+      POSTGRES_DB: ${DB_NAME:-pediatrico}
       POSTGRES_USER: pediatrico
       POSTGRES_PASSWORD: ${DB_PASSWORD:-pediatrico}
     volumes:
       - db-data:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U pediatrico -d pediatrico"]
+      test: ["CMD-SHELL", "pg_isready -U pediatrico -d $$POSTGRES_DB"]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -72,7 +83,7 @@ services:
       retries: 10
 
   storage:
-    image: rustfs/rustfs:latest   # pin a version before production
+    image: rustfs/rustfs:1.0.5@sha256:b81d16a90ee25bd9511280127ca1471788c6e874cf0f0da759645f46b2dc1d74
     restart: unless-stopped
     environment:
       RUSTFS_ACCESS_KEY: ${S3_ACCESS_KEY:-pediatrico}

@@ -1,16 +1,20 @@
 import { defineServerAuth } from '@nuxtjs/better-auth/config'
-import { createAuthMiddleware, APIError, getIP } from 'better-auth/api'
+import { createAuthMiddleware, APIError } from 'better-auth/api'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { username } from 'better-auth/plugins'
 import { eq } from 'drizzle-orm'
 import { recordAudit } from './services/audit.js'
 import * as schema from './db/schema.js'
 import { normalizeUsername, validatePassword } from './services/credentials.js'
-import { reserveLoginAttempt, releaseSuccessfulLoginIp, recordLoginFailure } from './services/otp-rate-limit.js'
+import { reserveLoginAttempt, releaseSuccessfulLoginIp, recordLoginFailure, recoveryClientAddress } from './services/otp-rate-limit.js'
 import { useDb } from './utils/db.js'
 
 export function trustedProxyIPSettings(cidr: string | undefined) {
   return cidr ? { ipAddressHeaders: ['x-forwarded-for'], trustedProxies: [cidr] } : { ipAddressHeaders: [] }
+}
+
+export function loginClientAddress(peer: string | undefined, forwarded: string | undefined, cidr: string | undefined) {
+  return recoveryClientAddress(peer, forwarded, cidr)
 }
 
 export default defineServerAuth({
@@ -29,7 +33,7 @@ export default defineServerAuth({
           await recordAudit('SIGN_IN', 'DENIED')
           throw new APIError('UNAUTHORIZED', { message: 'Usuario o contraseña incorrectos' })
         }
-        const ip = ctx.request ? getIP(ctx.request, ctx.context.options) || 'shared' : 'shared'
+        const ip = loginClientAddress(ctx.request?.headers.get('x-real-ip') || undefined, ctx.request?.headers.get('x-forwarded-for') || undefined, process.env.AUTH_TRUSTED_PROXY_CIDR)
         try {
           if (!await reserveLoginAttempt(input, ip)) {
             await recordAudit('SIGN_IN', 'DENIED')
@@ -53,7 +57,7 @@ export default defineServerAuth({
       if (ctx.path === '/sign-in/username') {
         const success = Boolean(ctx.context.newSession?.user?.id)
         const input = String(ctx.body?.username || '').toLowerCase()
-        const ip = ctx.request ? getIP(ctx.request, ctx.context.options) || 'shared' : 'shared'
+        const ip = loginClientAddress(ctx.request?.headers.get('x-real-ip') || undefined, ctx.request?.headers.get('x-forwarded-for') || undefined, process.env.AUTH_TRUSTED_PROXY_CIDR)
         if (success) await releaseSuccessfulLoginIp(ip)
         else await recordLoginFailure(input, ip)
         await recordAudit('SIGN_IN', success ? 'ALLOWED' : 'DENIED', success ? ctx.context.newSession!.user.id : undefined)

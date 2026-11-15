@@ -2,7 +2,8 @@ import { execFileSync, spawnSync } from 'node:child_process'
 import { mkdtempSync, readFileSync, rmSync, writeFileSync, chmodSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import { defineConfig } from '@playwright/test'
 
 const root = new URL('../..', import.meta.url)
 const compose = readFileSync(new URL('../../compose.yaml', import.meta.url), 'utf8')
@@ -15,7 +16,7 @@ describe('deployment safety', () => {
       expect(section).not.toContain('postgres://pediatrico:${DB_PASSWORD')
       expect(section).toContain('DB_PASSWORD:')
       expect(section).toContain('DB_HOST: db')
-      expect(section).toContain('DB_NAME: pediatrico')
+      expect(section).toContain('DB_NAME: ${DB_NAME:-pediatrico}')
     }
     const result = spawnSync('node', ['scripts/database-env.mjs', 'node', '-e', 'process.stdout.write(JSON.stringify({url:process.env.DATABASE_URL,raw:process.env.DB_PASSWORD}))'], {
       cwd: root, env: { ...process.env, DB_PASSWORD: password }, encoding: 'utf8'
@@ -27,6 +28,96 @@ describe('deployment safety', () => {
     expect(child.url).not.toContain(password)
     expect(child.url).toContain('part%3A%40%2F%3F%23%25%20with%20space')
     expect(new URL(child.url).password).toBe('part%3A%40%2F%3F%23%25%20with%20space')
+  })
+
+  it.each([
+    ['172.20.0.0/16', '172.20.0.1', '172.20.255.254', '172.20.255.253'],
+    ['172.21.32.0/20', '172.21.32.1', '172.21.47.254', '172.21.47.253'],
+    ['172.22.8.0/24', '172.22.8.1', '172.22.8.254', '172.22.8.253']
+  ])('selects two distinct unused peers inside actual Docker subnet %s', (subnet, gateway, proxy, peer) => {
+    const network = [{ IPAM: { Config: [{ Subnet: subnet, Gateway: gateway }] }, Containers: { db: { IPv4Address: `${gateway}/${subnet.split('/')[1]}` } } }]
+    const result = spawnSync('node', ['scripts/ci-alpha-network.mjs'], { cwd: root, input: JSON.stringify(network), encoding: 'utf8' })
+    expect(result.status, result.stderr).toBe(0)
+    expect(JSON.parse(result.stdout)).toEqual({ proxy, peer })
+  })
+
+  it('does not allocate occupied addresses or accept an invalid Docker subnet', () => {
+    const network = [{ IPAM: { Config: [{ Subnet: '172.22.8.0/24', Gateway: '172.22.8.1' }] }, Containers: { db: { IPv4Address: '172.22.8.254/24' } } }]
+    const occupied = spawnSync('node', ['scripts/ci-alpha-network.mjs'], { cwd: root, input: JSON.stringify(network), encoding: 'utf8' })
+    expect(occupied.status, occupied.stderr).toBe(0)
+    expect(JSON.parse(occupied.stdout)).toEqual({ proxy: '172.22.8.253', peer: '172.22.8.252' })
+    for (const config of [{ Subnet: '172.22.8.0/24', Gateway: '172.22.9.1' }, { Subnet: '172.22.8.1/24', Gateway: '172.22.8.2' }]) {
+      const invalid = spawnSync('node', ['scripts/ci-alpha-network.mjs'], { cwd: root, input: JSON.stringify([{ ...network[0], IPAM: { Config: [config] } }]), encoding: 'utf8' })
+      expect(invalid.status).not.toBe(0)
+      expect(invalid.stdout).toBe('')
+    }
+  })
+
+  it('fails closed when Docker cannot provide two distinct unoccupied addresses', () => {
+    const network: { IPAM: { Config: { Subnet: string, Gateway: string }[] }, Containers: Record<string, { IPv4Address: string }> }[] = [{ IPAM: { Config: [{ Subnet: '172.22.8.0/28', Gateway: '172.22.8.1' }] }, Containers: {} }]
+    const occupied = Array.from({ length: 12 }, (_, index) => index + 2)
+    for (const octet of occupied) network[0]!.Containers[`peer${octet}`] = { IPv4Address: `172.22.8.${octet}/28` }
+    const result = spawnSync('node', ['scripts/ci-alpha-network.mjs'], { cwd: root, input: JSON.stringify(network), encoding: 'utf8' })
+    expect(result.status).not.toBe(0)
+    expect(result.stdout).toBe('')
+  })
+
+  it('trusts the disposable certificate only in the isolated Compose browser', async () => {
+    vi.stubEnv('ALPHA_COMPOSE_E2E', '1')
+    try {
+      vi.resetModules()
+      const { default: config } = await import('../../playwright.config')
+      expect(defineConfig(config).use?.launchOptions?.args).toContain('--ignore-certificate-errors')
+    } finally {
+      vi.unstubAllEnvs()
+      vi.resetModules()
+    }
+  })
+
+  it('keeps certificate verification enabled outside the isolated Compose browser', async () => {
+    vi.stubEnv('ALPHA_COMPOSE_E2E', '')
+    try {
+      vi.resetModules()
+      const { default: config } = await import('../../playwright.config')
+      expect(defineConfig(config).use?.launchOptions?.args).toBeUndefined()
+    } finally {
+      vi.unstubAllEnvs()
+      vi.resetModules()
+    }
+  })
+
+  it('ignores forged direct-peer IP headers at the Nitro request boundary', async () => {
+    const { applyAuthPeerAddress } = await import('../../server/services/auth-peer')
+    const request = { node: { req: { socket: { remoteAddress: '172.20.4.253' }, headers: { 'x-forwarded-for': '198.51.100.17', 'x-real-ip': '203.0.113.77' } } } }
+    expect(applyAuthPeerAddress(request)).toBe('172.20.4.253')
+    expect(request.node.req.headers['x-real-ip']).toBe('172.20.4.253')
+    expect(request.node.req.headers['x-forwarded-for']).toBe('198.51.100.17')
+  })
+
+  it('does not trust an entire container bridge for the alpha reverse proxy', () => {
+    const script = readFileSync(new URL('../../scripts/ci-alpha-compose.sh', import.meta.url), 'utf8')
+    expect(script).not.toContain('AUTH_TRUSTED_PROXY_CIDR=172.16.0.0/12')
+    expect(script).toMatch(/AUTH_TRUSTED_PROXY_CIDR=.*\/32/)
+    expect(script).toContain('ALPHA_DIRECT_PEER_IP')
+    expect(script).toContain('docker network inspect "${project}_default" | node scripts/ci-alpha-network.mjs --space')
+    expect(script).not.toContain('network_subnet%.*/*')
+  })
+
+  it('forwards configured public HTTPS origin and secrets explicitly to the production image', () => {
+    const app = compose.split('\n  app:\n')[1]?.split('\n  ops:\n')[0]
+    expect(app).toContain('NUXT_APP_SECRET: ${NUXT_APP_SECRET:?')
+    expect(app).toContain('RECOVERY_QUEUE_SECRET: ${RECOVERY_QUEUE_SECRET:?')
+    expect(app).toContain('NUXT_PUBLIC_SITE_URL: ${NUXT_PUBLIC_SITE_URL:?')
+    expect(app).toContain('AUTH_TRUSTED_PROXY_CIDR: ${AUTH_TRUSTED_PROXY_CIDR:-}')
+  })
+
+  it('runs independent WHO Anthro comparisons against isolated checkpoint database without skips', () => {
+    const script = readFileSync(new URL('../../scripts/ci-alpha-compose.sh', import.meta.url), 'utf8')
+    expect(script).toContain('WHO_TEST_DATABASE_URL=')
+    expect(script).toContain('who-reference.test.ts')
+    expect(script).toContain('reference-selection.test.ts')
+    expect(script).toContain('numPendingTests')
+    expect(script).toContain('numFailedTests')
   })
 
   it('stops the worker before streaming the backup and requires a RustFS snapshot before migrating', () => {

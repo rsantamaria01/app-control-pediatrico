@@ -37,6 +37,12 @@ docker compose --profile full run --rm --no-deps -e WHO_ALLOW_CLINICAL_IMPORT=ye
 
 The flag must be exactly `yes`. If any file is missing or mismatched, the import fails without adding a partial release. The complete release is sealed atomically, and rerunning the command verifies the existing rows without replacing them. Check the command output for 12 datasets and validate the clinical reference availability with an authorized doctor; keep external writes blocked during an upgrade import. An absent or unapproved import leaves WHO indicators unavailable, not filled with fictional data.
 
+## Disposable growth-journey checkpoint
+
+The `alpha-production-checkpoint` CI job runs `scripts/ci-alpha-compose.sh` against a fresh Compose project and isolated database. It verifies ops migrations, generated-password admin bootstrap, doctor and assistant accounts, fictional patients and visits, doctor and approved family PDFs, Mailpit invitations, a guardian linked to two children, cross-family denial, sharing revocation, secure cookies, proxy IP trust, and the installed service worker's offline/no-cache behavior. Official WHO files are hash-checked and imported only as a disposable test fixture; the clinical import flag stays unset. CI run `43754845243` passed with 12 sealed datasets and 17,260 rows, 34 WHO/Anthro integration tests with no skips, the production-browser journey, the security test, Docker integration and ops-smoke.
+
+This checkpoint is not permission to import WHO references into a clinic or to use identifiable patient records. Before a real-record pilot, verify source rights and clinical signoff, the actual TLS ingress and trusted proxy, image pins, the paired PostgreSQL/RustFS restore drill below, and pediatrician and visual approval of the family charts and PDFs. The paired restore has **not** been demonstrated by this checkpoint; keep its operational evidence outside this repository.
+
 ## Upgrades and recovery
 
 ### Upgrade with a write-free window

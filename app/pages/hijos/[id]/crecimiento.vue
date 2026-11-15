@@ -25,7 +25,7 @@ const showTable = ref(false)
         Crecimiento de {{ data.name }}
       </h1>
       <p class="text-sm text-muted">
-        Mediciones de controles compartidos por la clínica y referencias OMS. Consulte las curvas con su pediatra.
+        Mediciones de controles compartidos por la clínica y referencias OMS. El eje de edad muestra la edad corregida o cronológica usada en cada medición; consulte la fecha y el tipo de edad en la tabla. Consulte las curvas con su pediatra.
       </p>
       <UButton
         variant="outline"

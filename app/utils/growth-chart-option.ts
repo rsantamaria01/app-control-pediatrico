@@ -27,14 +27,14 @@ export function growthChartOption(view: ChartView | FamilyChartView, dark: boole
     if (!point) return ''
     const date = new Intl.DateTimeFormat('es-EC', { timeZone: 'America/Guayaquil', day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(point.measuredAt))
     const value = new Intl.NumberFormat('es-EC', { maximumFractionDigits: 2 }).format(point.y)
-    if (family || !('z' in point)) return `${date} · ${value}`
+    if (family || !('z' in point)) return `${date} · ${value}${view.xUnit === 'DAY' ? ` · edad ${point.ageBasis === 'CORRECTED' ? 'corregida' : 'cronológica'} ${new Intl.NumberFormat('es-EC', { maximumFractionDigits: 1 }).format(point.x / 30.4375)} meses` : ''}`
     return `${date} · ${value} · ${point.ageBasis === 'CORRECTED' ? 'Edad corregida · ' : ''}${formatGrowthValues(point.z, point.percentile)}`
   } }
   return {
     aria: { enabled: true, description: family ? 'Mediciones y curvas de referencia de crecimiento' : 'Mediciones y siete curvas de desviación estándar OMS. Tabla disponible.' },
     textStyle: { fontFamily: 'Inter, sans-serif', color: color.text, fontSize: 11 },
     grid: { left: 14, right: family ? 14 : 44, top: 24, bottom: 65, containLabel: true },
-    xAxis: { type: 'value', name: view.xUnit === 'CM' ? 'Longitud/talla (cm)' : 'Edad (meses)', min: view.curves[0]?.data[0]?.[0], max: view.curves[0]?.data.at(-1)?.[0], axisLabel: { color: color.axis, formatter: view.xUnit === 'CM' ? '{value}' : (value: number) => String(Math.round(value / 30.4375)) }, splitLine: { lineStyle: { color: color.grid, type: 'dashed' } } },
+    xAxis: { type: 'value', name: view.xUnit === 'CM' ? 'Longitud/talla (cm)' : family ? 'Edad corregida o cronológica (meses)' : 'Edad (meses)', min: view.curves[0]?.data[0]?.[0], max: view.curves[0]?.data.at(-1)?.[0], axisLabel: { color: color.axis, formatter: view.xUnit === 'CM' ? '{value}' : (value: number) => String(Math.round(value / 30.4375)) }, splitLine: { lineStyle: { color: color.grid, type: 'dashed' } } },
     yAxis: { type: 'value', axisLabel: { color: color.axis }, splitLine: { lineStyle: { color: color.grid } } },
     dataZoom: [{ type: 'inside', zoomOnMouseWheel: false }, { type: 'slider', height: 24, bottom: 4, show: false }],
     tooltip,

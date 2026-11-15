@@ -7,6 +7,8 @@ import { hashPassword } from 'better-auth/crypto'
 import { createServer, type Socket } from 'node:net'
 import { account, guardianGrant, patient, setupToken, user, userRole, visit, visitResult, visitText } from '../../server/db/schema'
 import { eq } from 'drizzle-orm'
+import type { EChartsOption } from 'echarts'
+import { growthChartOption } from '../../app/utils/growth-chart-option'
 import { inspectVisual, inspectCanvas, inspectZoom } from './visual-evidence'
 
 const url = process.env.TEST_DATABASE_URL
@@ -154,6 +156,58 @@ test.describe('verified guardian invitation and isolated portal', () => {
     }
   })
 
+  test('preterm family growth identifies corrected and chronological ages across the 24-month cutoff', async ({ page }) => {
+    const parentId = randomUUID()
+    const childId = randomUUID()
+    const doctorId = randomUUID()
+    const username = `preterm-${parentId.slice(0, 8)}`
+    const password = 'preterm family passphrase'
+    await db.insert(user).values({ id: parentId, name: 'Familia', email: `${parentId}@example.test`, username })
+    await db.insert(userRole).values({ userId: parentId, role: 'PATIENT' })
+    await db.insert(account).values({ id: randomUUID(), userId: parentId, accountId: parentId, providerId: 'credential', password: await hashPassword(password) })
+    await db.insert(patient).values({ id: childId, name: 'Niña prematura', birthDate: '2023-01-01', sex: 'FEMALE', gestationDays: 252, correctionUntilMonths: 24, createdBy: doctorId })
+    await db.insert(guardianGrant).values({ patientId: childId, guardianId: parentId, contactEmail: `${parentId}@example.test`, proof: 'Verificado en consulta', verifiedBy: doctorId, status: 'ACTIVE' })
+    for (const [date, position, weight] of [['2025-01-01T12:00:00Z', 'RECUMBENT', '10'], ['2025-01-02T12:00:00Z', 'STANDING', '11']] as const) {
+      await db.insert(visit).values({ id: randomUUID(), patientId: childId, requestId: randomUUID(), requestDigest: 'fixture', measuredAt: new Date(date), weightKg: weight, lengthHeightCm: '80', position, headCircumferenceCm: '46', bmi: '17', birthDateAtVisit: '2023-01-01', sexAtVisit: 'FEMALE', correctionUntilMonths: 24, authorId: doctorId })
+    }
+    await page.goto('/acceso')
+    await page.waitForLoadState('networkidle')
+    await page.getByRole('textbox', { name: 'Usuario' }).fill(username)
+    await page.getByLabel('Contraseña').fill(password)
+    await page.getByRole('button', { name: 'Ingresar' }).click()
+    await expect(page).toHaveURL('/')
+    const response = await page.request.get(`/api/hijos/${childId}/crecimiento`)
+    expect(response.status()).toBe(200)
+    const family = await response.json()
+    expect(family.charts.WEIGHT_FOR_AGE.points).toEqual([
+      { measuredAt: '2025-01-01T12:00:00.000Z', x: 703, y: 10, ageBasis: 'CORRECTED', chronologicalAgeDays: 731 },
+      { measuredAt: '2025-01-02T12:00:00.000Z', x: 732, y: 11, ageBasis: 'CHRONOLOGICAL', chronologicalAgeDays: 732 }
+    ])
+    expect(family.charts.HEIGHT_FOR_AGE.points).toEqual([
+      { measuredAt: '2025-01-02T12:00:00.000Z', x: 732, y: 80, ageBasis: 'CHRONOLOGICAL', chronologicalAgeDays: 732 }
+    ])
+    expect(JSON.stringify(family)).not.toMatch(/"(?:z|percentile|classification|status)"/)
+    const option = growthChartOption(family.charts.WEIGHT_FOR_AGE, false, true) as EChartsOption
+    expect((option.xAxis as { name: string }).name).toContain('corregida o cronológica')
+    const formatter = (option.tooltip as { formatter: (params: unknown) => string }).formatter
+    expect(formatter({ seriesName: 'Mediciones', dataIndex: 0 })).toContain('edad corregida')
+    expect(formatter({ seriesName: 'Mediciones', dataIndex: 1 })).toContain('edad cronológica')
+    const ssr = await page.request.get(`/hijos/${childId}/crecimiento`)
+    const html = await ssr.text()
+    expect(html).toContain('edad corregida o cronológica')
+    expect(html).toContain('chronologicalAgeDays')
+    expect(html).not.toMatch(/"(?:z|percentile|classification|status)"/)
+    await page.goto(`/hijos/${childId}/crecimiento`)
+    await page.waitForLoadState('networkidle')
+    await expect(page.getByRole('heading', { name: 'Crecimiento de Niña prematura' })).toBeVisible()
+    await page.getByRole('button', { name: 'Ver tabla' }).click()
+    await expect(page.getByRole('button', { name: 'Ver gráfico' })).toBeVisible()
+    const table = page.getByRole('table', { name: 'Mediciones y referencias de crecimiento' }).first()
+    await expect(table).toContainText('edad corregida')
+    await expect(table).toContainText('edad cronológica')
+    expect(await page.locator('main').innerText()).not.toMatch(/percentil|Z [−+0-9]|normal|alterado/)
+  })
+
   test('assistant verifies and invites; parent sees only own child at 375 and 1440, revoke removes access', async ({ page }) => {
     for (const width of [375, 1440]) {
       messages.length = 0
@@ -244,7 +298,7 @@ test.describe('verified guardian invitation and isolated portal', () => {
       expect(growth.status()).toBe(200)
       expect(await growth.text()).not.toMatch(/"z"|percentile|classification|DO_NOT_EXPOSE|HIDDEN_ADVICE/)
       const familyCharts = await growth.json()
-      expect(familyCharts.charts.WEIGHT_FOR_AGE.points).toEqual([{ measuredAt: '2025-01-01T12:00:00.000Z', x: 366, y: 9 }])
+      expect(familyCharts.charts.WEIGHT_FOR_AGE.points).toEqual([{ measuredAt: '2025-01-01T12:00:00.000Z', x: 366, y: 9, ageBasis: 'CHRONOLOGICAL', chronologicalAgeDays: 366 }])
       expect(familyCharts.charts.WEIGHT_FOR_AGE.curves).toHaveLength(7)
       expect(familyCharts.charts.WEIGHT_FOR_AGE.curves[0]).not.toHaveProperty('label')
       expect(JSON.stringify(familyCharts)).not.toMatch(/2025-02-01|"y":10|"status"|"z"|percentile|classification/)

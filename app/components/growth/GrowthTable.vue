@@ -44,7 +44,7 @@ const pointLabel = (x: number) => props.view.xUnit === 'DAY' ? `${number.format(
             {{ date.format(new Date(point.measuredAt)) }}
           </td>
           <td class="p-3">
-            {{ pointLabel(point.x) }}<span v-if="!family && 'ageBasis' in point && point.ageBasis === 'CORRECTED'"> · edad corregida</span>
+            {{ pointLabel(point.x) }}<span v-if="view.xUnit === 'DAY'"> · edad {{ point.ageBasis === 'CORRECTED' ? 'corregida' : 'cronológica' }}</span>
           </td>
           <td class="p-3">
             {{ number.format(point.y) }}

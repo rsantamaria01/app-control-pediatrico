@@ -65,7 +65,7 @@ export async function getFamilyGrowth(actor: Actor, patientId: string): Promise<
         correctionUntilMonths: sexRow.correctionUntilMonths as 24 | 36, measuredLengthHeightCm: visit.lengthHeightCm, position: visit.position as 'RECUMBENT' | 'STANDING', sex, indicator })
       if ('unavailableReason' in ref) continue
       const value = measurement({ ...visit, bmi: 0 }, indicator, ref.adjustmentCm)
-      selected.push({ datasetId: ref.datasetId, position: ref.referencePosition, point: { measuredAt: visit.measuredAt, x: ref.x, y: value } })
+      selected.push({ datasetId: ref.datasetId, position: ref.referencePosition, point: { measuredAt: visit.measuredAt, x: ref.x, y: value, ageBasis: ref.ageBasis, chronologicalAgeDays: ref.chronologicalAgeDays } })
     }
     const latest = selected[0]
     if (!latest) continue

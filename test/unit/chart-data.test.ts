@@ -21,9 +21,9 @@ describe('chart data projections', () => {
   })
 
   it('removes every clinical field from the family projection including excess input keys', () => {
-    const view = buildFamilyChartData([row(0), row(30)], [{ ...point, x: 30, y: 4.4, z: 4, percentile: 99.9, status: 'abnormal', classification: 'danger' }])
-    expect(view.points).toEqual([{ measuredAt: point.measuredAt, x: 30, y: 4.4 }])
-    expect(JSON.stringify(view)).not.toMatch(/"(?:z|percentile|status|classification|result|ageBasis|sex)"|abnormal|danger/i)
+    const view = buildFamilyChartData([row(0), row(30)], [{ ...point, x: 30, y: 4.4, ageBasis: 'CORRECTED', chronologicalAgeDays: 40, z: 4, percentile: 99.9, status: 'abnormal', classification: 'danger' }])
+    expect(view.points).toEqual([{ measuredAt: point.measuredAt, x: 30, y: 4.4, ageBasis: 'CORRECTED', chronologicalAgeDays: 40 }])
+    expect(JSON.stringify(view)).not.toMatch(/"(?:z|percentile|status|classification|result|sex)"|abnormal|danger/i)
     expect(view.curves).toHaveLength(7)
     expect(view.curves[0]).toEqual({ data: [[0, 2], [30, 2]] })
   })
@@ -33,6 +33,7 @@ describe('chart data projections', () => {
     expect(buildChartData([row(0), row(30)], [{ ...point, result: { ...result, sex: Gender.MALE } }])).toBeNull()
     expect(buildChartData([row(0), row(30)], [{ ...point, result: { ...result, reference: { ...result.reference, x: 31 } } }])).toBeNull()
     expect(buildChartData([row(0), row(30)], [{ ...point, result: { ...result, reference: { ...result.reference, chronologicalAgeDays: 1827 } } }])).toBeNull()
-    expect(buildFamilyChartData([], [{ measuredAt: point.measuredAt, x: 30, y: 4.4 }])).toBeNull()
+    expect(buildFamilyChartData([], [{ measuredAt: point.measuredAt, x: 30, y: 4.4, ageBasis: 'CORRECTED', chronologicalAgeDays: 40 }])).toBeNull()
+    expect(buildFamilyChartData([row(0), row(30)], [{ measuredAt: point.measuredAt, x: 30, y: 4.4, ageBasis: 'CHRONOLOGICAL', chronologicalAgeDays: 40 }])).toBeNull()
   })
 })

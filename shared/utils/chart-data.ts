@@ -3,8 +3,8 @@ import type { WhoRow } from '../types/who'
 import { Gender, WhoIndicator } from './enums'
 
 export type ChartCurve = { label: string, data: [number, number][] }
-export type FamilyPoint = { measuredAt: string, x: number, y: number }
-export type DoctorPoint = FamilyPoint & { z: number, percentile: number | null, ageBasis: 'CHRONOLOGICAL' | 'CORRECTED' }
+export type FamilyPoint = { measuredAt: string, x: number, y: number, ageBasis: 'CHRONOLOGICAL' | 'CORRECTED', chronologicalAgeDays: number }
+export type DoctorPoint = Omit<FamilyPoint, 'chronologicalAgeDays'> & { z: number, percentile: number | null }
 export type ChartView = { curves: ChartCurve[], band: [number, number, number][], points: DoctorPoint[], xUnit: 'DAY' | 'CM', indicator: WhoIndicator, sex: Gender }
 export type FamilyChartView = { curves: { data: [number, number][] }[], points: FamilyPoint[], xUnit: 'DAY' | 'CM', indicator: WhoIndicator }
 export type DoctorSnapshotPoint = { measuredAt: string, value: number, result: GrowthResult }
@@ -51,6 +51,10 @@ export function buildFamilyChartData(rows: WhoRow[], shared: FamilyPoint[]): Fam
   if (!verifiedRows(rows)) return null
   const first = rows[0]!
   if (shared.some(point => !Number.isFinite(point.x) || point.x < first.x || point.x > rows.at(-1)!.x
-    || !Number.isFinite(point.y) || point.y <= 0 || !Number.isFinite(Date.parse(point.measuredAt)))) return null
-  return { curves: curves(rows).map(curve => ({ data: curve.data })), points: shared.map(point => ({ measuredAt: point.measuredAt, x: point.x, y: point.y })).sort((a, b) => a.x - b.x), xUnit: first.xUnit, indicator: first.indicator }
+    || !Number.isFinite(point.y) || point.y <= 0 || !Number.isFinite(Date.parse(point.measuredAt))
+    || !Number.isInteger(point.chronologicalAgeDays) || point.chronologicalAgeDays < 0 || point.chronologicalAgeDays >= 1827
+    || (point.ageBasis !== 'CORRECTED' && point.ageBasis !== 'CHRONOLOGICAL')
+    || (first.xUnit === 'DAY' && (point.x > point.chronologicalAgeDays || (point.ageBasis === 'CHRONOLOGICAL' && point.x !== point.chronologicalAgeDays)
+      || (point.ageBasis === 'CORRECTED' && point.x >= point.chronologicalAgeDays))))) return null
+  return { curves: curves(rows).map(curve => ({ data: curve.data })), points: shared.map(point => ({ measuredAt: point.measuredAt, x: point.x, y: point.y, ageBasis: point.ageBasis, chronologicalAgeDays: point.chronologicalAgeDays })).sort((a, b) => a.x - b.x), xUnit: first.xUnit, indicator: first.indicator }
 }

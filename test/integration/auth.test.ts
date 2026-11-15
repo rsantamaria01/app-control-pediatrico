@@ -972,13 +972,20 @@ describe('username/password access', () => {
   it('keeps the reservation limit during a failing-username lock across a second IP', async () => {
     const { reserveLoginAttempt, recordLoginFailure, clearLoginFailures } = await import('../../server/services/otp-rate-limit')
     const name = `reserved-${crypto.randomUUID().slice(0, 8)}`
-    for (let i = 0; i < 3; i++) {
-      expect(await reserveLoginAttempt(name, `203.0.115.${i + 1}`)).toBe(true)
-      await recordLoginFailure(name, `203.0.115.${i + 1}`)
+    const ipBlock = Number.parseInt(crypto.randomUUID().slice(0, 4), 16)
+    const octet = (ipBlock % 254) + 1
+    const firstAddress = `198.18.${octet}.1`
+    const secondIp = `198.19.${octet}.4`
+    expect(await reserveLoginAttempt(name, firstAddress)).toBe(true)
+    await recordLoginFailure(name, firstAddress)
+    for (let i = 1; i < 3; i++) {
+      const address = `198.18.${octet}.${i + 1}`
+      expect(await reserveLoginAttempt(name, address)).toBe(true)
+      await recordLoginFailure(name, address)
     }
-    expect(await reserveLoginAttempt(name, '203.0.113.2')).toBe(false)
+    expect(await reserveLoginAttempt(name, secondIp)).toBe(false)
     await clearLoginFailures(name)
-    expect(await reserveLoginAttempt(name, '203.0.113.2')).toBe(false)
+    expect(await reserveLoginAttempt(name, secondIp)).toBe(false)
   })
 
   it('locks failed sign-in attempts with a generic audited error and does not reset the lock on a correct password', async () => {

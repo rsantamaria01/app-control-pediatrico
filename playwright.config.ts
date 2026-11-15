@@ -3,7 +3,8 @@ import { defineConfig } from '@playwright/test'
 export default defineConfig({
   testDir: './test/e2e',
   use: {
-    baseURL: 'http://127.0.0.1:3000'
+    baseURL: 'http://127.0.0.1:3000',
+    ...(process.env.ALPHA_COMPOSE_E2E === '1' ? { launchOptions: { args: ['--ignore-certificate-errors'] } } : {})
   },
   webServer: process.env.ALPHA_COMPOSE_E2E === '1'
     ? undefined

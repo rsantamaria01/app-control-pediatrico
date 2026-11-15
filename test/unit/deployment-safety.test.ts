@@ -2,7 +2,8 @@ import { execFileSync, spawnSync } from 'node:child_process'
 import { mkdtempSync, readFileSync, rmSync, writeFileSync, chmodSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import { defineConfig } from '@playwright/test'
 
 const root = new URL('../..', import.meta.url)
 const compose = readFileSync(new URL('../../compose.yaml', import.meta.url), 'utf8')
@@ -59,6 +60,30 @@ describe('deployment safety', () => {
     const result = spawnSync('node', ['scripts/ci-alpha-network.mjs'], { cwd: root, input: JSON.stringify(network), encoding: 'utf8' })
     expect(result.status).not.toBe(0)
     expect(result.stdout).toBe('')
+  })
+
+  it('trusts the disposable certificate only in the isolated Compose browser', async () => {
+    vi.stubEnv('ALPHA_COMPOSE_E2E', '1')
+    try {
+      vi.resetModules()
+      const { default: config } = await import('../../playwright.config')
+      expect(defineConfig(config).use?.launchOptions?.args).toContain('--ignore-certificate-errors')
+    } finally {
+      vi.unstubAllEnvs()
+      vi.resetModules()
+    }
+  })
+
+  it('keeps certificate verification enabled outside the isolated Compose browser', async () => {
+    vi.stubEnv('ALPHA_COMPOSE_E2E', '')
+    try {
+      vi.resetModules()
+      const { default: config } = await import('../../playwright.config')
+      expect(defineConfig(config).use?.launchOptions?.args).toBeUndefined()
+    } finally {
+      vi.unstubAllEnvs()
+      vi.resetModules()
+    }
   })
 
   it('does not trust an entire container bridge for the alpha reverse proxy', () => {

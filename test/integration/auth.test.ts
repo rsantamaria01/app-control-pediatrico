@@ -774,6 +774,10 @@ describe('username/password access', () => {
     const { trustedProxyIPSettings } = await import('../../server/auth.config')
     expect(trustedProxyIPSettings(undefined)).toEqual({ ipAddressHeaders: [] })
     expect(trustedProxyIPSettings('192.0.2.0/24')).toEqual({ ipAddressHeaders: ['x-forwarded-for'], trustedProxies: ['192.0.2.0/24'] })
+    const { loginClientAddress } = await import('../../server/auth.config')
+    expect(loginClientAddress('172.20.4.253', '198.51.100.17', '172.20.4.254/32')).toBe('172.20.4.253')
+    expect(loginClientAddress('172.20.4.254', '198.51.100.17', '172.20.4.254/32')).toBe('198.51.100.17')
+    expect(loginClientAddress(undefined, '198.51.100.17', '172.20.4.254/32')).toBe('shared')
   })
 
   it('never creates a session when Valkey is unavailable on sign-in', async () => {

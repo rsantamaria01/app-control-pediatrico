@@ -167,6 +167,33 @@ test('production image journeys from bootstrapped admin through two children and
     expect(await familyGrowth.text()).not.toMatch(/percentile|"z"|HIDDEN_ADVICE/)
     await page.goto(`/hijos/${first}/crecimiento`)
     await expect(page.locator('main canvas').first()).toBeVisible()
+    await expect.poll(async () => page.evaluate(async () => {
+      await navigator.serviceWorker.ready
+      return Boolean(navigator.serviceWorker.controller)
+    }), { timeout: 15000 }).toBe(true)
+    await page.goto(`/hijos/${first}`)
+    await expect(page.getByText('Regresar en febrero')).toBeVisible()
+    const throughWorker = await page.evaluate(async (id) => {
+      const response = await fetch(`/api/hijos/${id}`)
+      return response.ok && (await response.text()).includes('Regresar en febrero')
+    }, first)
+    expect(throughWorker).toBe(true)
+    const cacheKeys = await page.evaluate(async () => (await Promise.all((await caches.keys()).map(async name => (await caches.open(name)).keys()))).flat().map(request => request.url))
+    expect(cacheKeys.filter(url => /\/(?:api|hijos|pacientes)\//.test(url) || /\/(?:hijos|pacientes)(?:$|\?)/.test(url))).toEqual([])
+    await context.setOffline(true)
+    expect(await page.evaluate(async id => fetch(`/api/hijos/${id}`).then(() => 'network', () => 'offline'), first)).toBe('offline')
+    const offlineDocument = await context.newPage()
+    try {
+      await expect(offlineDocument.goto(`/hijos/${first}`, { waitUntil: 'domcontentloaded' })).rejects.toThrow()
+      expect(await offlineDocument.locator('body').innerText().catch(() => '')).not.toMatch(/Regresar en febrero|PRIVATE_NEVER_SHOW/)
+    } finally {
+      await offlineDocument.close()
+      await context.setOffline(false)
+    }
+    await page.goto(`/hijos/${first}/crecimiento`)
+    await expect(page.locator('main canvas').first()).toBeVisible()
+    const afterOffline = await page.evaluate(async () => (await Promise.all((await caches.keys()).map(async name => (await caches.open(name)).keys()))).flat().map(request => request.url))
+    expect(afterOffline.filter(url => /\/(?:api|hijos|pacientes)\//.test(url) || /\/(?:hijos|pacientes)(?:$|\?)/.test(url))).toEqual([])
     const privateHtml = await context.request.get(`/hijos/${first}`)
     expect(privateHtml.headers()['cache-control']).toContain('no-store')
     expect(await privateHtml.text()).not.toMatch(/PRIVATE_NEVER_SHOW|HIDDEN_ADVICE/)

@@ -84,6 +84,19 @@ test('production image journeys from bootstrapped admin through two children and
     }
     const first = await createChild('Luz')
     const second = await createChild('Sol', '1710034065')
+    const otherPhone = `09${String(Math.floor(Math.random() * 1e8)).padStart(8, '0')}`
+    const otherEmail = `other-${randomUUID()}@example.test`
+    const otherChildResponse = await context.request.post('/api/pacientes/rapido', { data: { givenNames: 'Otra', surnames: 'Familia', birthDate: '2024-01-01', sex: 'FEMALE', contacts: [{ name: 'Otra madre', relationship: 'Madre', phone: otherPhone, email: otherEmail, proof: 'Identidad verificada presencialmente', invite: true }] } })
+    expect(otherChildResponse.status(), await otherChildResponse.text()).toBe(200)
+    const otherChild = (await otherChildResponse.json()).patient.id as string
+    const otherGrant = await context.request.get(`/api/guardian-grants/${otherChild}`)
+    expect((await otherGrant.json()).guardians[0].status).toBe('PENDING')
+    const otherVisit = await context.request.post(`/api/pacientes/${otherChild}/visitas`, { data: { requestId: randomUUID(), measuredAt: '2025-01-01T12:00:00.000Z', weightKg: 9, lengthHeightCm: 75, position: 'RECUMBENT', headCircumferenceCm: 45, shareWithFamily: true, parentAdvice: 'ONLY_OTHER_FAMILY', privateNote: 'PRIVATE_OTHER_FAMILY' } })
+    expect(otherVisit.status(), await otherVisit.text()).toBe(200)
+    const otherPreview = await context.request.post(`/api/pacientes/${otherChild}/informes`)
+    expect(otherPreview.status(), await otherPreview.text()).toBe(200)
+    const otherReportId = (await otherPreview.json()).id as string
+    expect((await context.request.post(`/api/pacientes/${otherChild}/informes/${otherReportId}/aprobar`)).status()).toBe(200)
     const secondRecord = await context.request.get(`/api/pacientes/${second}`)
     expect((await secondRecord.json()).nationalId).toBe('1710034065')
     const firstRecord = await context.request.get(`/api/pacientes/${first}`)
@@ -126,10 +139,23 @@ test('production image journeys from bootstrapped admin through two children and
     const sibling = await context.request.post('/api/guardian-grants', { data: { patientId: second, contact: { name: 'Familia de prueba', email, phone, relationship: 'Madre', proof: 'Identidad verificada presencialmente', confirmedGuardianId: guardianId } } })
     expect(sibling.status(), await sibling.text()).toBe(200)
     await context.clearCookies()
+    await setup(otherEmail, 'journey-other-family', 'unique other guardian phrase')
+    await signIn('journey-other-family', 'unique other guardian phrase')
+    expect((await context.request.get(`/api/hijos/${otherChild}`)).status()).toBe(200)
+    expect((await context.request.get(`/api/hijos/${first}`)).status()).toBe(404)
+    await context.clearCookies()
     await signIn('journey-family', 'unique guardian setup phrase')
     await expect(page.getByRole('heading', { name: 'Mis hijos' })).toBeVisible()
     const children = await context.request.get('/api/hijos')
-    expect((await children.json()).map((item: { id: string }) => item.id)).toEqual(expect.arrayContaining([first, second]))
+    const visibleChildren = (await children.json()).map((item: { id: string }) => item.id)
+    expect(visibleChildren).toEqual(expect.arrayContaining([first, second]))
+    expect(visibleChildren).not.toContain(otherChild)
+    for (const path of [`/api/hijos/${otherChild}`, `/api/hijos/${otherChild}/crecimiento`, `/api/hijos/${otherChild}/informes/${otherReportId}/pdf`, `/api/hijos/${otherChild}/informes/${otherReportId}`, `/hijos/${otherChild}`, `/hijos/${otherChild}/crecimiento`, `/hijos/${otherChild}/informe`]) {
+      const denied = await context.request.get(path)
+      expect(denied.status(), path).toBe(404)
+      expect(denied.headers()['cache-control'], path).toContain('no-store')
+      expect(await denied.text(), path).not.toMatch(/ONLY_OTHER_FAMILY|PRIVATE_OTHER_FAMILY|Otra Familia|weightKg|percentile|"z"/i)
+    }
     await page.goto(`/hijos/${second}`)
     await expect(page.getByRole('heading', { name: 'Indicaciones de Sol Prueba' })).toBeVisible()
     const own = await context.request.get(`/api/hijos/${first}`)

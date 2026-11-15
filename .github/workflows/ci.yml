@@ -89,5 +89,6 @@ jobs:
         run: |
           pnpm exec vitest run --config vitest.integration.config.ts test/integration/production-ops.test.ts --reporter=json --outputFile=/tmp/opencode/production-ops-results.json || result=$?
           jq -r '.testResults[].assertionResults[] | "\(.status): \(.fullName)"' /tmp/opencode/production-ops-results.json
+          jq -r '.testResults[].assertionResults[] | select(.status == "failed") | .failureMessages[] | split("\n")[] | select(test("production-ops.test.ts:[0-9]+")) | match("production-ops.test.ts:[0-9]+(:[0-9]+)?").string' /tmp/opencode/production-ops-results.json
           jq -e '(.numPassedTests == 4) and (.numPendingTests == 0) and (.numFailedTests == 0)' /tmp/opencode/production-ops-results.json > /dev/null
           test "${result:-0}" -eq 0

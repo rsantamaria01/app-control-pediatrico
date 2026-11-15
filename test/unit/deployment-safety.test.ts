@@ -29,12 +29,44 @@ describe('deployment safety', () => {
     expect(new URL(child.url).password).toBe('part%3A%40%2F%3F%23%25%20with%20space')
   })
 
+  it.each([
+    ['172.20.0.0/16', '172.20.0.1', '172.20.255.254', '172.20.255.253'],
+    ['172.21.32.0/20', '172.21.32.1', '172.21.47.254', '172.21.47.253'],
+    ['172.22.8.0/24', '172.22.8.1', '172.22.8.254', '172.22.8.253']
+  ])('selects two distinct unused peers inside actual Docker subnet %s', (subnet, gateway, proxy, peer) => {
+    const network = [{ IPAM: { Config: [{ Subnet: subnet, Gateway: gateway }] }, Containers: { db: { IPv4Address: `${gateway}/${subnet.split('/')[1]}` } } }]
+    const result = spawnSync('node', ['scripts/ci-alpha-network.mjs'], { cwd: root, input: JSON.stringify(network), encoding: 'utf8' })
+    expect(result.status, result.stderr).toBe(0)
+    expect(JSON.parse(result.stdout)).toEqual({ proxy, peer })
+  })
+
+  it('does not allocate occupied addresses or accept an invalid Docker subnet', () => {
+    const network = [{ IPAM: { Config: [{ Subnet: '172.22.8.0/24', Gateway: '172.22.8.1' }] }, Containers: { db: { IPv4Address: '172.22.8.254/24' } } }]
+    const occupied = spawnSync('node', ['scripts/ci-alpha-network.mjs'], { cwd: root, input: JSON.stringify(network), encoding: 'utf8' })
+    expect(occupied.status, occupied.stderr).toBe(0)
+    expect(JSON.parse(occupied.stdout)).toEqual({ proxy: '172.22.8.253', peer: '172.22.8.252' })
+    for (const config of [{ Subnet: '172.22.8.0/24', Gateway: '172.22.9.1' }, { Subnet: '172.22.8.1/24', Gateway: '172.22.8.2' }]) {
+      const invalid = spawnSync('node', ['scripts/ci-alpha-network.mjs'], { cwd: root, input: JSON.stringify([{ ...network[0], IPAM: { Config: [config] } }]), encoding: 'utf8' })
+      expect(invalid.status).not.toBe(0)
+      expect(invalid.stdout).toBe('')
+    }
+  })
+
+  it('fails closed when Docker cannot provide two distinct unoccupied addresses', () => {
+    const network: { IPAM: { Config: { Subnet: string, Gateway: string }[] }, Containers: Record<string, { IPv4Address: string }> }[] = [{ IPAM: { Config: [{ Subnet: '172.22.8.0/28', Gateway: '172.22.8.1' }] }, Containers: {} }]
+    const occupied = Array.from({ length: 12 }, (_, index) => index + 2)
+    for (const octet of occupied) network[0]!.Containers[`peer${octet}`] = { IPv4Address: `172.22.8.${octet}/28` }
+    const result = spawnSync('node', ['scripts/ci-alpha-network.mjs'], { cwd: root, input: JSON.stringify(network), encoding: 'utf8' })
+    expect(result.status).not.toBe(0)
+    expect(result.stdout).toBe('')
+  })
+
   it('does not trust an entire container bridge for the alpha reverse proxy', () => {
     const script = readFileSync(new URL('../../scripts/ci-alpha-compose.sh', import.meta.url), 'utf8')
     expect(script).not.toContain('AUTH_TRUSTED_PROXY_CIDR=172.16.0.0/12')
     expect(script).toMatch(/AUTH_TRUSTED_PROXY_CIDR=.*\/32/)
     expect(script).toContain('ALPHA_DIRECT_PEER_IP')
-    expect(script).toContain('index .IPAM.Config 0).Gateway')
+    expect(script).toContain('docker network inspect "${project}_default" | node scripts/ci-alpha-network.mjs --space')
     expect(script).not.toContain('network_subnet%.*/*')
   })
 

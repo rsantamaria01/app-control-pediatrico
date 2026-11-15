@@ -165,6 +165,13 @@ const dateFormat = new Intl.DateTimeFormat('es-EC', { day: 'numeric', month: 'sh
         </div>
         <div class="flex flex-wrap gap-2">
           <UButton
+            :to="`/pacientes/${id}/informe`"
+            variant="outline"
+            size="lg"
+          >
+            Informes
+          </UButton>
+          <UButton
             :to="`/representantes/invitar?patient=${encodeURIComponent(id)}`"
             variant="outline"
             size="lg"

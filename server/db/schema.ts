@@ -229,6 +229,18 @@ export const visitText = pgTable('visit_text', {
   clinicianTrend: text('clinician_trend')
 })
 
+export const familyReport = pgTable('family_report', {
+  id: text('id').primaryKey(),
+  patientId: text('patient_id').notNull().references(() => patient.id, { onDelete: 'restrict' }),
+  content: jsonb('content').notNull(),
+  pdfBase64: text('pdf_base64'),
+  version: integer('version').notNull(),
+  createdBy: text('created_by').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  approvedBy: text('approved_by'),
+  approvedAt: timestamp('approved_at', { withTimezone: true })
+}, table => [index('family_report_patient_idx').on(table.patientId, table.approvedAt), check('family_report_approval_ck', sql`(${table.approvedBy} IS NULL) = (${table.approvedAt} IS NULL)`)])
+
 export const whoDataset = pgTable('who_dataset', {
   id: text('id').primaryKey(),
   publisher: text('publisher').notNull(),

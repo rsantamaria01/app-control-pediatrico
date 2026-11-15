@@ -29,6 +29,13 @@ const size = new Intl.NumberFormat('es-EC', { minimumFractionDigits: 1, maximumF
         Indicaciones de {{ child.name }}
       </h1>
       <UButton
+        :to="`/hijos/${id}/informe`"
+        variant="outline"
+        class="min-h-11"
+      >
+        Ver informes
+      </UButton>
+      <UButton
         :to="`/hijos/${id}/crecimiento`"
         variant="outline"
         class="min-h-11"

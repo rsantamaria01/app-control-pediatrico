@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { Pool } from 'pg'
 import { drizzle } from 'drizzle-orm/node-postgres'
 import { migrate } from 'drizzle-orm/node-postgres/migrator'
-import { eq } from 'drizzle-orm'
+import { and, eq, isNotNull } from 'drizzle-orm'
 import { hashPassword } from 'better-auth/crypto'
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
 import { account, familyReport, guardianGrant, patient, user, userRole, visit, visitSharing, visitText } from '../../server/db/schema'
@@ -60,8 +60,12 @@ test.describe('doctor-approved family PDF', () => {
       }
 
       await login(username)
+      const legacyId = randomUUID()
+      await db.insert(familyReport).values({ id: legacyId, patientId: childId, content: { name: 'Niña con informe', birthDate: '2024-01-01', visits: [{ id: visitId, measuredAt: '2025-01-01T12:00:00.000Z', weightKg: 9, lengthHeightCm: 75, position: 'RECUMBENT', headCircumferenceCm: 45, nextControlAt: null, parentAdvice: 'Control familiar en febrero' }], charts: {}, sources: [] }, version: 1, createdBy: doctorId, approvedBy: doctorId, approvedAt: new Date() })
       await page.goto(`/pacientes/${childId}/informe`)
       await page.waitForLoadState('networkidle')
+      await expect(page.getByText('Informe anterior sin PDF descargable')).toBeVisible()
+      await expect(page.getByText('Requiere una nueva vista previa y aprobación médica.')).toBeVisible()
       await expect(page.getByRole('heading', { name: 'Informes de crecimiento' })).toBeVisible()
       const pdfBefore = await page.request.get(`/api/hijos/${childId}/informe`)
       expect(pdfBefore.status()).toBe(403)
@@ -75,8 +79,9 @@ test.describe('doctor-approved family PDF', () => {
       expect(doctorPreview.status()).toBe(200)
       const previewBytes = await doctorPreview.body()
       expect(previewBytes.subarray(0, 4).toString()).toBe('%PDF')
+      expect((await page.request.get(`/api/pacientes/${childId}/informes/anteriores`)).status()).toBe(200)
       expect(await page.locator('main').innerText()).not.toMatch(/PRIVATE_NEVER_SHOW|percentil|Puntuación Z/)
-      const [preview] = await db.select().from(familyReport).where(eq(familyReport.patientId, childId))
+      const [preview] = await db.select().from(familyReport).where(and(eq(familyReport.patientId, childId), isNotNull(familyReport.pdfBase64)))
       expect(preview?.approvedAt).toBeNull()
       await page.getByRole('button', { name: 'Aprobar este informe para la familia' }).click()
       await expect(page.getByRole('status')).toContainText('Informe aprobado')
@@ -84,6 +89,9 @@ test.describe('doctor-approved family PDF', () => {
       await login(guardianName)
       await page.goto(`/hijos/${childId}/informe`)
       await expect(page.getByRole('heading', { name: 'Informes aprobados' })).toBeVisible()
+      expect((await page.request.get(`/api/hijos/${childId}/informes/${legacyId}/pdf`)).status()).toBe(404)
+      expect((await page.request.get(`/api/hijos/${childId}/informes/${legacyId}`)).status()).toBe(404)
+      expect((await page.request.get(`/api/hijos/${childId}/informe`).then(response => response.json())).map((item: { id: string }) => item.id)).not.toContain(legacyId)
       const href = await page.getByRole('link', { name: 'Descargar PDF' }).getAttribute('href')
       expect(href).toContain(preview!.id)
       const response = await page.request.get(href!)

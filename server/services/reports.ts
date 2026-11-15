@@ -124,11 +124,19 @@ export async function getDoctorDraft(actor: Actor, patientId: string, draftId: s
   return row.approvedAt ? approved(row) : draft(row)
 }
 
+export async function listLegacyReports(actor: Actor, patientId: string): Promise<{ id: string, approvedAt: string }[]> {
+  await authorizeClinical(actor, 'CLINICAL_READ', patientId)
+  const [exists] = await useDb().select({ id: patient.id }).from(patient).where(eq(patient.id, patientId))
+  if (!exists) throw createError({ statusCode: 404, statusMessage: 'Patient not found' })
+  const rows = await useDb().select({ id: familyReport.id, approvedAt: familyReport.approvedAt }).from(familyReport).where(and(eq(familyReport.patientId, patientId), sql`${familyReport.approvedAt} IS NOT NULL`, sql`${familyReport.pdfBase64} IS NULL`)).orderBy(desc(familyReport.approvedAt))
+  return rows.map(row => ({ id: row.id, approvedAt: row.approvedAt!.toISOString() }))
+}
+
 export async function listFamilyReports(actor: Actor, patientId: string): Promise<{ id: string, approvedAt: string }[]> {
   const db = useDb()
   const [grant] = actor.roles.length === 1 && actor.roles[0] === 'PATIENT' ? await db.select({ patientId: guardianGrant.patientId }).from(guardianGrant).where(and(eq(guardianGrant.patientId, patientId), eq(guardianGrant.guardianId, actor.id), eq(guardianGrant.status, 'ACTIVE'))) : []
   if (!grant) throw createError({ statusCode: 404, statusMessage: 'Not found' })
-  const rows = await db.select().from(familyReport).where(and(eq(familyReport.patientId, patientId), sql`${familyReport.approvedAt} IS NOT NULL`)).orderBy(desc(familyReport.approvedAt))
+  const rows = await db.select().from(familyReport).where(and(eq(familyReport.patientId, patientId), sql`${familyReport.approvedAt} IS NOT NULL`, sql`${familyReport.pdfBase64} IS NOT NULL`)).orderBy(desc(familyReport.approvedAt))
   const accessible: { id: string, approvedAt: string }[] = []
   for (const row of rows) {
     try {
@@ -145,7 +153,7 @@ export async function getApprovedReport(guardian: Actor, patientId: string, repo
   const db = useDb()
   if (guardian.roles.length !== 1 || guardian.roles[0] !== 'PATIENT') throw createError({ statusCode: 404, statusMessage: 'Not found' })
   const [match] = await db.select().from(familyReport).innerJoin(guardianGrant, and(eq(guardianGrant.patientId, familyReport.patientId), eq(guardianGrant.guardianId, guardian.id), eq(guardianGrant.status, 'ACTIVE')))
-    .where(and(eq(familyReport.id, reportId), eq(familyReport.patientId, patientId), sql`${familyReport.approvedAt} IS NOT NULL`))
+    .where(and(eq(familyReport.id, reportId), eq(familyReport.patientId, patientId), sql`${familyReport.approvedAt} IS NOT NULL`, sql`${familyReport.pdfBase64} IS NOT NULL`))
   const row = match?.family_report
   if (!row) {
     await recordAudit('REPORT_READ', 'DENIED', guardian.id, patientId)

@@ -4,8 +4,9 @@ import { drizzle } from 'drizzle-orm/node-postgres'
 import { migrate } from 'drizzle-orm/node-postgres/migrator'
 import { Pool } from 'pg'
 import { eq } from 'drizzle-orm'
-import { readFile } from 'node:fs/promises'
-import { resolve } from 'node:path'
+import { readFile, mkdtemp, rm, cp, writeFile } from 'node:fs/promises'
+import { resolve, join } from 'node:path'
+import { tmpdir } from 'node:os'
 import manifest from '../../scripts/who-2006-manifest.json'
 import { WhoIndicator } from '../../shared/utils/enums'
 import type { Gender } from '../../shared/utils/enums'
@@ -32,15 +33,37 @@ const stranger: Actor = { id: randomUUID(), roles: ['PATIENT'] }
 const assistant: Actor = { id: randomUUID(), roles: ['ASSISTANT'] }
 const childId = randomUUID()
 const otherChildId = randomUUID()
+const legacyId = randomUUID()
+let legacyVisitId = ''
+let legacyBefore: Record<string, unknown>
+let legacyApprovedAt: Date
 let created = false
 
 beforeAll(async () => {
   await adminPool.query(`CREATE DATABASE "${name}"`)
   created = true
   process.env.DATABASE_URL = target.href
-  await migrate(db, { migrationsFolder: './server/db/migrations' })
+  const migrations = resolve('server/db/migrations')
+  const directory = await mkdtemp(join(tmpdir(), 'pediatrico-report-upgrade-'))
+  try {
+    await cp(migrations, directory, { recursive: true })
+    const journal = JSON.parse(await readFile(join(directory, 'meta/_journal.json'), 'utf8')) as { entries: { tag: string }[] }
+    journal.entries = journal.entries.filter(entry => entry.tag !== '0028_gorgeous_talon')
+    await writeFile(join(directory, 'meta/_journal.json'), JSON.stringify(journal))
+    await migrate(db, { migrationsFolder: directory })
+    await db.insert(patient).values({ id: childId, name: 'Niña del informe', birthDate: '2024-01-01', sex: 'FEMALE', createdBy: doctor.id })
+    legacyVisitId = randomUUID()
+    await db.insert(visit).values({ id: legacyVisitId, patientId: childId, requestId: randomUUID(), requestDigest: 'fixture', measuredAt: new Date('2025-01-01T12:00:00Z'), weightKg: '9', lengthHeightCm: '75', position: 'RECUMBENT', headCircumferenceCm: '45', bmi: '16', birthDateAtVisit: '2024-01-01', sexAtVisit: 'FEMALE', correctionUntilMonths: 24, authorId: doctor.id })
+    await db.insert(visitText).values({ visitId: legacyVisitId, privateNote: 'PRIVATE_ARCHIVE', parentAdvice: 'Texto histórico sin resultados' })
+    legacyApprovedAt = new Date('2026-11-15T03:00:00Z')
+    const content = { name: 'Niña histórica', birthDate: '2024-01-01', visits: [{ id: legacyVisitId, measuredAt: '2025-01-01T12:00:00.000Z', weightKg: 9, lengthHeightCm: 75, position: 'RECUMBENT', headCircumferenceCm: 45, nextControlAt: null, parentAdvice: 'Texto histórico sin resultados' }], charts: {}, sources: [] }
+    await pool.query('INSERT INTO family_report (id, patient_id, content, version, created_by, created_at, approved_by, approved_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)', [legacyId, childId, JSON.stringify(content), 1, doctor.id, new Date('2026-11-15T01:00:00Z'), doctor.id, legacyApprovedAt])
+    legacyBefore = (await pool.query('SELECT * FROM family_report WHERE id = $1', [legacyId])).rows[0]
+    await migrate(db, { migrationsFolder: migrations })
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
   await db.insert(patient).values([
-    { id: childId, name: 'Niña del informe', birthDate: '2024-01-01', sex: 'FEMALE', createdBy: doctor.id },
     { id: otherChildId, name: 'Otra niña', birthDate: '2024-01-01', sex: 'FEMALE', createdBy: doctor.id }
   ])
   await db.insert(user).values({ id: guardian.id, name: 'Familia', email: 'guardian@example.test' })
@@ -104,7 +127,8 @@ describe('approved report boundary', () => {
     const sharedId = await seedVisit(true, 'PRIVATE_SECRET', 'Indicaciones compartidas')
     await seedVisit(false, 'PRIVATE_HIDDEN', 'Oculto')
     const draft = await previewFamilyReport(doctor, childId)
-    expect(draft.content.visits).toHaveLength(1)
+    expect(draft.content.visits.map(item => item.id)).toEqual(expect.arrayContaining([legacyVisitId, sharedId]))
+    expect(draft.content.visits).toHaveLength(2)
     expect(JSON.stringify(draft)).not.toMatch(/PRIVATE|Oculto|\bz\b|percentile|classification|status|bmi|normal|abnormal/i)
     await expect(getApprovedReport(guardian, childId, draft.id)).rejects.toMatchObject({ statusCode: 404 })
     await expect(approveFamilyReport(assistant, draft.id)).rejects.toMatchObject({ statusCode: 403 })
@@ -128,6 +152,30 @@ describe('approved report boundary', () => {
     await db.update(guardianGrant).set({ status: 'REVOKED' }).where(eq(guardianGrant.patientId, childId))
     await expect(getApprovedReport(guardian, childId, approved.id)).rejects.toMatchObject({ statusCode: 404 })
   })
+
+  it('upgrades a populated 0027 approved row without advertising an unavailable PDF and requires explicit doctor reissue', async () => {
+    const { listFamilyReports, renderFamilyReport, getApprovedReport, listLegacyReports, previewFamilyReport, approveFamilyReport } = await import('../../server/services/reports')
+    await db.update(guardianGrant).set({ status: 'ACTIVE' }).where(eq(guardianGrant.patientId, childId))
+    expect((await listFamilyReports(guardian, childId)).map(report => report.id)).not.toContain(legacyId)
+    await expect(renderFamilyReport(guardian, childId, legacyId)).rejects.toMatchObject({ statusCode: 404 })
+    await expect(getApprovedReport(stranger, childId, legacyId)).rejects.toMatchObject({ statusCode: 404 })
+    expect(await listLegacyReports(doctor, childId)).toEqual([{ id: legacyId, approvedAt: legacyApprovedAt.toISOString() }])
+    await expect(listLegacyReports(assistant, childId)).rejects.toMatchObject({ statusCode: 403 })
+    const newDraft = await previewFamilyReport(doctor, childId)
+    expect(newDraft.id).not.toBe(legacyId)
+    await expect(renderFamilyReport(guardian, childId, newDraft.id)).rejects.toMatchObject({ statusCode: 404 })
+    const reissued = await approveFamilyReport(doctor, newDraft.id)
+    expect((await listFamilyReports(guardian, childId)).map(report => report.id)).toContain(reissued.id)
+    expect((await listFamilyReports(guardian, childId)).map(report => report.id)).not.toContain(legacyId)
+    expect((await renderFamilyReport(guardian, childId, reissued.id)).subarray(0, 4).toString()).toBe('%PDF')
+    const after = await pool.query('SELECT * FROM family_report WHERE id = $1', [legacyId])
+    expect(after.rows[0]).toEqual({ ...legacyBefore, pdf_base64: null })
+    await db.insert(visitSharing).values({ visitId: legacyVisitId, shared: false, changedBy: doctor.id })
+    await expect(renderFamilyReport(guardian, childId, reissued.id)).rejects.toMatchObject({ statusCode: 404 })
+    expect(await listFamilyReports(guardian, childId)).toEqual([])
+    await db.update(guardianGrant).set({ status: 'REVOKED' }).where(eq(guardianGrant.patientId, childId))
+    await expect(renderFamilyReport(guardian, childId, reissued.id)).rejects.toMatchObject({ statusCode: 404 })
+  }, 120000)
 
   it('doctor previews identical frozen PDF bytes before approval, despite later branding changes', async () => {
     const { previewFamilyReport, approveFamilyReport, getDoctorPreviewPdf, renderFamilyReport } = await import('../../server/services/reports')

@@ -11,6 +11,7 @@ const date = new Intl.DateTimeFormat('es-EC', { day: 'numeric', month: 'short', 
 const number = new Intl.NumberFormat('es-EC', { minimumFractionDigits: 1, maximumFractionDigits: 2 })
 const url = `/api/pacientes/${encodeURIComponent(id)}/informes`
 const { data: access, error: accessError } = await useFetch(`/api/pacientes/${encodeURIComponent(id)}`)
+const { data: legacyReports } = await useFetch<{ id: string, approvedAt: string }[]>(`${url}/anteriores`)
 
 async function preview() {
   busy.value = true
@@ -85,6 +86,22 @@ async function approve() {
         <p class="text-sm text-muted">
           Solo controles compartidos; sin resultados clínicos ni notas privadas. Revise cada informe antes de aprobarlo.
         </p>
+        <div
+          v-if="legacyReports?.length"
+          class="space-y-2 rounded-lg border border-default p-4"
+        >
+          <p class="font-medium">
+            Informe anterior sin PDF descargable
+          </p>
+          <p>Requiere una nueva vista previa y aprobación médica.</p>
+          <p
+            v-for="report in legacyReports"
+            :key="report.id"
+            class="text-sm text-muted"
+          >
+            Aprobado anteriormente el {{ date.format(new Date(report.approvedAt)) }} · {{ report.id }}
+          </p>
+        </div>
         <UButton
           :disabled="busy"
           class="min-h-11"

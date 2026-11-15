@@ -98,9 +98,9 @@ test('production image journeys from bootstrapped admin through two children and
     const otherReportId = (await otherPreview.json()).id as string
     expect((await context.request.post(`/api/pacientes/${otherChild}/informes/${otherReportId}/aprobar`)).status()).toBe(200)
     const secondRecord = await context.request.get(`/api/pacientes/${second}`)
-    expect((await secondRecord.json()).nationalId).toBe('1710034065')
+    expect((await secondRecord.json()).patient.nationalId).toBe('1710034065')
     const firstRecord = await context.request.get(`/api/pacientes/${first}`)
-    expect((await firstRecord.json()).nationalId).toBeUndefined()
+    expect((await firstRecord.json()).patient.nationalId).toBeUndefined()
     const uninvited = await context.request.get(`/api/guardian-grants/${first}`)
     expect((await uninvited.json()).guardians[0].status).toBe('UNINVITED')
     const visit = await context.request.post(`/api/pacientes/${first}/visitas`, { data: { requestId: randomUUID(), measuredAt: '2025-01-01T12:00:00.000Z', weightKg: 9, lengthHeightCm: 75, position: 'RECUMBENT', headCircumferenceCm: 45, shareWithFamily: true, parentAdvice: 'Regresar en febrero', privateNote: 'PRIVATE_NEVER_SHOW' } })

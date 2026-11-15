@@ -65,6 +65,7 @@ useSeoMeta({
         <UNavigationMenu
           v-if="navigation?.length"
           :items="navigation"
+          class="hidden lg:flex"
         />
         <UColorModeButton aria-label="Cambiar tema" />
       </template>
@@ -86,5 +87,19 @@ useSeoMeta({
       </UContainer>
       <NuxtPage v-else />
     </UMain>
+    <nav
+      v-if="online && navigation?.length"
+      aria-label="Navegación principal"
+      class="fixed inset-x-0 bottom-0 z-40 grid grid-flow-col border-t border-default bg-default pb-[env(safe-area-inset-bottom)] lg:hidden"
+    >
+      <NuxtLink
+        v-for="item in navigation"
+        :key="item.to"
+        :to="item.to"
+        class="flex min-h-14 min-w-0 items-center justify-center px-1 text-center text-xs font-medium text-primary focus-visible:outline-2 focus-visible:outline-primary"
+      >
+        {{ item.label }}
+      </NuxtLink>
+    </nav>
   </UApp>
 </template>

@@ -1,0 +1,175 @@
+import { expect, test } from '@playwright/test'
+import { hashPassword } from 'better-auth/crypto'
+import { drizzle } from 'drizzle-orm/node-postgres'
+import { migrate } from 'drizzle-orm/node-postgres/migrator'
+import { Pool } from 'pg'
+import { account, patient, user, userRole, visit } from '../../server/db/schema'
+
+const enabled = process.env.AUTH_E2E === '1' && process.env.CLINICAL_E2E === '1' && process.env.CLINICAL_E2E_DATABASE_URL === process.env.TEST_DATABASE_URL
+const url = process.env.TEST_DATABASE_URL
+
+test.describe('agenda by role and viewport', () => {
+  test.skip(!enabled, 'Requires disposable clinical E2E database')
+  let pool: Pool
+  test.beforeAll(async () => {
+    if (!url || new URL(url).pathname !== '/pediatrico_auth_slice2_test' || url === process.env.DATABASE_URL) throw new Error('Dedicated disposable E2E DB required')
+    pool = new Pool({ connectionString: url })
+    await migrate(drizzle(pool), { migrationsFolder: './server/db/migrations' })
+  })
+  test.afterAll(async () => pool?.end())
+
+  test('assistant receives only scheduling fields in API and SSR, doctor sees clinical summary', async ({ browser }) => {
+    const db = drizzle(pool)
+    const secret = `CLINICAL-SECRET-${crypto.randomUUID()}`
+    const patientId = crypto.randomUUID()
+    await db.insert(patient).values({ id: patientId, name: 'Paciente protegido', birthDate: '2024-01-01', sex: 'FEMALE', createdBy: 'doctor' })
+    await db.insert(visit).values({ id: crypto.randomUUID(), patientId, requestId: crypto.randomUUID(), requestDigest: 'test', measuredAt: new Date('2025-01-01T12:00:00Z'), weightKg: '9.5', lengthHeightCm: '75', position: 'RECUMBENT', headCircumferenceCm: '45', bmi: '16', birthDateAtVisit: '2024-01-01', sexAtVisit: 'FEMALE', correctionUntilMonths: 24, authorId: 'doctor' })
+    for (const role of ['DOCTOR', 'ASSISTANT'] as const) {
+      const id = crypto.randomUUID()
+      const username = `agenda-${id.slice(0, 8)}`
+      await db.insert(user).values({ id, name: role, email: `${id}@example.test`, username })
+      await db.insert(userRole).values({ userId: id, role })
+      await db.insert(account).values({ id: crypto.randomUUID(), userId: id, accountId: id, providerId: 'credential', password: await hashPassword('long secure password') })
+      const context = await browser.newContext()
+      const page = await context.newPage()
+      await page.goto('/acceso')
+      await page.waitForLoadState('networkidle')
+      await page.getByRole('textbox', { name: 'Usuario' }).fill(username)
+      await page.getByLabel('Contraseña').fill('long secure password')
+      await page.getByRole('button', { name: 'Ingresar' }).click()
+      await expect(page).toHaveURL('/')
+      if (role === 'DOCTOR') {
+        const settings = await context.request.put('/api/agenda/horarios', { data: { days: [{ weekday: 1, open: '09:00', close: '11:00' }], durationMinutes: 30, blocked: [] } })
+        expect(settings.status()).toBe(200)
+        const future = new Date()
+        future.setUTCDate(future.getUTCDate() + (8 - future.getUTCDay()) % 7 + 350)
+        const date = future.toISOString().slice(0, 10)
+        const created = await context.request.post('/api/agenda', { data: { date, time: '10:30', name: 'Paciente protegido', contact: '0991234567', reason: secret, patientId } })
+        expect(created.status(), await created.text()).toBe(200)
+        const doctorBody = await created.json()
+        expect(doctorBody).toMatchObject({ patientId, lastWeightKg: 9.5, reason: secret })
+        await context.close()
+        continue
+      }
+      const doctorRows = await db.select().from(patient)
+      expect(doctorRows.some(row => row.id === patientId)).toBe(true)
+      const from = new Date()
+      from.setUTCDate(from.getUTCDate() + (8 - from.getUTCDay()) % 7 + 350)
+      const date = from.toISOString().slice(0, 10)
+      const response = await context.request.get(`/api/agenda?from=${date}&to=${date}`)
+      expect(response.status()).toBe(200)
+      const body = await response.text()
+      expect(body).toContain('Paciente protegido')
+      expect(body).not.toContain(secret)
+      expect(body).not.toContain(patientId)
+      expect(body).not.toContain('9.5')
+      expect(await (await context.request.get('/api/clinical/crecimiento-por-revisar')).status()).toBe(403)
+      await page.goto(`/agenda?vista=dia&fecha=${date}`)
+      await expect(page.getByText('Paciente protegido').first()).toBeVisible()
+      await page.getByRole('button', { name: /Paciente protegido/ }).first().click()
+      await expect(page.getByText('Abrir ficha')).toHaveCount(0)
+      const html = await page.content()
+      expect(html).not.toContain(secret)
+      expect(html).not.toContain(patientId)
+      await context.close()
+    }
+  })
+
+  test('doctor home shows real today counts and links only the available growth queue', async ({ browser }) => {
+    const id = crypto.randomUUID()
+    const username = `agenda-${id.slice(0, 8)}`
+    const db = drizzle(pool)
+    await db.insert(user).values({ id, name: 'Doctora', email: `${id}@example.test`, username })
+    await db.insert(userRole).values({ userId: id, role: 'DOCTOR' })
+    await db.insert(account).values({ id: crypto.randomUUID(), userId: id, accountId: id, providerId: 'credential', password: await hashPassword('long secure password') })
+    const context = await browser.newContext({ viewport: { width: 375, height: 812 } })
+    const page = await context.newPage()
+    await page.goto('/acceso')
+    await page.waitForLoadState('networkidle')
+    await page.getByRole('textbox', { name: 'Usuario' }).fill(username)
+    await page.getByLabel('Contraseña').fill('long secure password')
+    await page.getByRole('button', { name: 'Ingresar' }).click()
+    await expect(page).toHaveURL('/')
+    await expect(page.getByRole('heading', { name: 'Hoy' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Próximas citas' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Mis pacientes' })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Ver agenda completa' })).toHaveAttribute('href', '/agenda?vista=dia')
+    await expect(page.getByRole('link', { name: 'Crecimiento por revisar' })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Vacunación por revisar' })).toHaveCount(0)
+    await expect(page.getByRole('link', { name: 'Controles pendientes' })).toHaveCount(0)
+    await context.close()
+  })
+
+  for (const role of ['DOCTOR', 'ASSISTANT'] as const) {
+    for (const width of [375, 1024, 1440]) {
+      test(`${role} navigates day, week, month and details at ${width}px`, async ({ browser }) => {
+        const id = crypto.randomUUID()
+        const username = `agenda-${id.slice(0, 8)}`
+        const db = drizzle(pool)
+        await db.insert(user).values({ id, name: role, email: `${id}@example.test`, username })
+        await db.insert(userRole).values({ userId: id, role })
+        await db.insert(account).values({ id: crypto.randomUUID(), userId: id, accountId: id, providerId: 'credential', password: await hashPassword('long secure password') })
+        const context = await browser.newContext({ viewport: { width, height: 900 } })
+        const page = await context.newPage()
+        await page.goto('/acceso')
+        await page.waitForLoadState('networkidle')
+        await page.getByRole('textbox', { name: 'Usuario' }).fill(username)
+        await page.getByLabel('Contraseña').fill('long secure password')
+        await page.getByRole('button', { name: 'Ingresar' }).click()
+        await expect(page).toHaveURL('/')
+        await page.goto('/agenda?vista=dia')
+        await expect(page.getByRole('heading', { name: 'Agenda' })).toBeVisible()
+        if (role === 'DOCTOR' && width === 375) {
+          const monday = new Date()
+          monday.setUTCDate(monday.getUTCDate() + (8 - monday.getUTCDay()) % 7 + 357)
+          const date = monday.toISOString().slice(0, 10)
+          await page.goto('/agenda/horarios')
+          await expect(page.getByRole('heading', { name: 'Horarios de atención' })).toBeVisible()
+          await page.waitForLoadState('networkidle')
+          if (!(await page.getByLabel('Lunes').isChecked())) await page.getByLabel('Lunes').check()
+          const saved = page.waitForResponse(response => response.url().endsWith('/api/agenda/horarios') && response.request().method() === 'PUT')
+          await page.getByRole('button', { name: 'Guardar horarios' }).click()
+          const savedResponse = await saved
+          expect(savedResponse.status(), await savedResponse.text()).toBe(200)
+          await expect(page.getByRole('status')).toContainText('Horarios guardados')
+          await page.goto(`/agenda?vista=dia&fecha=${date}`)
+          await page.waitForLoadState('networkidle')
+          await page.getByRole('button', { name: 'Nueva cita' }).click()
+          await page.getByRole('dialog').getByRole('textbox', { name: 'Nombre' }).fill('Cita desde teléfono')
+          await page.getByRole('dialog').getByRole('textbox', { name: 'Contacto' }).fill('0991234567')
+          await page.getByRole('dialog').getByRole('textbox', { name: 'Motivo' }).fill('Consulta')
+          const available = page.getByRole('dialog').getByRole('combobox').locator('option:not([value=""])')
+          await expect(available.first()).toBeAttached()
+          await page.getByRole('dialog').getByRole('combobox').selectOption(await available.first().getAttribute('value') ?? '')
+          await page.getByRole('button', { name: 'Guardar cita' }).click()
+          await expect(page.getByRole('button', { name: /Cita desde teléfono/ }).last()).toBeVisible()
+          await page.getByRole('button', { name: /Cita desde teléfono/ }).last().click()
+          await expect(page.getByRole('dialog', { name: 'Cita' })).toBeVisible()
+          await page.getByRole('dialog', { name: 'Cita' }).getByRole('combobox').selectOption('10:30')
+          await page.getByRole('button', { name: 'Guardar cambio' }).click()
+          await expect(page.getByRole('button', { name: /10:30 Cita desde teléfono/ })).toBeVisible()
+          await page.getByRole('button', { name: /10:30 Cita desde teléfono/ }).click()
+          page.once('dialog', dialog => dialog.accept())
+          await page.getByRole('button', { name: 'Cancelar cita' }).click()
+          await expect(page.getByRole('button', { name: /10:30 Cita desde teléfono/ })).toContainText('CANCELLED')
+        }
+        await page.getByRole('link', { name: 'Semana' }).click()
+        await expect(page).toHaveURL(/vista=semana/)
+        await page.getByRole('link', { name: 'Mes' }).click()
+        await expect(page).toHaveURL(/vista=mes/)
+        await page.getByRole('link', { name: 'Día' }).click()
+        await expect(page).toHaveURL(/vista=dia/)
+        await expect(page.getByRole('button', { name: 'Fecha anterior' })).toBeVisible()
+        await page.getByRole('button', { name: 'Fecha siguiente' }).focus()
+        await page.keyboard.press('Enter')
+        await expect(page.getByLabel('Seleccionar fecha')).toHaveValue(/\d{4}-\d{2}-\d{2}/)
+        await expect(page.getByRole('main').getByRole('link', { name: 'Horarios' })).toBeVisible()
+        await page.getByRole('main').getByRole('link', { name: 'Horarios' }).click()
+        await expect(page.getByRole('heading', { name: 'Horarios de atención' })).toBeVisible()
+        const layout = await page.evaluate(() => ({ width: document.documentElement.scrollWidth, overflowing: [...document.querySelectorAll('*')].filter(element => element.getBoundingClientRect().right > innerWidth + 1).slice(0, 8).map(element => ({ tag: element.tagName, cls: element.className, right: element.getBoundingClientRect().right })) }))
+        expect(layout.width, JSON.stringify(layout.overflowing)).toBeLessThanOrEqual(width + 1)
+        await context.close()
+      })
+    }
+  }
+})

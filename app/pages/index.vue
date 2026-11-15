@@ -1,11 +1,15 @@
 <script setup lang="ts">
-import type { PatientView } from '#shared/types/measurement'
+import type { Appointment } from '#shared/types/scheduling'
 import type { FamilyChildSummary } from '../../server/services/invitations'
 
 const { data: navigation } = await useFetch<{ label: string, to: string }[]>('/api/auth/navigation')
 const isDoctor = computed(() => Boolean(navigation.value?.some(item => item.to === '/pacientes')))
 const isParent = computed(() => Boolean(navigation.value?.some(item => item.to === '/')) && !isDoctor.value)
-const { data: patients, error, refresh } = await useFetch<PatientView[]>('/api/pacientes', { immediate: isDoctor.value, default: () => [] })
+const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Guayaquil', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
+const { data: appointments, error, refresh } = await useFetch<Appointment[]>('/api/agenda', { query: { from: today, to: today }, immediate: isDoctor.value, default: () => [] })
+const { data: growthReview, error: growthError, refresh: refreshGrowth } = await useFetch<{ id: string }[]>('/api/clinical/crecimiento-por-revisar', { immediate: isDoctor.value, default: () => [] })
+const active = computed(() => appointments.value?.filter(item => item.status !== 'CANCELLED') ?? [])
+const upcoming = computed(() => active.value.filter(item => item.status !== 'ATTENDED' && new Date(`${item.date}T${item.time}:00-05:00`) >= new Date()))
 const { data: children, error: childrenError, refresh: refreshChildren } = await useFetch<FamilyChildSummary[]>('/api/hijos', { immediate: isParent.value, default: () => [] })
 const dateFormat = new Intl.DateTimeFormat('es-EC', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'America/Guayaquil' })
 const dateTimeFormat = new Intl.DateTimeFormat('es-EC', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'America/Guayaquil' })
@@ -44,55 +48,102 @@ function age(birthDate: string) {
         </UButton>
       </div>
       <UCard>
-        <div class="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h2 class="text-lg font-semibold">
-              Pacientes
-            </h2>
-            <p class="text-sm text-muted">
-              Busque una ficha o registre una nueva visita.
-            </p>
-          </div>
-          <UButton
-            to="/pacientes"
-            variant="outline"
+        <div class="flex items-center justify-between gap-2">
+          <h2 class="text-lg font-semibold">
+            Hoy
+          </h2><UButton
+            to="/agenda?vista=dia"
+            variant="link"
           >
-            Buscar pacientes
+            Ver agenda completa
           </UButton>
         </div>
-      </UCard>
-      <UAlert
-        v-if="error"
-        color="error"
-        variant="soft"
-        title="No se pudieron consultar las fichas"
-        :actions="[{ label: 'Reintentar', onClick: () => refresh() }]"
-      />
-      <UCard v-else>
-        <h2 class="mb-4 text-lg font-semibold">
-          Pacientes recientes
-        </h2>
-        <UEmpty
-          v-if="!patients?.length"
-          icon="i-lucide-users"
-          title="Aún no hay pacientes"
-          :actions="[{ label: 'Nuevo paciente', to: '/pacientes/nuevo' }]"
+        <UAlert
+          v-if="error"
+          color="error"
+          title="No se pudo cargar la agenda"
+          :actions="[{ label: 'Reintentar', onClick: () => refresh() }]"
         />
+        <dl
+          v-else
+          class="mt-3 grid grid-cols-3 gap-2 text-center tabular-nums"
+        >
+          <div>
+            <dt class="text-sm text-muted">
+              Citas
+            </dt><dd class="text-xl font-semibold">
+              {{ active.length }}
+            </dd>
+          </div><div>
+            <dt class="text-sm text-muted">
+              Por confirmar
+            </dt><dd class="text-xl font-semibold">
+              {{ active.filter(item => item.status === 'PENDING').length }}
+            </dd>
+          </div><div>
+            <dt class="text-sm text-muted">
+              Atendido
+            </dt><dd class="text-xl font-semibold">
+              {{ active.filter(item => item.status === 'ATTENDED').length }}
+            </dd>
+          </div>
+        </dl>
+      </UCard>
+      <UCard>
+        <h2 class="text-lg font-semibold">
+          Próximas citas
+        </h2>
+        <p
+          v-if="!upcoming.length"
+          class="mt-2 text-sm text-muted"
+        >
+          Sin próximas citas hoy.
+        </p>
         <ul
           v-else
-          class="divide-y divide-default"
+          class="mt-2 divide-y divide-default"
         >
           <li
-            v-for="person in patients.slice(0, 8)"
-            :key="person.id"
+            v-for="item in upcoming"
+            :key="item.id"
+            class="flex flex-wrap items-center gap-2 py-2 text-sm"
           >
+            <strong class="tabular-nums">{{ item.time }}</strong><NuxtLink
+              v-if="item.patientId"
+              :to="`/pacientes/${item.patientId}`"
+              class="font-semibold text-primary underline focus-visible:outline-2 focus-visible:outline-primary"
+            >{{ item.name }}</NuxtLink><span
+              v-else
+              class="font-semibold"
+            >{{ item.name }}</span><span class="text-muted">{{ item.birthDate ? age(item.birthDate) : 'Edad no registrada' }} · {{ item.lastWeightKg !== undefined ? `${weightFormat.format(item.lastWeightKg)} kg` : 'Peso no registrado' }}</span><span v-if="item.reason">{{ item.reason }}</span>
+          </li>
+        </ul>
+      </UCard>
+      <UCard>
+        <h2 class="text-lg font-semibold">
+          Mis pacientes
+        </h2>
+        <ul class="mt-2 divide-y divide-default">
+          <li class="flex min-h-12 items-center justify-between gap-2 text-sm">
+            <span>Vacunación por revisar</span><span class="text-muted">No disponible aún</span>
+          </li>
+          <li class="flex min-h-12 items-center justify-between gap-2 text-sm">
             <NuxtLink
-              :to="`/pacientes/${person.id}`"
-              class="flex min-h-14 items-center justify-between rounded-md py-3 hover:bg-elevated focus-visible:outline-2 focus-visible:outline-primary"
-            ><span>{{ person.name }}</span><UIcon
-              name="i-lucide-chevron-right"
-              aria-hidden="true"
-            /></NuxtLink>
+              to="/pacientes/crecimiento-por-revisar"
+              class="text-primary underline focus-visible:outline-2 focus-visible:outline-primary"
+            >Crecimiento por revisar</NuxtLink><span
+              v-if="growthError"
+              class="text-sm text-muted"
+            ><UButton
+              variant="link"
+              @click="refreshGrowth()"
+            >Reintentar</UButton></span><strong
+              v-else
+              class="tabular-nums"
+            >{{ growthReview?.length ?? 0 }}</strong>
+          </li>
+          <li class="flex min-h-12 items-center justify-between gap-2 text-sm">
+            <span>Controles pendientes</span><span class="text-muted">No disponible aún</span>
           </li>
         </ul>
       </UCard>

@@ -48,7 +48,7 @@ beforeAll(async () => {
   try {
     await cp(migrations, directory, { recursive: true })
     const journal = JSON.parse(await readFile(join(directory, 'meta/_journal.json'), 'utf8')) as { entries: { tag: string }[] }
-    journal.entries = journal.entries.filter(entry => entry.tag !== '0028_gorgeous_talon')
+    journal.entries = journal.entries.filter(entry => Number(entry.tag.slice(0, 4)) < 28)
     await writeFile(join(directory, 'meta/_journal.json'), JSON.stringify(journal))
     await migrate(db, { migrationsFolder: directory })
     await db.insert(patient).values({ id: childId, name: 'Niña del informe', birthDate: '2024-01-01', sex: 'FEMALE', createdBy: doctor.id })

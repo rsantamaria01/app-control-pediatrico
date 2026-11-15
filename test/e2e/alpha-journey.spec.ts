@@ -38,6 +38,10 @@ test('production image journeys from bootstrapped admin through two children and
   }
   const context = await browser.newContext({ baseURL: origin, ignoreHTTPSErrors: true })
   const page = await context.newPage()
+  const workerErrors: string[] = []
+  page.on('console', (message) => {
+    if (message.type() === 'error' && /service.worker|workbox|sw\.js/i.test(message.text())) workerErrors.push(message.text().slice(0, 250))
+  })
   const signIn = async (username: string, secret: string) => {
     await page.goto('/acceso')
     await page.getByRole('textbox', { name: 'Usuario' }).fill(username)
@@ -168,10 +172,18 @@ test('production image journeys from bootstrapped admin through two children and
     expect(await familyGrowth.text()).not.toMatch(/percentile|"z"|HIDDEN_ADVICE/)
     await page.goto(`/hijos/${first}/crecimiento`)
     await expect(page.locator('main canvas').first()).toBeVisible()
+    const workerResponse = await context.request.get('/sw.js')
+    expect(workerResponse.status()).toBe(200)
+    expect(workerResponse.headers()['content-type']).toMatch(/javascript/)
     const registration = await page.evaluate(async () => {
-      const worker = await navigator.serviceWorker.ready
-      return { scope: worker.scope, scriptURL: worker.active?.scriptURL, state: worker.active?.state }
+      const snapshot = async () => ({ secure: isSecureContext, url: location.href, controller: navigator.serviceWorker?.controller?.scriptURL ?? null, registrations: 'serviceWorker' in navigator ? (await navigator.serviceWorker.getRegistrations()).map(item => ({ scope: item.scope, active: item.active?.state ?? null, scriptURL: item.active?.scriptURL ?? null })) : [] })
+      if (!('serviceWorker' in navigator)) return { error: 'service worker unavailable', state: await snapshot() }
+      return Promise.race([
+        navigator.serviceWorker.ready.then(worker => ({ scope: worker.scope, scriptURL: worker.active?.scriptURL, state: worker.active?.state })),
+        new Promise<{ error: string, state: Awaited<ReturnType<typeof snapshot>> }>(resolve => setTimeout(async () => resolve({ error: 'service worker registration not ready', state: await snapshot() }), 10000))
+      ])
     })
+    if ('error' in registration) throw new Error(JSON.stringify({ ...registration, workerErrors }))
     expect(registration.scope).toBe(`${origin}/`)
     expect(registration.scriptURL).toBe(`${origin}/sw.js`)
     expect(['activating', 'activated']).toContain(registration.state)

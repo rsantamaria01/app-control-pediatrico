@@ -8,10 +8,12 @@ export const availabilitySchema = z.strictObject({
   durationMinutes: z.number().int().min(15).max(120),
   blocked: z.array(z.strictObject({ date, from: time, to: time }).refine(block => block.from < block.to)).max(366)
 })
-export const appointmentSchema = z.strictObject({ date, time, name: z.string().trim().min(2).max(160), contact: z.string().trim().min(3).max(160), reason: z.string().trim().min(2).max(500), status: z.enum(['PENDING', 'CONFIRMED']).default('CONFIRMED'), patientId: z.uuid().optional() })
+const appointmentFields = { date, time, name: z.string().trim().min(2).max(160), contact: z.string().trim().min(3).max(160), status: z.enum(['PENDING', 'CONFIRMED']).default('CONFIRMED') }
+export const assistantAppointmentSchema = z.strictObject(appointmentFields)
+export const appointmentSchema = z.strictObject({ ...appointmentFields, reason: z.string().trim().min(2).max(500), patientId: z.uuid().optional() })
 export const appointmentMoveSchema = z.strictObject({ date, time })
 export type DateRange = z.infer<typeof dateRangeSchema>
 export type Slot = { date: string, time: string, free: boolean, durationMinutes: number }
 export type AvailabilityInput = z.infer<typeof availabilitySchema>
-export type AppointmentInput = z.input<typeof appointmentSchema>
+export type AppointmentInput = z.input<typeof appointmentSchema> | z.input<typeof assistantAppointmentSchema>
 export type Appointment = { id: string, date: string, time: string, name: string, contact: string, status: string, reason?: string, patientId?: string, birthDate?: string, lastWeightKg?: number }

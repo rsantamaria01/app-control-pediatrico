@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull } from 'drizzle-orm'
+import { desc, eq } from 'drizzle-orm'
 import { createError } from 'nuxt/server'
 import type { Actor } from '../../shared/types/access'
 import { patient, visit, visitResult } from '../db/schema'
@@ -34,8 +34,14 @@ export async function listGrowthReview(actor: Actor, options: GrowthReviewConfig
   const people = await db.select({ id: patient.id, name: patient.name }).from(patient).orderBy(patient.name)
   const review: { id: string, name: string, indicators: string[] }[] = []
   for (const person of people) {
-    const history = await db.select({ measuredAt: visit.measuredAt, indicator: visitResult.indicator, snapshot: visitResult.snapshot }).from(visit).innerJoin(visitResult, eq(visitResult.visitId, visit.id)).where(and(eq(visit.patientId, person.id), isNull(visitResult.recalculationId))).orderBy(desc(visit.measuredAt), desc(visit.createdAt))
-    const readings: GrowthReading[] = history.map((row) => {
+    const history = await db.select({ visitId: visit.id, measuredAt: visit.measuredAt, indicator: visitResult.indicator, snapshot: visitResult.snapshot }).from(visit).innerJoin(visitResult, eq(visitResult.visitId, visit.id)).where(eq(visit.patientId, person.id)).orderBy(desc(visit.measuredAt), desc(visit.createdAt), desc(visitResult.createdAt), desc(visitResult.id))
+    const selected = new Set<string>()
+    const readings: GrowthReading[] = history.filter((row) => {
+      const key = `${row.visitId}:${row.indicator}`
+      if (selected.has(key)) return false
+      selected.add(key)
+      return true
+    }).map((row) => {
       const snapshot = row.snapshot as { status: string, z?: number, reference?: { version: string, datasetId: string, ageBasis: string } }
       return { measuredAt: row.measuredAt.toISOString(), indicator: row.indicator, z: snapshot.status === 'available' && typeof snapshot.z === 'number' ? snapshot.z : null, reference: snapshot.reference ? `${snapshot.reference.version}:${snapshot.reference.datasetId}` : '', ageBasis: snapshot.reference?.ageBasis ?? '' }
     })

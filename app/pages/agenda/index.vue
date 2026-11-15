@@ -44,7 +44,7 @@ function step(direction: number) {
 async function save() {
   message.value = ''
   try {
-    await $fetch('/api/agenda', { method: 'POST', body: { date: form.date, time: form.time, name: form.name, contact: form.contact, reason: form.reason, ...(form.patientId ? { patientId: form.patientId } : {}) } })
+    await $fetch('/api/agenda', { method: 'POST', body: { date: form.date, time: form.time, name: form.name, contact: form.contact, ...(isDoctor.value ? { reason: form.reason, ...(form.patientId ? { patientId: form.patientId } : {}) } : {}) } })
     newOpen.value = false
     await refresh()
     await refreshSlots()
@@ -232,6 +232,7 @@ function openDetail(item: Appointment) {
             />
           </UFormField>
           <UFormField
+            v-if="isDoctor"
             label="Motivo"
             required
           >

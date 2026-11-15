@@ -1,14 +1,14 @@
 import { randomUUID } from 'node:crypto'
-import { and, eq, gte, lte, ne, sql } from 'drizzle-orm'
+import { and, eq, gte, lte, sql } from 'drizzle-orm'
 import { createError } from 'nuxt/server'
 import type { Actor } from '../../shared/types/access'
-import { appointmentMoveSchema, appointmentSchema, dateRangeSchema, type Appointment, type AppointmentInput, type DateRange } from '../../shared/types/scheduling'
-import { appointment, patient, visit } from '../db/schema'
+import { appointmentMoveSchema, appointmentSchema, assistantAppointmentSchema, dateRangeSchema, type Appointment, type AppointmentInput, type DateRange } from '../../shared/types/scheduling'
+import { appointment, auditEvent, patient, visit } from '../db/schema'
 import { useDb } from '../utils/db'
-import { recordAudit } from './audit'
 import { availableSlots, instant, localDate, localTime, requireSchedule, zone } from './availability'
 
 type Row = typeof appointment.$inferSelect
+const audit = (action: string, actor: Actor, subjectId: string) => ({ id: randomUUID(), action, actorId: actor.id, subjectId, outcome: 'ALLOWED' })
 function projection(row: Row, actor: Actor, details?: { birthDate: string, weightKg: string | null }): Appointment {
   const basic: Appointment = { id: row.id, date: localDate(row.startsAt), time: localTime(row.startsAt), name: row.name, contact: row.contact, status: row.status }
   if (!actor.roles.includes('DOCTOR')) return basic
@@ -32,16 +32,19 @@ async function reserve(actor: Actor, date: string, time: string, existingId?: st
 
 export async function scheduleAppointment(actor: Actor, input: AppointmentInput): Promise<Appointment> {
   await requireSchedule(actor)
-  const values = appointmentSchema.parse(input)
+  const doctor = actor.roles.includes('DOCTOR')
+  if (!doctor && ('patientId' in input || 'reason' in input)) throw createError({ statusCode: 403, statusMessage: 'Access denied' })
+  const values = doctor ? appointmentSchema.parse(input) : assistantAppointmentSchema.parse(input)
   const db = useDb()
   const row = await db.transaction(async (tx) => {
     await tx.execute('SELECT pg_advisory_xact_lock(1130011)')
-    if (values.patientId && !(await tx.select({ id: patient.id }).from(patient).where(eq(patient.id, values.patientId)))[0]) throw createError({ statusCode: 404, statusMessage: 'Patient not found' })
+    const patientId = 'patientId' in values && typeof values.patientId === 'string' ? values.patientId : undefined
+    if (patientId && !(await tx.select({ id: patient.id }).from(patient).where(eq(patient.id, patientId)))[0]) throw createError({ statusCode: 404, statusMessage: 'Patient not found' })
     const interval = await reserve(actor, values.date, values.time)
-    const [inserted] = await tx.insert(appointment).values({ id: randomUUID(), ...interval, patientId: values.patientId, name: values.name, contact: values.contact, reason: values.reason, timeZone: zone, status: values.status, createdBy: actor.id }).returning()
+    const [inserted] = await tx.insert(appointment).values({ id: randomUUID(), ...interval, patientId, name: values.name, contact: values.contact, reason: 'reason' in values && typeof values.reason === 'string' ? values.reason : '', timeZone: zone, status: values.status, createdBy: actor.id }).returning()
+    await tx.insert(auditEvent).values(audit('APPOINTMENT_CREATE', actor, inserted!.id))
     return inserted!
   })
-  await recordAudit('APPOINTMENT_CREATE', 'ALLOWED', actor.id, row.id)
   return project(row, actor)
 }
 
@@ -69,9 +72,9 @@ export async function rescheduleAppointment(actor: Actor, id: string, input: { d
     if (current.status === 'CANCELLED' || current.status === 'ATTENDED') throw createError({ statusCode: 409, statusMessage: 'Cita cerrada' })
     const interval = await reserve(actor, values.date, values.time, id)
     const [updated] = await tx.update(appointment).set(interval).where(eq(appointment.id, id)).returning()
+    await tx.insert(auditEvent).values(audit('APPOINTMENT_RESCHEDULE', actor, id))
     return updated!
   })
-  await recordAudit('APPOINTMENT_RESCHEDULE', 'ALLOWED', actor.id, id)
   return project(row, actor)
 }
 
@@ -83,16 +86,21 @@ export async function cancelAppointment(actor: Actor, id: string): Promise<Appoi
     if (!current) throw createError({ statusCode: 404, statusMessage: 'Cita no encontrada' })
     if (current.status === 'CANCELLED' || current.status === 'ATTENDED') throw createError({ statusCode: 409, statusMessage: 'Cita cerrada' })
     const [updated] = await tx.update(appointment).set({ status: 'CANCELLED' }).where(eq(appointment.id, id)).returning()
+    await tx.insert(auditEvent).values(audit('APPOINTMENT_CANCEL', actor, id))
     return updated!
   })
-  await recordAudit('APPOINTMENT_CANCEL', 'ALLOWED', actor.id, id)
   return project(row, actor)
 }
 
 export async function attendAppointment(actor: Actor, id: string): Promise<Appointment> {
   await requireSchedule(actor)
-  const [row] = await useDb().update(appointment).set({ status: 'ATTENDED' }).where(and(eq(appointment.id, id), ne(appointment.status, 'CANCELLED'))).returning()
-  if (!row) throw createError({ statusCode: 409, statusMessage: 'Cita no disponible' })
-  await recordAudit('APPOINTMENT_ATTEND', 'ALLOWED', actor.id, id)
+  const row = await useDb().transaction(async (tx) => {
+    await tx.execute('SELECT pg_advisory_xact_lock(1130011)')
+    const [current] = await tx.select().from(appointment).where(eq(appointment.id, id))
+    if (!current || current.status === 'CANCELLED' || current.status === 'ATTENDED') throw createError({ statusCode: 409, statusMessage: 'Cita no disponible' })
+    const [updated] = await tx.update(appointment).set({ status: 'ATTENDED' }).where(eq(appointment.id, id)).returning()
+    await tx.insert(auditEvent).values(audit('APPOINTMENT_ATTEND', actor, id))
+    return updated!
+  })
   return project(row, actor)
 }

@@ -3,6 +3,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { drizzle } from 'drizzle-orm/node-postgres'
 import { migrate } from 'drizzle-orm/node-postgres/migrator'
 import { Pool } from 'pg'
+import { eq } from 'drizzle-orm'
+import { appointment, auditEvent } from '../../server/db/schema'
 import type { Actor } from '../../shared/types/access'
 import { getAvailability, saveAvailability } from '../../server/services/availability'
 import { cancelAppointment, getAppointment, listAppointments, rescheduleAppointment, scheduleAppointment } from '../../server/services/appointments'
@@ -16,6 +18,7 @@ const admin = new URL(configured)
 admin.pathname = '/postgres'
 const adminPool = new Pool({ connectionString: admin.href })
 const pool = new Pool({ connectionString: target.href })
+const db = drizzle(pool)
 const prior = process.env.DATABASE_URL
 const doctor: Actor = { id: randomUUID(), roles: ['DOCTOR'] }
 const assistant: Actor = { id: randomUUID(), roles: ['ASSISTANT'] }
@@ -60,7 +63,7 @@ describe('agenda on disposable database', () => {
 
   it('reserves atomically and never exposes clinical identity or links to assistant', async () => {
     await saveAvailability(doctor, { days: [{ weekday: 1, open: '09:00', close: '11:00' }], durationMinutes: 30, blocked: [] })
-    const results = await Promise.allSettled([scheduleAppointment(doctor, input), scheduleAppointment(assistant, { ...input, name: 'Otra persona' })])
+    const results = await Promise.allSettled([scheduleAppointment(doctor, input), scheduleAppointment(assistant, { date, time: '09:00', name: 'Otra persona', contact: input.contact })])
     expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(1)
     expect(results.filter(result => result.status === 'rejected')).toHaveLength(1)
     const [item] = await listAppointments(assistant, { from: date, to: date })
@@ -69,25 +72,128 @@ describe('agenda on disposable database', () => {
     expect(doctorItem.reason).toBe('Control')
     await expect(listAppointments(adminOnly, { from: date, to: date })).rejects.toMatchObject({ statusCode: 403 })
     expect((await getAvailability(assistant, { from: date, to: date })).find(slot => slot.time === '09:00')?.free).toBe(false)
-    await expect(scheduleAppointment(assistant, { ...input, name: 'Solapa', time: '09:15' })).rejects.toMatchObject({ statusCode: 409 })
+    await expect(scheduleAppointment(assistant, { date, name: 'Solapa', contact: input.contact, time: '09:15' })).rejects.toMatchObject({ statusCode: 409 })
     await saveAvailability(doctor, { days: [{ weekday: 1, open: '09:00', close: '11:00' }], durationMinutes: 60, blocked: [] })
     expect((await getAvailability(doctor, { from: date, to: date })).find(slot => slot.time === '09:00')?.free).toBe(false)
     expect((await getAvailability(doctor, { from: date, to: date })).find(slot => slot.time === '10:00')?.free).toBe(true)
     await saveAvailability(doctor, { days: [{ weekday: 1, open: '09:00', close: '11:00' }], durationMinutes: 30, blocked: [] })
   })
 
+  it('rejects assistant patient links and reasons without persisting clinical data', async () => {
+    await saveAvailability(doctor, { days: [{ weekday: 1, open: '09:00', close: '11:00' }], durationMinutes: 30, blocked: [] })
+    const patientId = randomUUID()
+    await pool.query('INSERT INTO patient (id, name, birth_date, sex, created_by) VALUES ($1,$2,$3,$4,$5)', [patientId, 'Niña protegida', '2024-01-01', 'FEMALE', doctor.id])
+    await expect(scheduleAppointment(assistant, { ...input, time: '09:30', patientId })).rejects.toMatchObject({ statusCode: 403 })
+    await expect(scheduleAppointment(assistant, { ...input, time: '09:30' })).rejects.toMatchObject({ statusCode: 403 })
+    await expect(scheduleAppointment(assistant, { date, time: '09:30', name: 'Inyección', contact: input.contact, patientId })).rejects.toMatchObject({ statusCode: 403 })
+    await expect(scheduleAppointment(assistant, { date, time: '09:30', name: 'Inyección', contact: input.contact, reason: 'Confidencial' })).rejects.toMatchObject({ statusCode: 403 })
+    const created = await scheduleAppointment(assistant, { date, time: '09:30', name: 'Sin datos clínicos', contact: '0998765432' })
+    const [stored] = await pool.query('SELECT patient_id, reason FROM appointment WHERE id = $1', [created.id]).then(result => result.rows)
+    expect(stored).toEqual({ patient_id: null, reason: '' })
+    expect(await getAppointment(assistant, created.id)).toEqual({ id: created.id, date, time: '09:30', name: 'Sin datos clínicos', contact: '0998765432', status: 'CONFIRMED' })
+    await expect(scheduleAppointment(doctor, { date, time: '10:00', name: 'Doctor sin motivo', contact: '0998765432' })).rejects.toThrow()
+  })
+
+  it('rolls back a new appointment when its audit insert fails', async () => {
+    await saveAvailability(doctor, { days: [{ weekday: 1, open: '09:00', close: '11:00' }], durationMinutes: 30, blocked: [] })
+    await pool.query(`CREATE FUNCTION reject_appointment_audit() RETURNS trigger AS $$ BEGIN IF NEW.action = 'APPOINTMENT_CREATE' THEN RAISE EXCEPTION 'audit unavailable'; END IF; RETURN NEW; END; $$ LANGUAGE plpgsql`)
+    await pool.query('CREATE TRIGGER reject_appointment_audit BEFORE INSERT ON audit_event FOR EACH ROW EXECUTE FUNCTION reject_appointment_audit()')
+    try {
+      await expect(scheduleAppointment(doctor, { ...input, time: '10:30' })).rejects.toThrow()
+      expect((await db.select({ id: appointment.id }).from(appointment).where(eq(appointment.startsAt, new Date('2026-12-07T15:30:00Z'))))).toEqual([])
+    } finally {
+      await pool.query('DROP TRIGGER reject_appointment_audit ON audit_event')
+      await pool.query('DROP FUNCTION reject_appointment_audit()')
+    }
+  })
+
+  it('does not reprogram or cancel a committed appointment if its audit cannot be stored', async () => {
+    await saveAvailability(doctor, { days: [{ weekday: 1, open: '09:00', close: '11:00' }], durationMinutes: 30, blocked: [] })
+    const created = await scheduleAppointment(doctor, { ...input, date: '2026-12-14', time: '10:00' })
+    await pool.query(`CREATE FUNCTION reject_appointment_changes() RETURNS trigger AS $$ BEGIN IF NEW.action IN ('APPOINTMENT_RESCHEDULE','APPOINTMENT_CANCEL') THEN RAISE EXCEPTION 'audit unavailable'; END IF; RETURN NEW; END; $$ LANGUAGE plpgsql`)
+    await pool.query('CREATE TRIGGER reject_appointment_changes BEFORE INSERT ON audit_event FOR EACH ROW EXECUTE FUNCTION reject_appointment_changes()')
+    try {
+      await expect(rescheduleAppointment(doctor, created.id, { date: '2026-12-14', time: '10:30' })).rejects.toThrow()
+      expect((await getAppointment(doctor, created.id)).time).toBe('10:00')
+      await expect(cancelAppointment(doctor, created.id)).rejects.toThrow()
+      expect((await getAppointment(doctor, created.id)).status).toBe('CONFIRMED')
+    } finally {
+      await pool.query('DROP TRIGGER reject_appointment_changes ON audit_event')
+      await pool.query('DROP FUNCTION reject_appointment_changes()')
+    }
+  })
+
+  it('rolls back attendance on an audit failure and never attends a cancelled appointment', async () => {
+    const { attendAppointment } = await import('../../server/services/appointments')
+    await saveAvailability(doctor, { days: [{ weekday: 1, open: '09:00', close: '11:00' }], durationMinutes: 30, blocked: [] })
+    const created = await scheduleAppointment(doctor, { ...input, date: '2026-12-21', time: '10:00' })
+    await pool.query(`CREATE FUNCTION reject_attendance_audit() RETURNS trigger AS $$ BEGIN IF NEW.action = 'APPOINTMENT_ATTEND' THEN RAISE EXCEPTION 'audit unavailable'; END IF; RETURN NEW; END; $$ LANGUAGE plpgsql`)
+    await pool.query('CREATE TRIGGER reject_attendance_audit BEFORE INSERT ON audit_event FOR EACH ROW EXECUTE FUNCTION reject_attendance_audit()')
+    try {
+      await expect(attendAppointment(doctor, created.id)).rejects.toThrow()
+      expect((await getAppointment(doctor, created.id)).status).toBe('CONFIRMED')
+    } finally {
+      await pool.query('DROP TRIGGER reject_attendance_audit ON audit_event')
+      await pool.query('DROP FUNCTION reject_attendance_audit()')
+    }
+    await cancelAppointment(doctor, created.id)
+    await expect(attendAppointment(doctor, created.id)).rejects.toMatchObject({ statusCode: 409 })
+  })
+
+  it('attendance waits for the scheduling lock and rechecks the cancelled state', async () => {
+    const { attendAppointment } = await import('../../server/services/appointments')
+    await saveAvailability(doctor, { days: [{ weekday: 1, open: '09:00', close: '11:00' }], durationMinutes: 30, blocked: [] })
+    const current = await scheduleAppointment(doctor, { ...input, date: '2026-12-28', time: '10:00' })
+    const blocker = await pool.connect()
+    await blocker.query('BEGIN')
+    await blocker.query('SELECT pg_advisory_xact_lock(1130011)')
+    let settled = false
+    const pending = attendAppointment(doctor, current.id).finally(() => {
+      settled = true
+    }).catch(() => undefined)
+    try {
+      await new Promise(resolve => setTimeout(resolve, 100))
+      expect(settled).toBe(false)
+      const waiting = await pool.query('SELECT wait_event_type, wait_event FROM pg_stat_activity WHERE wait_event_type = $1 AND query LIKE $2', ['Lock', '%pg_advisory_xact_lock(1130011)%'])
+      expect(waiting.rows.length).toBeGreaterThan(0)
+      await blocker.query('UPDATE appointment SET status = $1 WHERE id = $2', ['CANCELLED', current.id])
+      await blocker.query('COMMIT')
+      await pending
+      expect((await getAppointment(doctor, current.id)).status).toBe('CANCELLED')
+      expect((await db.select().from(auditEvent).where(eq(auditEvent.subjectId, current.id))).map(row => row.action)).not.toContain('APPOINTMENT_ATTEND')
+    } finally {
+      await blocker.query('ROLLBACK')
+      blocker.release()
+    }
+  })
+
+  it('serializes attendance against cancellation and rescheduling without resurrecting a closed appointment', async () => {
+    const { attendAppointment } = await import('../../server/services/appointments')
+    await saveAvailability(doctor, { days: [{ weekday: 1, open: '09:00', close: '11:00' }], durationMinutes: 30, blocked: [] })
+    const current = await scheduleAppointment(doctor, { ...input, date: '2027-01-04', time: '10:00' })
+    const outcomes = await Promise.allSettled([attendAppointment(doctor, current.id), cancelAppointment(assistant, current.id)])
+    expect(outcomes.filter(outcome => outcome.status === 'fulfilled')).toHaveLength(1)
+    const final = await getAppointment(doctor, current.id)
+    expect(['CANCELLED', 'ATTENDED']).toContain(final.status)
+    expect(outcomes.find(outcome => outcome.status === 'fulfilled')).toMatchObject({ value: { status: final.status } })
+    await expect(rescheduleAppointment(doctor, current.id, { date: '2027-01-04', time: '10:30' })).rejects.toMatchObject({ statusCode: 409 })
+    const second = await scheduleAppointment(doctor, { ...input, date: '2027-01-04', time: '10:30' })
+    const competing = await Promise.allSettled([attendAppointment(doctor, second.id), rescheduleAppointment(assistant, second.id, { date: '2027-01-04', time: '09:30' })])
+    const end = await getAppointment(doctor, second.id)
+    expect(competing.some(outcome => outcome.status === 'fulfilled')).toBe(true)
+    if (end.status === 'ATTENDED') await expect(rescheduleAppointment(assistant, second.id, { date: '2027-01-04', time: '09:00' })).rejects.toMatchObject({ statusCode: 409 })
+    expect((await db.select().from(auditEvent).where(eq(auditEvent.subjectId, second.id))).map(row => row.action)).toContain('APPOINTMENT_ATTEND')
+  })
+
   it('audits reschedule and cancellation while restoring old capacity', async () => {
     const current = (await listAppointments(doctor, { from: date, to: date }))[0]!
-    const moved = await rescheduleAppointment(assistant, current.id, { date, time: '10:00' })
-    expect(moved.time).toBe('10:00')
-    expect((await getAvailability(doctor, { from: date, to: date })).find(slot => slot.time === '09:00')?.free).toBe(true)
+    const moved = await rescheduleAppointment(assistant, current.id, { date, time: '09:00' })
+    expect(moved.time).toBe('09:00')
+    expect((await getAvailability(doctor, { from: date, to: date })).find(slot => slot.time === '09:00')?.free).toBe(false)
     expect((await cancelAppointment(doctor, current.id)).status).toBe('CANCELLED')
     expect((await getAppointment(assistant, current.id)).status).toBe('CANCELLED')
     expect((await getAvailability(doctor, { from: date, to: date })).find(slot => slot.time === '10:00')?.free).toBe(true)
-    await expect(scheduleAppointment(assistant, { ...input, name: 'Sin expediente', patientId: randomUUID(), time: '10:00' })).rejects.toMatchObject({ statusCode: 404 })
-    const { useDb } = await import('../../server/utils/db')
-    const { auditEvent } = await import('../../server/db/schema')
-    const { eq } = await import('drizzle-orm')
-    expect((await useDb().select().from(auditEvent).where(eq(auditEvent.subjectId, current.id))).map(row => row.action)).toEqual(expect.arrayContaining(['APPOINTMENT_RESCHEDULE', 'APPOINTMENT_CANCEL']))
+    await expect(scheduleAppointment(doctor, { ...input, name: 'Sin expediente', patientId: randomUUID(), time: '10:00' })).rejects.toMatchObject({ statusCode: 404 })
+    expect((await db.select().from(auditEvent).where(eq(auditEvent.subjectId, current.id))).map(row => row.action)).toEqual(expect.arrayContaining(['APPOINTMENT_RESCHEDULE', 'APPOINTMENT_CANCEL']))
   })
 })

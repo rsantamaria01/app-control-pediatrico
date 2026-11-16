@@ -65,7 +65,10 @@ if (import.meta.server && (error.value?.statusCode === 401 || error.value?.statu
       </ul>
       <div v-if="person.contacts.length">
         <p class="font-medium">
-          Contacto familiar verificado
+          Contacto registrado por personal clínico
+        </p>
+        <p class="text-sm text-muted">
+          Confirme el número y el canal con la familia antes de contactar.
         </p>
         <div
           v-for="contact in person.contacts"
@@ -80,7 +83,7 @@ if (import.meta.server && (error.value?.statusCode === 401 || error.value?.statu
             variant="outline"
             class="min-h-11"
           >
-            WhatsApp
+            Abrir WhatsApp (si usa este número)
           </UButton>
           <UButton
             :to="call(contact.phone)"
@@ -95,7 +98,7 @@ if (import.meta.server && (error.value?.statusCode === 401 || error.value?.statu
         v-else
         class="text-sm text-muted"
       >
-        Sin teléfono verificado para contactar.
+        Sin teléfono registrado por personal clínico para contactar.
       </p>
     </UCard>
   </UContainer>

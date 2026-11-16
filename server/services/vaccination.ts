@@ -1,20 +1,55 @@
 import { randomUUID } from 'node:crypto'
-import { and, asc, desc, eq, inArray } from 'drizzle-orm'
+import { and, asc, desc, eq } from 'drizzle-orm'
 import { createError } from 'nuxt/server'
 import type { Actor } from '../../shared/types/access'
 import { draftBadge, draftStatus } from '../../shared/types/catalog'
 import { complementaryInputSchema, doseInputSchema, type ComplementaryInput, type DoseInput, type DoseRecord, type PendingVaccine } from '../../shared/types/preventive'
-import { catalogItem, catalogRelease, complementaryVaccine, guardianGrant, patient, user, vaccineDose } from '../db/schema'
+import { auditEvent, catalogItem, catalogRelease, complementaryVaccine, guardianGrant, patient, user, vaccineDose } from '../db/schema'
 import { useDb } from '../utils/db'
 import { recordAudit } from './audit'
 import { authorizeClinical } from './patients'
 
-function ageMonths(birth: string, today: Date) {
-  const date = today.toISOString().slice(0, 10)
-  const [y, m, d] = date.split('-').map(Number)
-  const [by, bm, bd] = birth.split('-').map(Number)
-  return (y! - by!) * 12 + m! - bm! - (d! < bd! ? 1 : 0)
+function addMonths(day: string, months: number) {
+  const [year, month, date] = day.split('-').map(Number)
+  const target = new Date(Date.UTC(year!, month! - 1 + months, 1))
+  target.setUTCDate(Math.min(date!, new Date(Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0)).getUTCDate()))
+  return target.toISOString().slice(0, 10)
 }
+
+function intervalDate(day: string, interval: string | null) {
+  if (!interval) return day
+  const weeks = /^(\d+) semanas?$/.exec(interval)
+  const months = /^(\d+) mes(?:es)?$/.exec(interval)
+  const years = /^(\d+) años?(?: después de la (?:tercera|segunda|primera) dosis)?$/.exec(interval)
+  if (months) return addMonths(day, Number(months[1]))
+  if (years) return addMonths(day, Number(years[1]) * 12)
+  if (weeks) return new Date(Date.parse(`${day}T00:00:00Z`) + Number(weeks[1]) * 7 * 86400000).toISOString().slice(0, 10)
+  return null
+}
+
+function releaseIdentity(row: { publisher: string, version: string, url: string }) {
+  return JSON.stringify([row.publisher, row.version, row.url])
+}
+
+function isApplied(item: typeof catalogItem.$inferSelect, release: typeof catalogRelease.$inferSelect, doses: Pick<DoseRecord, 'releaseId' | 'key' | 'appliedAt'>[], releases: (typeof catalogRelease.$inferSelect)[]) {
+  return doses.some(dose => dose.key === item.key && dose.releaseId !== null && releases.some(row => row.id === dose.releaseId && releaseIdentity(row) === releaseIdentity(release)))
+}
+
+function eligibleDate(item: typeof catalogItem.$inferSelect, siblings: (typeof catalogItem.$inferSelect)[], doses: Pick<DoseRecord, 'releaseId' | 'key' | 'appliedAt'>[], birth: string, releases: (typeof catalogRelease.$inferSelect)[], release: typeof catalogRelease.$inferSelect) {
+  let date = addMonths(birth, Number(item.minAgeMonths))
+  if (item.doseNumber && Number(item.doseNumber) > 1) {
+    const previousKey = item.key.replace(/-(?:\d+|refuerzo)$/, `-${Number(item.doseNumber) - 1}`)
+    const previous = siblings.find(row => row.key === previousKey && Number(row.doseNumber) === Number(item.doseNumber) - 1)
+    if (!previous) return null
+    const prior = doses.filter(dose => dose.key === previous.key && dose.releaseId !== null && releases.some(row => row.id === dose.releaseId && releaseIdentity(row) === releaseIdentity(release))).sort((a, b) => b.appliedAt.localeCompare(a.appliedAt))[0]
+    if (!prior) return null
+    const earliest = intervalDate(prior.appliedAt, item.minimumInterval)
+    if (!earliest) return null
+    if (earliest > date) date = earliest
+  }
+  return date
+}
+
 async function currentReleases(kind: string) {
   const releases = await useDb().select().from(catalogRelease).where(eq(catalogRelease.kind, kind)).orderBy(desc(catalogRelease.importedAt), desc(catalogRelease.id))
   const current = new Map<string, typeof catalogRelease.$inferSelect>()
@@ -56,18 +91,27 @@ export async function recordDose(actor: Actor, patientId: string, raw: DoseInput
     sourcePage = item.source
     key = item.id
   } else {
-    const [item] = await db.select({ label: catalogItem.label, doseLabel: catalogItem.doseLabel, doseNumber: catalogItem.doseNumber, sourcePage: catalogItem.sourcePage, status: catalogItem.status, version: catalogRelease.version, kind: catalogRelease.kind }).from(catalogItem).innerJoin(catalogRelease, eq(catalogRelease.id, catalogItem.releaseId)).where(and(eq(catalogItem.releaseId, input.releaseId!), eq(catalogItem.key, input.key!)))
-    if (!item || item.kind !== 'VACCINE' || item.status !== draftStatus) throw createError({ statusCode: 404, statusMessage: 'Vaccine not found' })
+    const [item] = await db.select().from(catalogItem).where(and(eq(catalogItem.releaseId, input.releaseId!), eq(catalogItem.key, input.key!)))
+    const [release] = await db.select().from(catalogRelease).where(eq(catalogRelease.id, input.releaseId!))
+    if (!item || !release || release.kind !== 'VACCINE' || item.status !== draftStatus) throw createError({ statusCode: 404, statusMessage: 'Vaccine not found' })
+    const releases = await db.select().from(catalogRelease).where(eq(catalogRelease.kind, 'VACCINE'))
+    const doses = await db.select().from(vaccineDose).where(eq(vaccineDose.patientId, patientId))
+    const siblings = await db.select().from(catalogItem).where(eq(catalogItem.releaseId, release.id))
+    if (isApplied(item, release, doses, releases)) throw createError({ statusCode: 409, statusMessage: 'Dose already recorded' })
+    const earliest = eligibleDate(item, siblings, doses, person.birthDate, releases, release)
+    if (!earliest || input.appliedAt < earliest) throw createError({ statusCode: 400, statusMessage: 'Dose before documented minimum age or interval' })
     label = item.label
     doseLabel = item.doseLabel ?? (item.doseNumber ? `Dosis ${item.doseNumber}` : null)
-    version = item.version
+    version = release.version
     sourcePage = item.sourcePage
     key = input.key!
     releaseId = input.releaseId!
   }
-  const [row] = await db.insert(vaccineDose).values({ id: randomUUID(), patientId, releaseId, key, label, doseLabel, catalogVersion: version, sourcePage, sourceStatus: draftStatus, appliedAt: input.appliedAt, external: input.external, lot: input.lot ?? null, privateNote: input.privateNote ?? null, authorId: actor.id }).returning()
-  await recordAudit('VACCINE_DOSE', 'ALLOWED', actor.id, patientId)
-  return row as DoseRecord
+  return db.transaction(async (tx) => {
+    const [row] = await tx.insert(vaccineDose).values({ id: randomUUID(), patientId, releaseId, key, label, doseLabel, catalogVersion: version, sourcePage, sourceStatus: draftStatus, appliedAt: input.appliedAt, external: input.external, lot: input.lot ?? null, privateNote: input.privateNote ?? null, authorId: actor.id }).returning()
+    await tx.insert(auditEvent).values({ id: randomUUID(), action: 'VACCINE_DOSE', outcome: 'ALLOWED', actorId: actor.id, subjectId: patientId })
+    return row as DoseRecord
+  })
 }
 
 export async function listVaccines(actor: Actor, patientId: string, today = new Date()): Promise<{ pending: PendingVaccine[], applied: DoseRecord[] }> {
@@ -75,13 +119,14 @@ export async function listVaccines(actor: Actor, patientId: string, today = new 
   const db = useDb()
   const [person] = await db.select({ birthDate: patient.birthDate }).from(patient).where(eq(patient.id, patientId))
   if (!person) throw createError({ statusCode: 404, statusMessage: 'Patient not found' })
-  const age = ageMonths(person.birthDate, today)
   const applied = await db.select().from(vaccineDose).where(eq(vaccineDose.patientId, patientId)).orderBy(desc(vaccineDose.appliedAt)) as DoseRecord[]
   const pending: PendingVaccine[] = []
+  const releases = await db.select().from(catalogRelease).where(eq(catalogRelease.kind, 'VACCINE'))
   for (const release of await currentReleases('VACCINE')) {
     const rows = await db.select().from(catalogItem).where(eq(catalogItem.releaseId, release.id)).orderBy(asc(catalogItem.minAgeMonths), asc(catalogItem.key))
     for (const item of rows) {
-      if (item.status !== draftStatus || age < Number(item.minAgeMonths) || applied.some(dose => dose.releaseId === item.releaseId && dose.key === item.key)) continue
+      const earliest = eligibleDate(item, rows, applied, person.birthDate, releases, release)
+      if (item.status !== draftStatus || !earliest || today.toISOString().slice(0, 10) < earliest || isApplied(item, release, applied, releases)) continue
       pending.push({ kind: 'MSP', id: `${release.id}:${item.key}`, key: item.key, label: item.label, doseLabel: item.doseLabel ?? (item.doseNumber ? `Dosis ${item.doseNumber}` : null), version: release.version, sourcePage: item.sourcePage, source: `${release.publisher} · ${release.title}`, minimumInterval: item.minimumInterval, recommendedAge: item.recommendedAge, status: draftStatus, badge: draftBadge, review: 'PENDING_REVIEW' })
     }
   }
@@ -106,17 +151,8 @@ export async function listVaccinationReview(actor: Actor, today = new Date()) {
   await authorizeClinical(actor, 'CLINICAL_READ')
   const db = useDb()
   const people = await db.select({ id: patient.id, name: patient.name, birthDate: patient.birthDate }).from(patient).orderBy(asc(patient.name))
-  const releases = await currentReleases('VACCINE')
-  const items = releases.length ? await db.select().from(catalogItem).where(inArray(catalogItem.releaseId, releases.map(row => row.id))) : []
-  const complementary = await db.select().from(complementaryVaccine)
-  const applied = await db.select({ patientId: vaccineDose.patientId, releaseId: vaccineDose.releaseId, key: vaccineDose.key }).from(vaccineDose)
-  const candidates = new Set<string>()
-  for (const person of people) {
-    if (complementary.some(item => item.patientId === person.id && item.status === draftStatus && !applied.some(dose => dose.patientId === person.id && dose.releaseId === null && dose.key === item.id))
-      || items.some(item => item.status === draftStatus && ageMonths(person.birthDate, today) >= Number(item.minAgeMonths) && !applied.some(dose => dose.patientId === person.id && dose.releaseId === item.releaseId && dose.key === item.key))) candidates.add(person.id)
-  }
   const output: { id: string, name: string, pending: PendingVaccine[], contacts: { name: string, phone: string }[] }[] = []
-  for (const person of people.filter(row => candidates.has(row.id))) {
+  for (const person of people) {
     const { pending } = await listVaccines(actor, person.id, today)
     if (!pending.length) continue
     const contacts = await db.select({ name: user.name, phone: guardianGrant.contactPhone }).from(guardianGrant).innerJoin(user, eq(user.id, guardianGrant.guardianId)).where(and(eq(guardianGrant.patientId, person.id), eq(guardianGrant.status, 'ACTIVE')))

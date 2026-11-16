@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "vaccine_dose_complementary_unique_idx" ON "vaccine_dose" USING btree ("patient_id","key") WHERE "vaccine_dose"."release_id" IS NULL;

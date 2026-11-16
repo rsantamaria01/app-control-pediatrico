@@ -1,7 +1,7 @@
 <script setup lang="ts">
 const props = defineProps<{ patientId: string }>()
 const url = `/api/pacientes/${encodeURIComponent(props.patientId)}/preventivo`
-const { data, error, refresh } = await useFetch<{ assessments: { id: string, label: string, domain: string, outcome: string, acquiredAgeMonths: number | null, privateNote: string | null }[], screenings: { id: string, instrument: string, category: string, appliedAt: string, result: string, privateNote: string | null }[], milestones: { id: string, label: string, source: string, minAgeMonths: string, maxAgeMonths: string }[], reminders: unknown[] }>(`${url}/desarrollo`)
+const { data, error, refresh } = await useFetch<{ assessments: { id: string, label: string, domain: string, outcome: string, acquiredAgeMonths: number | null, privateNote: string | null }[], screenings: { id: string, instrument: string, category: string, appliedAt: string, result: string, privateNote: string | null }[], milestones: { id: string, label: string, source: string, minAgeMonths: string, maxAgeMonths: string }[], reminders: { key: string, label: string, ageMonths: number, source: string, version: string, sourcePage: string, badge: string }[], remindersAvailable: boolean }>(`${url}/desarrollo`)
 const assessment = reactive({ label: '', domain: 'GROSS_MOTOR', outcome: 'NOT_ASSESSED', acquiredAgeMonths: undefined as number | undefined, privateNote: '' })
 const screening = reactive({ category: 'DEVELOPMENT', instrument: '', appliedAt: new Date().toISOString().slice(0, 10), result: '', privateNote: '' })
 const saveError = ref('')
@@ -139,8 +139,21 @@ async function saveScreening() {
         Tamizajes
       </h2>
       <p class="text-sm text-muted">
-        No hay recordatorios importados sin fuente validada. Un tamizaje figura como aplicado solo si se registran instrumento y resultado.
+        {{ data?.remindersAvailable ? 'Recordatorios de catálogo en borrador para revisión médica; no indican aplicación.' : 'Recordatorios no disponibles: no hay catálogo de tamizajes importado con procedencia.' }} Un tamizaje figura como aplicado solo si se registran instrumento y resultado.
       </p>
+      <ul
+        v-if="data?.reminders.length"
+        class="divide-y divide-default"
+        aria-label="Tamizajes por revisar"
+      >
+        <li
+          v-for="item in data.reminders"
+          :key="item.key"
+          class="py-2 text-sm"
+        >
+          {{ item.label }} · {{ item.ageMonths }} meses · {{ item.badge }} · {{ item.source }} · {{ item.version }} · {{ item.sourcePage }}
+        </li>
+      </ul>
       <ul
         v-if="data?.screenings.length"
         class="divide-y divide-default"

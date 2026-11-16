@@ -30,7 +30,7 @@ async function complete(item: Checkup) {
       Controles por edad
     </h2>
     <p class="text-sm text-muted">
-      Edades AAP como borrador para revisión médica; no son citas, fechas previstas ni recordatorios definitivos.
+      Fechas derivadas de las edades AAP en borrador para revisión médica; no son citas ni recordatorios definitivos.
     </p>
     <UAlert
       v-if="error"
@@ -70,7 +70,7 @@ async function complete(item: Checkup) {
             class="border-t border-default"
           >
             <td class="p-2">
-              {{ item.label }}<span v-if="item.date"> · {{ item.date }}</span><span v-if="item.reason"> · {{ item.reason }}</span><br>
+              {{ item.label }} · {{ item.date }}<span v-if="item.endDate && item.endDate !== item.date">–{{ item.endDate }}</span><span v-if="item.reason"> · {{ item.reason }}</span><br>
               <UBadge
                 color="neutral"
                 variant="soft"

@@ -24,4 +24,4 @@ export type ScreeningResult = z.input<typeof screeningResultSchema>
 export type Screening = ScreeningResult & { id: string, patientId: string, instrument: string, recordedAt: string }
 export const checkupInputSchema = z.strictObject({ releaseId: z.string().min(1).optional(), key: z.string().min(1).optional(), individualId: z.uuid().optional(), completedAt: day }).refine(value => Boolean(value.individualId) !== Boolean(value.releaseId && value.key))
 export const individualCheckupSchema = z.strictObject({ date: day, reason: z.string().trim().min(2).max(500) })
-export type Checkup = { key: string | null, id: string, label: string, date: string | null, reason: string | null, version: string, source: string, sourcePage: string, status: typeof draftStatus, badge: typeof draftBadge }
+export type Checkup = { key: string | null, id: string, label: string, date: string, endDate?: string, reason: string | null, version: string, source: string, sourcePage: string, status: typeof draftStatus, badge: typeof draftBadge }

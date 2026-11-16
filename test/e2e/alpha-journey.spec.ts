@@ -410,6 +410,7 @@ test('production image journeys from bootstrapped admin through two children and
     expect((await ownApplied.json() as { label: string }[])).toHaveLength(1)
     expect((await context.request.get(`/api/hijos/${otherChild}/vacunas`)).status()).toBe(404)
     expect((await context.request.get('/admin/catalogos')).status()).toBe(403)
+    await page.goto('/')
     await expect(page.getByRole('heading', { name: 'Mis hijos' })).toBeVisible()
     const children = await context.request.get('/api/hijos')
     const visibleChildren = (await children.json()).map((item: { id: string }) => item.id)

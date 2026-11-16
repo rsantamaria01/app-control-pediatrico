@@ -12,8 +12,14 @@ test('growth pages require a verified session at phone and desktop widths', asyn
       }
       const response = await page.goto(path)
       expect(response?.headers()['cache-control']).toContain('no-store')
-      await expect(page.getByText(/No se pudo abrir la ficha|No se pudo consultar esta información/)).toBeVisible()
+      if (path.startsWith('/hijos/')) {
+        expect(response?.status()).toBeGreaterThanOrEqual(400)
+        await expect(page.locator('#__nuxt').getByRole('heading', { name: 'No disponible' })).toBeVisible()
+      } else {
+        await expect(page.getByText('No se pudo abrir la ficha')).toBeVisible()
+      }
       await expect(page.getByRole('heading', { name: /curvas|crecimiento|mediciones/i })).toHaveCount(0)
+      expect(await page.content()).not.toMatch(/Z [−+]|percentil|Peso\s*\d+[,.]\d+\s*kg/)
     }
   }
 })

@@ -157,8 +157,8 @@ export async function listParentAppointments(actor: Actor): Promise<ParentAppoin
 export async function recordBookingAppointmentChange(tx: Parameters<Parameters<ReturnType<typeof useDb>['transaction']>[0]>[0], appointmentId: string, status: 'RESCHEDULED' | 'CANCELLED') {
   const [row] = await tx.select({ id: bookingRequest.id, guardianId: bookingRequest.guardianId, email: bookingRequest.email }).from(bookingRequest).where(eq(bookingRequest.appointmentId, appointmentId))
   if (row) {
-    await tx.insert(bookingNotice).values(notice(row.id, status))
-    const [current] = await tx.select({ startsAt: appointment.startsAt }).from(appointment).where(eq(appointment.id, appointmentId))
-    await queueNotification(tx, { kind: status === 'RESCHEDULED' ? 'BOOKING_RESCHEDULED' : 'BOOKING_CANCELLED', subjectId: row.id, occurrenceId: status === 'RESCHEDULED' ? current!.startsAt.toISOString() : '' }, row.guardianId ? { channel: 'IN_APP', userId: row.guardianId } : { channel: 'EMAIL', address: row.email })
+    const change = notice(row.id, status)
+    await tx.insert(bookingNotice).values(change)
+    await queueNotification(tx, { kind: status === 'RESCHEDULED' ? 'BOOKING_RESCHEDULED' : 'BOOKING_CANCELLED', subjectId: row.id, occurrenceId: change.id }, row.guardianId ? { channel: 'IN_APP', userId: row.guardianId } : { channel: 'EMAIL', address: row.email })
   }
 }

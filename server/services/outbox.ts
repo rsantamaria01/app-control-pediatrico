@@ -13,7 +13,7 @@ export function providerStatus(channel: NotificationChannel): ProviderStatus {
 }
 
 export async function queueNotification(tx: Tx, event: DomainEvent, recipient: Recipient): Promise<OutboxId> {
-  if (!['BOOKING_PENDING', 'BOOKING_APPROVED', 'BOOKING_DECLINED', 'BOOKING_RESCHEDULED', 'BOOKING_CANCELLED', 'VISIT_RECORDED'].includes(event.kind) || !event.subjectId || (event.occurrenceId && event.kind !== 'BOOKING_RESCHEDULED')) throw new Error('Invalid notification event')
+  if (!['BOOKING_PENDING', 'BOOKING_APPROVED', 'BOOKING_DECLINED', 'BOOKING_RESCHEDULED', 'BOOKING_CANCELLED', 'VISIT_RECORDED'].includes(event.kind) || !event.subjectId || (event.occurrenceId && !['BOOKING_RESCHEDULED', 'BOOKING_CANCELLED'].includes(event.kind))) throw new Error('Invalid notification event')
   if (!['EMAIL', 'WHATSAPP', 'IN_APP'].includes(recipient.channel) || (recipient.channel === 'IN_APP' ? !recipient.userId : !recipient.address?.trim())) throw new Error('Invalid notification recipient')
   if (recipient.channel === 'EMAIL' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient.address.trim())) throw new Error('Invalid email recipient')
   if (recipient.channel === 'WHATSAPP' && !/^\+[1-9]\d{7,14}$/.test(recipient.address.trim())) throw new Error('Invalid WhatsApp recipient')
@@ -21,9 +21,9 @@ export async function queueNotification(tx: Tx, event: DomainEvent, recipient: R
     const [account] = await tx.select({ email: user.email }).from(user).where(eq(user.id, recipient.userId))
     if (recipient.channel !== 'EMAIL' || account?.email !== recipient.address.trim().toLowerCase()) throw new Error('Notification recipient does not match account')
   }
-  if (recipient.userId && event.kind.startsWith('BOOKING_')) {
-    const [booking] = await tx.select({ guardianId: bookingRequest.guardianId }).from(bookingRequest).where(eq(bookingRequest.id, event.subjectId))
-    if (booking && booking.guardianId !== recipient.userId) throw new Error('Notification recipient does not own booking')
+  if (event.kind.startsWith('BOOKING_')) {
+    const [booking] = await tx.select({ guardianId: bookingRequest.guardianId, email: bookingRequest.email }).from(bookingRequest).where(eq(bookingRequest.id, event.subjectId))
+    if (!booking || (recipient.channel === 'IN_APP' ? booking.guardianId !== recipient.userId : recipient.channel !== 'EMAIL' || (recipient.userId ? booking.guardianId !== recipient.userId : booking.guardianId !== null) || booking.email.trim().toLowerCase() !== recipient.address.trim().toLowerCase())) throw new Error('Notification recipient does not own booking')
   }
   if (!recipient.userId && event.kind === 'VISIT_RECORDED') throw new Error('Visit notice requires a verified guardian')
   if (recipient.userId && event.kind === 'VISIT_RECORDED') {
@@ -43,15 +43,23 @@ export async function queueNotification(tx: Tx, event: DomainEvent, recipient: R
   return existing.id
 }
 
-export async function deliver(outboxId: OutboxId, now = new Date(), adapter?: ProviderAdapter): Promise<DeliveryOutcome> {
+export async function deliver(outboxId: OutboxId, now = new Date(), adapter?: ProviderAdapter, timeoutMs = 15000): Promise<DeliveryOutcome> {
   const claimed = await prepareDelivery(outboxId, now, adapter)
   if ('outcome' in claimed) return claimed.outcome
   let outcome: 'SENT' | 'RETRY' | 'FAILED'
+  let timer: ReturnType<typeof setTimeout> | undefined
   try {
-    const result = await claimed.adapter.send({ outboxId, address: claimed.address, event: claimed.event, idempotencyKey: outboxId })
+    const result = await Promise.race([
+      claimed.adapter.send({ outboxId, address: claimed.address, event: claimed.event, idempotencyKey: outboxId }),
+      new Promise<'FAILED'>((resolve) => {
+        timer = setTimeout(() => resolve('FAILED'), timeoutMs)
+      })
+    ])
     outcome = result === 'SENT' || result === 'RETRY' || result === 'FAILED' ? result : 'FAILED'
   } catch {
     outcome = 'FAILED'
+  } finally {
+    if (timer) clearTimeout(timer)
   }
   return useDb().transaction(async (tx) => {
     const [row] = await tx.select().from(notificationOutbox).where(eq(notificationOutbox.id, outboxId)).for('update')
@@ -71,9 +79,10 @@ async function prepareDelivery(outboxId: OutboxId, now: Date, adapter?: Provider
     if (row.state === 'SENT' || row.state === 'NOT_CONFIGURED' || row.state === 'OPTED_OUT' || row.state === 'FAILED') return { outcome: { id: outboxId, status: row.state as DeliveryOutcome['status'] } }
     if (row.state === 'SENDING' || row.nextAttemptAt > now) return { outcome: { id: outboxId, status: 'DEFERRED' } }
     const channel = row.channel as NotificationChannel
-    if (row.recipientUserId && row.eventKind.startsWith('BOOKING_')) {
-      const [booking] = await tx.select({ guardianId: bookingRequest.guardianId, patientId: bookingRequest.patientId }).from(bookingRequest).where(eq(bookingRequest.id, row.subjectId))
-      if (booking && (booking.guardianId !== row.recipientUserId || !booking.patientId || !await tx.select({ guardianId: guardianGrant.guardianId }).from(guardianGrant).where(and(eq(guardianGrant.patientId, booking.patientId), eq(guardianGrant.guardianId, row.recipientUserId), eq(guardianGrant.status, 'ACTIVE'))).then(rows => rows.length > 0))) {
+    if (row.eventKind.startsWith('BOOKING_')) {
+      const [booking] = await tx.select({ guardianId: bookingRequest.guardianId, patientId: bookingRequest.patientId, email: bookingRequest.email }).from(bookingRequest).where(eq(bookingRequest.id, row.subjectId))
+      const allowed = booking && (row.recipientUserId ? booking.guardianId === row.recipientUserId && !!booking.patientId && await tx.select({ guardianId: guardianGrant.guardianId }).from(guardianGrant).where(and(eq(guardianGrant.patientId, booking.patientId), eq(guardianGrant.guardianId, row.recipientUserId), eq(guardianGrant.status, 'ACTIVE'))).then(rows => rows.length > 0) : booking.guardianId === null && row.channel === 'EMAIL' && createHash('sha256').update(`email:${booking.email.trim().toLowerCase()}`).digest('hex') === row.recipientKey)
+      if (!allowed) {
         await tx.update(notificationOutbox).set({ state: 'OPTED_OUT' }).where(eq(notificationOutbox.id, outboxId))
         return { outcome: { id: outboxId, status: 'OPTED_OUT' } }
       }
@@ -94,7 +103,7 @@ async function prepareDelivery(outboxId: OutboxId, now: Date, adapter?: Provider
       await tx.update(notificationOutbox).set({ state, attempts: row.attempts + 1, errorClass }).where(eq(notificationOutbox.id, outboxId))
       return { outcome: { id: outboxId, status: state } }
     }
-    const optedOut = preference ? !preference.enabled : channel !== 'IN_APP'
+    const optedOut = preference ? !preference.enabled : channel !== 'IN_APP' && !(channel === 'EMAIL' && !row.recipientUserId && row.eventKind.startsWith('BOOKING_'))
     if (optedOut) {
       await tx.update(notificationOutbox).set({ state: 'OPTED_OUT' }).where(eq(notificationOutbox.id, outboxId))
       return { outcome: { id: outboxId, status: 'OPTED_OUT' } }
@@ -111,13 +120,15 @@ async function prepareDelivery(outboxId: OutboxId, now: Date, adapter?: Provider
     }
     if (channel !== 'IN_APP') {
       const [account] = row.recipientUserId ? await tx.select({ email: user.email }).from(user).where(eq(user.id, row.recipientUserId)) : []
-      if (!account || channel !== 'EMAIL' || createHash('sha256').update(`email:${account.email.trim().toLowerCase()}`).digest('hex') !== row.recipientKey) {
+      const [booking] = !row.recipientUserId && row.eventKind.startsWith('BOOKING_') ? await tx.select({ email: bookingRequest.email }).from(bookingRequest).where(eq(bookingRequest.id, row.subjectId)) : []
+      const address = account?.email ?? booking?.email
+      if (!address || channel !== 'EMAIL' || createHash('sha256').update(`email:${address.trim().toLowerCase()}`).digest('hex') !== row.recipientKey) {
         await tx.update(notificationOutbox).set({ state: 'FAILED', errorClass: 'RecipientUnavailable' }).where(eq(notificationOutbox.id, outboxId))
         await tx.insert(notificationAttempt).values({ id: randomUUID(), outboxId, outcome: 'FAILED', errorClass: 'RecipientUnavailable', attemptedAt: now })
         return { outcome: { id: outboxId, status: 'FAILED' } }
       }
-      await tx.update(notificationOutbox).set({ state: 'SENDING', attempts: row.attempts + 1 }).where(eq(notificationOutbox.id, outboxId))
-      return { adapter: adapter!, address: account.email, event: { kind: row.eventKind as DomainEvent['kind'], subjectId: row.subjectId } }
+      await tx.update(notificationOutbox).set({ state: 'SENDING', attempts: row.attempts + 1, nextAttemptAt: new Date(now.getTime() + 5 * 60000) }).where(eq(notificationOutbox.id, outboxId))
+      return { adapter: adapter!, address, event: { kind: row.eventKind as DomainEvent['kind'], subjectId: row.subjectId, ...(row.occurrenceId ? { occurrenceId: row.occurrenceId } : {}) } }
     }
     const state = 'SENT'
     if (channel === 'IN_APP') {
@@ -129,15 +140,16 @@ async function prepareDelivery(outboxId: OutboxId, now: Date, adapter?: Provider
   })
 }
 
-export async function reconcileNotificationOutbox(): Promise<number> {
+export async function reconcileNotificationOutbox(now = new Date()): Promise<number> {
   return useDb().transaction(async (tx) => {
-    const rows = await tx.update(notificationOutbox).set({ state: 'FAILED', errorClass: 'InterruptedDelivery' }).where(eq(notificationOutbox.state, 'SENDING')).returning({ id: notificationOutbox.id })
+    const rows = await tx.update(notificationOutbox).set({ state: 'FAILED', errorClass: 'InterruptedDelivery' }).where(and(eq(notificationOutbox.state, 'SENDING'), lte(notificationOutbox.nextAttemptAt, now))).returning({ id: notificationOutbox.id })
     for (const row of rows) await tx.insert(notificationAttempt).values({ id: randomUUID(), outboxId: row.id, outcome: 'FAILED', errorClass: 'InterruptedDelivery' })
     return rows.length
   })
 }
 
 export async function processNotificationOutbox(now = new Date(), limit = 50): Promise<number> {
+  await reconcileNotificationOutbox(now)
   const rows = await useDb().select({ id: notificationOutbox.id }).from(notificationOutbox).where(and(inArray(notificationOutbox.state, ['QUEUED', 'RETRY']), lte(notificationOutbox.nextAttemptAt, now))).orderBy(notificationOutbox.createdAt).limit(limit)
   for (const row of rows) await deliver(row.id, now)
   return rows.length

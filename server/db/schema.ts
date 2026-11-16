@@ -1,7 +1,7 @@
 import { bigint, boolean, check, index, integer, jsonb, numeric, pgTable, primaryKey, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
 
-export { appointment, blockedHour, clinicSchedule, openingHour } from './schema/scheduling.ts'
+export { appointment, blockedHour, bookingNotice, bookingProof, bookingRequest, clinicSchedule, openingHour } from './schema/scheduling.ts'
 
 export const user = pgTable('user', {
   id: text('id').primaryKey(),

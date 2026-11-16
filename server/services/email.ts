@@ -36,6 +36,10 @@ async function sendMail(email: string, subject: string, text: string) {
   await setHealth('CONFIGURED')
 }
 
+export async function sendBookingCode(email: string, code: string) {
+  await sendMail(email, 'Verificación de solicitud · Control Pediátrico', `Código para solicitar una cita: ${code}. Caduca en 10 minutos. No crea acceso al portal.`)
+}
+
 export async function sendLink(email: string, link: string) {
   await sendMail(email, 'Acceso · Control Pediátrico', `Use este enlace para configurar o recuperar su acceso: ${link}`)
 }

@@ -7,6 +7,7 @@ const isDoctor = computed(() => Boolean(navigation.value?.some(item => item.to =
 const isParent = computed(() => Boolean(navigation.value?.some(item => item.to === '/')) && !isDoctor.value)
 const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Guayaquil', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
 const { data: appointments, error, refresh } = await useFetch<Appointment[]>('/api/agenda', { query: { from: today, to: today }, immediate: isDoctor.value, default: () => [] })
+const { data: requestsCount, error: requestsError, refresh: refreshRequests } = await useFetch<{ count: number }>('/api/agenda/solicitudes/count', { immediate: isDoctor.value })
 const { data: growthReview, error: growthError, refresh: refreshGrowth } = await useFetch<{ id: string }[]>('/api/clinical/crecimiento-por-revisar', { immediate: isDoctor.value, default: () => [] })
 const active = computed(() => appointments.value?.filter(item => item.status !== 'CANCELLED') ?? [])
 const upcoming = computed(() => active.value.filter(item => item.status !== 'ATTENDED' && new Date(`${item.date}T${item.time}:00-05:00`) >= new Date()))
@@ -78,7 +79,7 @@ function age(birthDate: string) {
             <dt class="text-sm text-muted">
               Por confirmar
             </dt><dd class="text-xl font-semibold">
-              {{ active.filter(item => item.status === 'PENDING').length }}
+              {{ active.filter(item => item.status === 'PENDING').length + (requestsCount?.count ?? 0) }}
             </dd>
           </div><div>
             <dt class="text-sm text-muted">
@@ -89,6 +90,19 @@ function age(birthDate: string) {
           </div>
         </dl>
       </UCard>
+      <UAlert
+        v-if="requestsError"
+        color="error"
+        title="No se pudo cargar las solicitudes"
+        :actions="[{ label: 'Reintentar', onClick: () => refreshRequests() }]"
+      />
+      <UButton
+        to="/agenda/solicitudes"
+        variant="outline"
+        class="min-h-11"
+      >
+        Revisar solicitudes pendientes
+      </UButton>
       <UCard>
         <h2 class="text-lg font-semibold">
           Próximas citas
@@ -221,10 +235,20 @@ function age(birthDate: string) {
         </UCard>
       </div>
     </template>
-    <UPageHero
+    <div
       v-else
-      title="Control Pediátrico"
-      description="Registro de medidas y curvas de crecimiento según los Patrones de Crecimiento Infantil de la OMS."
-    />
+      class="space-y-5"
+    >
+      <UPageHero
+        title="Control Pediátrico"
+        description="Registro de medidas y curvas de crecimiento según los Patrones de Crecimiento Infantil de la OMS."
+      />
+      <UButton
+        to="/reservar"
+        class="min-h-11"
+      >
+        Solicitar cita
+      </UButton>
+    </div>
   </UContainer>
 </template>

@@ -6,11 +6,13 @@ const entries: Record<Role, Item[]> = {
   DOCTOR: [
     { label: 'Inicio', to: '/' },
     { label: 'Pacientes', to: '/pacientes' },
-    { label: 'Agenda', to: '/agenda' }
+    { label: 'Agenda', to: '/agenda' },
+    { label: 'Solicitudes', to: '/agenda/solicitudes' }
   ],
   ASSISTANT: [
     { label: 'Invitaciones', to: '/representantes/invitar' },
     { label: 'Agenda', to: '/agenda' },
+    { label: 'Solicitudes', to: '/agenda/solicitudes' },
     { label: 'Horarios', to: '/agenda/horarios' }
   ],
   PATIENT: [

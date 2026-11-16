@@ -6,6 +6,7 @@ import { appointmentMoveSchema, appointmentSchema, assistantAppointmentSchema, d
 import { appointment, auditEvent, patient, visit } from '../db/schema'
 import { useDb } from '../utils/db'
 import { availableSlots, instant, localDate, localTime, requireSchedule, zone } from './availability'
+import { recordBookingAppointmentChange } from './booking'
 
 type Row = typeof appointment.$inferSelect
 const audit = (action: string, actor: Actor, subjectId: string) => ({ id: randomUUID(), action, actorId: actor.id, subjectId, outcome: 'ALLOWED' })
@@ -73,6 +74,7 @@ export async function rescheduleAppointment(actor: Actor, id: string, input: { d
     const interval = await reserve(tx, values.date, values.time, id)
     const [updated] = await tx.update(appointment).set(interval).where(eq(appointment.id, id)).returning()
     await tx.insert(auditEvent).values(audit('APPOINTMENT_RESCHEDULE', actor, id))
+    await recordBookingAppointmentChange(tx, id, 'RESCHEDULED')
     return updated!
   })
   return project(row, actor)
@@ -87,6 +89,7 @@ export async function cancelAppointment(actor: Actor, id: string): Promise<Appoi
     if (current.status === 'CANCELLED' || current.status === 'ATTENDED') throw createError({ statusCode: 409, statusMessage: 'Cita cerrada' })
     const [updated] = await tx.update(appointment).set({ status: 'CANCELLED' }).where(eq(appointment.id, id)).returning()
     await tx.insert(auditEvent).values(audit('APPOINTMENT_CANCEL', actor, id))
+    await recordBookingAppointmentChange(tx, id, 'CANCELLED')
     return updated!
   })
   return project(row, actor)

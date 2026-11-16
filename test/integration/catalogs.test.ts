@@ -86,6 +86,14 @@ describe('immutable preventive catalogs on disposable database', () => {
     expect((await getCatalogView('CHECKUP')).versions).toEqual([])
   })
 
+  it('rejects a replaced AAP original before inserting either draft release', async () => {
+    const preload = `globalThis.fetch = async () => ({ arrayBuffer: async () => new Uint8Array(317138).buffer })`
+    const env = { ...process.env, DATABASE_URL: target.href, NODE_OPTIONS: `--import=data:text/javascript,${encodeURIComponent(preload)}` }
+    expect(() => execFileSync('node', ['scripts/prepare-catalogs.mjs'], { env, encoding: 'utf8', stdio: 'pipe' })).toThrow('Source mismatch: periodicity_schedule.pdf')
+    expect((await getCatalogView('VACCINE')).versions).toEqual([])
+    expect((await getCatalogView('CHECKUP')).versions).toEqual([])
+  })
+
   it('runs the same migration-then-import startup as production, idempotently on retry', async () => {
     const env = { ...process.env, DATABASE_URL: target.href }
     const start = () => execFileSync('node', ['scripts/prepare-catalogs.mjs'], { env, encoding: 'utf8' })

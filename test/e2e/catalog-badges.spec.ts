@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { execFileSync } from 'node:child_process'
 import { hashPassword } from 'better-auth/crypto'
 import { drizzle } from 'drizzle-orm/node-postgres'
 import { migrate } from 'drizzle-orm/node-postgres/migrator'
@@ -15,6 +16,7 @@ test.describe('preventive catalog admin review', () => {
     if (!url || new URL(url).pathname !== '/pediatrico_auth_slice2_test' || url === process.env.DATABASE_URL) throw new Error('Dedicated disposable E2E DB required')
     pool = new Pool({ connectionString: url })
     await migrate(drizzle(pool), { migrationsFolder: './server/db/migrations' })
+    execFileSync('node', ['scripts/prepare-catalogs.mjs'], { env: { ...process.env, DATABASE_URL: url }, stdio: 'pipe' })
   })
   test.afterAll(async () => pool?.end())
 
@@ -39,9 +41,16 @@ test.describe('preventive catalog admin review', () => {
       await page.getByRole('button', { name: 'Ingresar' }).click()
       await expect(page).toHaveURL('/')
       await page.goto('/admin/catalogos')
+      await page.waitForLoadState('networkidle')
       await expect(page.getByRole('heading', { name: 'Catálogos preventivos' })).toBeVisible()
       const section = page.getByRole('region', { name: `Test-only fixture · ${version}` })
       await expect(section.getByText('Borrador - pendiente de revisión')).toHaveCount(2)
+      await page.getByRole('button', { name: 'Vacunas MSP' }).click()
+      const vaccineSection = page.getByRole('region', { name: 'Esquema Nacional de Vacunación 2026 · 2026-07' })
+      await expect(vaccineSection.getByText('Borrador - pendiente de revisión')).toHaveCount(21)
+      await page.getByRole('button', { name: 'Controles AAP' }).click()
+      const checkupSection = page.getByRole('region', { name: 'Bright Futures/AAP periodicity schedule (ages only) · approved 2024-12; published 2025-02' })
+      await expect(checkupSection.getByText('Borrador - pendiente de revisión')).toHaveCount(31)
       expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width + 1)
       const response = await context.request.get('/api/admin/catalogos/MOTOR')
       expect(response.status()).toBe(200)

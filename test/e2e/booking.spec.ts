@@ -115,6 +115,7 @@ test.describe('booking by role and phone', () => {
       await guest.clearCookies()
       await signIn(users[2].username)
       await page.goto('/citas')
+      await page.waitForLoadState('networkidle')
       await expect(page.getByText('Aprobada')).toBeVisible()
     } finally {
       await guest.close()

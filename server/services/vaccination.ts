@@ -4,7 +4,7 @@ import { createError } from 'nuxt/server'
 import type { Actor } from '../../shared/types/access'
 import { draftBadge, draftStatus } from '../../shared/types/catalog'
 import { complementaryInputSchema, doseInputSchema, type ComplementaryInput, type DoseInput, type DoseRecord, type PendingVaccine } from '../../shared/types/preventive'
-import { auditEvent, catalogItem, catalogRelease, complementaryVaccine, guardianGrant, patient, user, vaccineDose } from '../db/schema'
+import { auditEvent, catalogItem, catalogRelease, complementaryVaccine, guardianGrant, patient, user, vaccineDose, vaccineDoseClaim } from '../db/schema'
 import { useDb } from '../utils/db'
 import { recordAudit } from './audit'
 import { authorizeClinical } from './patients'
@@ -111,6 +111,10 @@ export async function recordDose(actor: Actor, patientId: string, raw: DoseInput
   }
   return db.transaction(async (tx) => {
     const [row] = await tx.insert(vaccineDose).values({ id: randomUUID(), patientId, releaseId, key, label, doseLabel, catalogVersion: version, sourcePage, sourceStatus: draftStatus, appliedAt: input.appliedAt, external: input.external, lot: input.lot ?? null, privateNote: input.privateNote ?? null, authorId: actor.id }).returning()
+    if (releaseId) {
+      const [release] = await tx.select({ publisher: catalogRelease.publisher, version: catalogRelease.version, url: catalogRelease.url }).from(catalogRelease).where(eq(catalogRelease.id, releaseId))
+      await tx.insert(vaccineDoseClaim).values({ patientId, publisher: release!.publisher, version: release!.version, url: release!.url, key, doseId: row!.id })
+    }
     await tx.insert(auditEvent).values({ id: randomUUID(), action: 'VACCINE_DOSE', outcome: 'ALLOWED', actorId: actor.id, subjectId: patientId })
     return row as DoseRecord
   })

@@ -1,11 +1,12 @@
 import { randomUUID } from 'node:crypto'
+import { readFileSync } from 'node:fs'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { drizzle } from 'drizzle-orm/node-postgres'
 import { migrate } from 'drizzle-orm/node-postgres/migrator'
 import { Pool } from 'pg'
 import type { Actor } from '../../shared/types/access'
 import { catalogItem, catalogRelease, guardianGrant, patient, user, vaccineDose } from '../../server/db/schema'
-import { eq } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import { recordDose, listVaccines, listVaccinationReview, listAppliedDoses, addComplementaryVaccine } from '../../server/services/vaccination'
 import { assessMilestone, listDevelopment, recordScreening } from '../../server/services/development'
 import { nextCheckups, recordCheckup, setIndividualCheckup } from '../../server/services/checkups'
@@ -128,6 +129,47 @@ describe('doctor-only preventive record and draft review', () => {
     await expect(listAppliedDoses(stranger, child)).rejects.toMatchObject({ statusCode: 404 })
   })
 
+  it('atomically rejects simultaneous applications of one dose across catalog revisions while retaining distinct keys and sources', async () => {
+    const first = '3'.repeat(64)
+    const second = '4'.repeat(64)
+    const otherSource = '5'.repeat(64)
+    const patientId = randomUUID()
+    await db.insert(patient).values({ id: patientId, name: 'Niña concurrente', birthDate: '2024-01-01', sex: 'FEMALE', createdBy: doctor.id })
+    await db.insert(catalogRelease).values([
+      { id: first, kind: 'VACCINE', publisher: 'MSP Ecuador', title: 'Primera revisión', version: '2026', retrievedAt: '2026-11-16', url: 'https://www.salud.gob.ec/concurrent.pdf', sha256: first },
+      { id: second, kind: 'VACCINE', publisher: 'MSP Ecuador', title: 'Segunda revisión', version: '2026', revision: second, retrievedAt: '2026-11-16', url: 'https://www.salud.gob.ec/concurrent.pdf', sha256: second },
+      { id: otherSource, kind: 'VACCINE', publisher: 'Otra fuente', title: 'Otra fuente', version: '2026', retrievedAt: '2026-11-16', url: 'https://example.org/concurrent.pdf', sha256: otherSource }
+    ])
+    await db.insert(catalogItem).values([first, second, otherSource].flatMap(releaseId => ['shared-1', 'distinct-1'].map(key => ({ releaseId, key, label: key, domain: 'MSP', minAgeMonths: '0', maxAgeMonths: '0', sourcePage: 'p. 1' }))))
+    const results = await Promise.allSettled([first, second].map(releaseId => recordDose(doctor, patientId, { releaseId, key: 'shared-1', appliedAt: '2026-01-01', external: true })))
+    expect(results.map(result => result.status).sort()).toEqual(['fulfilled', 'rejected'])
+    expect((await db.select().from(vaccineDose).where(eq(vaccineDose.patientId, patientId))).filter(row => row.key === 'shared-1')).toHaveLength(1)
+    await recordDose(doctor, patientId, { releaseId: second, key: 'distinct-1', appliedAt: '2026-01-01', external: true })
+    await recordDose(doctor, patientId, { releaseId: otherSource, key: 'shared-1', appliedAt: '2026-01-01', external: true })
+    expect(await db.select().from(vaccineDose).where(eq(vaccineDose.patientId, patientId))).toHaveLength(3)
+  })
+
+  it('backfills existing dose claims during an upgrade and rejects a revised duplicate without altering history', async () => {
+    const patientId = randomUUID()
+    const oldRelease = '6'.repeat(64)
+    const revised = '7'.repeat(64)
+    await db.insert(patient).values({ id: patientId, name: 'Niña migración', birthDate: '2024-01-01', sex: 'FEMALE', createdBy: doctor.id })
+    await db.insert(catalogRelease).values([
+      { id: oldRelease, kind: 'VACCINE', publisher: 'MSP Ecuador', title: 'Anterior', version: '2026', retrievedAt: '2026-11-16', url: 'https://www.salud.gob.ec/upgrade.pdf', sha256: oldRelease },
+      { id: revised, kind: 'VACCINE', publisher: 'MSP Ecuador', title: 'Revisado', version: '2026', revision: revised, retrievedAt: '2026-11-16', url: 'https://www.salud.gob.ec/upgrade.pdf', sha256: revised }
+    ])
+    await db.insert(catalogItem).values([{ releaseId: oldRelease, key: 'upgrade-1', label: 'Original', domain: 'MSP', minAgeMonths: '0', maxAgeMonths: '0', sourcePage: 'p. 1' }, { releaseId: revised, key: 'upgrade-1', label: 'Revisada', domain: 'MSP', minAgeMonths: '0', maxAgeMonths: '0', sourcePage: 'p. 2' }])
+    const original = await recordDose(doctor, patientId, { releaseId: oldRelease, key: 'upgrade-1', appliedAt: '2026-01-01', external: true, lot: 'original' })
+    const migration = readFileSync('./server/db/migrations/0039_dry_invisible_woman.sql', 'utf8')
+    await db.execute(sql.raw('DROP TABLE vaccine_dose_claim CASCADE'))
+    await db.insert(vaccineDose).values({ id: randomUUID(), patientId, releaseId: revised, key: 'upgrade-1', label: 'Revisada antigua', doseLabel: null, catalogVersion: '2026', sourcePage: 'p. 2', sourceStatus: 'DRAFT_PENDING_PEDIATRICIAN_REVIEW', appliedAt: '2026-01-02', external: true, lot: 'legacy', privateNote: null, authorId: doctor.id })
+    for (const statement of migration.split('--> statement-breakpoint')) await db.execute(sql.raw(statement))
+    expect((await db.select().from(vaccineDose).where(eq(vaccineDose.patientId, patientId))).map(row => row.label).sort()).toEqual(['Original', 'Revisada antigua'])
+    expect((await db.select().from(vaccineDose).where(eq(vaccineDose.id, original.id)))[0]).toMatchObject({ id: original.id, releaseId: oldRelease, label: 'Original', lot: 'original' })
+    await expect(recordDose(doctor, patientId, { releaseId: revised, key: 'upgrade-1', appliedAt: '2026-01-02', external: true })).rejects.toThrow()
+    expect(await db.select().from(vaccineDose).where(eq(vaccineDose.patientId, patientId))).toHaveLength(2)
+  })
+
   it('rejects a duplicate complementary dose even though its release id is null', async () => {
     const item = await addComplementaryVaccine(doctor, { label: 'Complementaria única', doseLabel: 'Dosis individual', source: 'Criterio médico de prueba', patientId: newborn })
     await recordDose(doctor, newborn, { complementaryId: item!.id, appliedAt: '2026-11-15', external: false })
@@ -198,6 +240,18 @@ describe('doctor-only preventive record and draft review', () => {
     const after = await listDevelopment(doctor, intervalChild, new Date('2026-07-03T12:00:00Z'))
     expect(after.screenings.some(row => row.instrument === 'Instrumento de prueba' && row.result === 'Registrado')).toBe(true)
     expect(after.reminders).toEqual([])
+  })
+
+  it('starts a sourced monthly screening reminder on the clamped calendar anniversary, not before', async () => {
+    const source = '8'.repeat(64)
+    const leapChild = randomUUID()
+    await db.insert(patient).values({ id: leapChild, name: 'Niña fin de mes', birthDate: '2024-01-31', sex: 'FEMALE', createdBy: doctor.id })
+    await db.insert(catalogRelease).values({ id: source, kind: 'SCREENING', publisher: 'Fuente de prueba', title: 'Tamizaje mensual', version: 'v2', retrievedAt: '2026-11-16', url: 'https://example.org/month-boundary.pdf', sha256: source })
+    await db.insert(catalogItem).values([{ releaseId: source, key: 'month-1', label: 'Tamizaje de un mes', domain: 'DEVELOPMENT', minAgeMonths: '1', maxAgeMonths: '1', sourcePage: 'p. 1' }, { releaseId: source, key: 'month-13', label: 'Tamizaje de trece meses', domain: 'LANGUAGE', minAgeMonths: '13', maxAgeMonths: '13', sourcePage: 'p. 2' }])
+    expect((await listDevelopment(doctor, leapChild, new Date('2024-02-28T12:00:00Z'))).reminders).toEqual([])
+    expect((await listDevelopment(doctor, leapChild, new Date('2024-02-29T12:00:00Z'))).reminders.map(row => row.key)).toEqual(['month-1'])
+    expect((await listDevelopment(doctor, leapChild, new Date('2025-02-27T12:00:00Z'))).reminders.map(row => row.key)).toEqual(['month-1'])
+    expect((await listDevelopment(doctor, leapChild, new Date('2025-02-28T12:00:00Z'))).reminders.map(row => row.key)).toEqual(['month-1', 'month-13'])
   })
 
   it('derives newborn and day-window control dates from the patient birth date', async () => {

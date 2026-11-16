@@ -3,7 +3,7 @@ import { sql } from 'drizzle-orm'
 
 export { appointment, blockedHour, bookingNotice, bookingProof, bookingRequest, clinicSchedule, openingHour } from './schema/scheduling.ts'
 export { catalogItem, catalogRelease, doctorCatalogEntry } from './schema/catalogs.ts'
-export { vaccineDose, complementaryVaccine, milestoneAssessment, screeningApplication, individualCheckup, completedCheckup } from './schema/preventive.ts'
+export { vaccineDose, vaccineDoseClaim, complementaryVaccine, milestoneAssessment, screeningApplication, individualCheckup, completedCheckup } from './schema/preventive.ts'
 
 export const user = pgTable('user', {
   id: text('id').primaryKey(),

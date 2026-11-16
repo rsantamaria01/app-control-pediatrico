@@ -41,15 +41,16 @@ export async function listDevelopment(actor: Actor, patientId: string, today = n
     if (!current.has(identity)) current.set(identity, release)
   }
   const [person] = await db.select({ birthDate: patient.birthDate }).from(patient).where(eq(patient.id, patientId))
-  const age = person ? (today.getUTCFullYear() - Number(person.birthDate.slice(0, 4))) * 12 + today.getUTCMonth() + 1 - Number(person.birthDate.slice(5, 7)) - (today.getUTCDate() < Number(person.birthDate.slice(8, 10)) ? 1 : 0) : -1
   const reminders = [] as { key: string, label: string, category: string, ageMonths: number, version: string, source: string, sourcePage: string, badge: typeof draftBadge }[]
   for (const release of current.values()) {
     if (release.status !== draftStatus) continue
     const items = await db.select().from(catalogItem).where(eq(catalogItem.releaseId, release.id))
     for (const item of items) {
       const [year, month, day] = person!.birthDate.split('-').map(Number)
-      const due = new Date(Date.UTC(year!, month! - 1 + Number(item.minAgeMonths), day!)).toISOString().slice(0, 10)
-      if (item.status !== draftStatus || age < Number(item.minAgeMonths) || screenings.some(screening => screening.category === item.domain && screening.appliedAt >= due)) continue
+      const dueMonth = new Date(Date.UTC(year!, month! - 1 + Number(item.minAgeMonths), 1))
+      dueMonth.setUTCDate(Math.min(day!, new Date(Date.UTC(dueMonth.getUTCFullYear(), dueMonth.getUTCMonth() + 1, 0)).getUTCDate()))
+      const due = dueMonth.toISOString().slice(0, 10)
+      if (item.status !== draftStatus || today.toISOString().slice(0, 10) < due || screenings.some(screening => screening.category === item.domain && screening.appliedAt >= due)) continue
       reminders.push({ key: item.key, label: item.label, category: item.domain, ageMonths: Number(item.minAgeMonths), version: release.version, source: `${release.publisher} · ${release.title}`, sourcePage: item.sourcePage, badge: draftBadge })
     }
   }

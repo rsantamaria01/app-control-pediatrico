@@ -129,6 +129,7 @@ const labels: Record<WhoIndicator, string> = {
 }
 const weightFormat = new Intl.NumberFormat('es-EC', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const lengthFormat = new Intl.NumberFormat('es-EC', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+const preventiveTab = ref<'vacunas' | 'desarrollo' | 'controles'>('vacunas')
 const dateFormat = new Intl.DateTimeFormat('es-EC', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'America/Guayaquil' })
 </script>
 
@@ -187,6 +188,38 @@ const dateFormat = new Intl.DateTimeFormat('es-EC', { day: 'numeric', month: 'sh
           </UButton>
         </div>
       </div>
+      <section
+        class="space-y-3"
+        aria-label="Seguimiento preventivo"
+      >
+        <nav
+          class="flex flex-wrap gap-2"
+          aria-label="Secciones preventivas"
+        >
+          <UButton
+            v-for="tab in (['vacunas', 'desarrollo', 'controles'] as const)"
+            :key="tab"
+            variant="outline"
+            class="min-h-11"
+            :aria-pressed="preventiveTab === tab"
+            @click="preventiveTab = tab"
+          >
+            {{ tab === 'vacunas' ? 'Vacunas' : tab === 'desarrollo' ? 'Desarrollo' : 'Controles' }}
+          </UButton>
+        </nav>
+        <PatientsVaccinesTab
+          v-if="preventiveTab === 'vacunas'"
+          :patient-id="id"
+        />
+        <PatientsMilestonesTab
+          v-if="preventiveTab === 'desarrollo'"
+          :patient-id="id"
+        />
+        <PatientsCheckupsTab
+          v-if="preventiveTab === 'controles'"
+          :patient-id="id"
+        />
+      </section>
       <UAlert
         v-if="patientWarning"
         color="warning"
@@ -544,11 +577,18 @@ const dateFormat = new Intl.DateTimeFormat('es-EC', { day: 'numeric', month: 'sh
             </div>
           </UCard>
         </section>
-        <section class="space-y-3" aria-label="Curvas de crecimiento">
+        <section
+          class="space-y-3"
+          aria-label="Curvas de crecimiento"
+        >
           <h2 class="text-lg font-semibold">
             Curvas de crecimiento OMS
           </h2>
-          <div class="flex flex-wrap gap-2" role="group" aria-label="Indicador de crecimiento">
+          <div
+            class="flex flex-wrap gap-2"
+            role="group"
+            aria-label="Indicador de crecimiento"
+          >
             <UButton
               v-for="indicator in chartIndicators"
               :key="indicator"
@@ -569,8 +609,14 @@ const dateFormat = new Intl.DateTimeFormat('es-EC', { day: 'numeric', month: 'sh
             {{ showGrowthTable ? 'Ver gráfico' : 'Ver tabla' }}
           </UButton>
           <UCard v-if="growth?.charts[chartIndicator]">
-            <GrowthTable v-if="showGrowthTable" :view="growth.charts[chartIndicator]!" />
-            <GrowthChart v-else :view="growth.charts[chartIndicator]!" />
+            <GrowthTable
+              v-if="showGrowthTable"
+              :view="growth.charts[chartIndicator]!"
+            />
+            <GrowthChart
+              v-else
+              :view="growth.charts[chartIndicator]!"
+            />
           </UCard>
           <UCard v-else>
             <p class="text-muted">

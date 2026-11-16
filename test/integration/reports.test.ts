@@ -13,7 +13,7 @@ import type { Gender } from '../../shared/utils/enums'
 import { importWhoRelease, parseWhoWorkbook } from '../../server/services/who-import'
 import type { VerifiedSource } from '../../shared/types/who'
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
-import { familyReport, guardianGrant, patient, user, visit, visitSharing, visitText } from '../../server/db/schema'
+import { vaccineDose, familyReport, guardianGrant, patient, user, visit, visitSharing, visitText } from '../../server/db/schema'
 import type { Actor } from '../../shared/types/access'
 
 const configured = process.env.TEST_DATABASE_URL
@@ -139,9 +139,10 @@ describe('approved report boundary', () => {
     await expect(db.delete(familyReport).where(eq(familyReport.id, approved.id))).rejects.toBeDefined()
     await expect(db.update(visitText).set({ parentAdvice: 'Cambio posterior', privateNote: 'PRIVATE_NEW' }).where(eq(visitText.visitId, sharedId))).rejects.toMatchObject({ cause: { message: 'Clinical snapshots are immutable' } })
     const laterId = await seedVisit(true, 'PRIVATE_NEW', 'Cambio posterior')
+    await db.insert(vaccineDose).values({ id: randomUUID(), patientId: childId, key: 'report-fixture', label: 'Vacuna posterior', catalogVersion: 'Registro médico', sourcePage: 'Consulta', sourceStatus: 'DRAFT_PENDING_PEDIATRICIAN_REVIEW', appliedAt: '2025-01-01', external: false, lot: 'PRIVATE_LOT', privateNote: 'PRIVATE_VACCINE', authorId: doctor.id })
     const retrieved = await getApprovedReport(guardian, childId, approved.id)
     expect(retrieved.content.visits[0]?.parentAdvice).toBe('Indicaciones compartidas')
-    expect(JSON.stringify(retrieved)).not.toMatch(/PRIVATE|Cambio posterior|\bz\b|percentile|classification|status|bmi/i)
+    expect(JSON.stringify(retrieved)).not.toMatch(/PRIVATE|Cambio posterior|Vacuna posterior|\bz\b|percentile|classification|status|bmi/i)
     await expect(getApprovedReport(stranger, childId, approved.id)).rejects.toMatchObject({ statusCode: 404 })
     await expect(getApprovedReport({ id: guardian.id, roles: ['PATIENT', 'DOCTOR'] }, childId, approved.id)).rejects.toMatchObject({ statusCode: 404 })
     await expect(getApprovedReport(guardian, otherChildId, approved.id)).rejects.toMatchObject({ statusCode: 404 })

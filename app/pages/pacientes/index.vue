@@ -9,6 +9,8 @@ const age = (birthDate: string) => {
   return months < 12 ? `${months} meses` : `${Math.floor(months / 12)} años ${months % 12} meses`
 }
 const weight = new Intl.NumberFormat('es-EC', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+const { data: vaccineReview } = await useFetch<{ id: string }[]>('/api/clinical/vacunacion-por-revisar', { default: () => [] })
+const pendingIds = computed(() => new Set(vaccineReview.value?.map(item => item.id) ?? []))
 const { data: patients, status, error, refresh } = await useFetch<PatientView[]>('/api/pacientes', { query: computed(() => ({ q: query.value })), default: () => [] })
 </script>
 
@@ -87,6 +89,12 @@ const { data: patients, status, error, refresh } = await useFetch<PatientView[]>
               size="md"
             />
             <span class="min-w-0 flex-1"><span class="block truncate font-medium">{{ person.name }}</span><span class="block text-sm text-muted">{{ age(person.birthDate) }} · {{ person.lastWeightKg === undefined ? 'Sin peso registrado' : `${weight.format(person.lastWeightKg)} kg` }}</span></span>
+            <UBadge
+              v-if="pendingIds.has(person.id)"
+              color="neutral"
+              variant="soft"
+              size="xs"
+            >Vacunas por revisar</UBadge>
             <UIcon
               name="i-lucide-chevron-right"
               aria-hidden="true"

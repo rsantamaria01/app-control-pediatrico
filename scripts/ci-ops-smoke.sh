@@ -43,6 +43,10 @@ fi
 
 phase=build
 docker build --target ops -t "$image" .
+phase=schema-modules
+if ! docker run --rm --network none --read-only --entrypoint node "$image" --experimental-transform-types --input-type=module -e 'import { readdir } from "node:fs/promises"; import { pathToFileURL } from "node:url"; const root = "/app/server/db/schema"; for (const name of await readdir(root, { recursive: true })) if (name.endsWith(".ts")) await import(pathToFileURL(root + "/" + name).href); const schema = await import(pathToFileURL("/app/server/db/schema.ts").href); if (!Object.keys(schema).length) process.exit(1)' >/dev/null 2>&1; then
+  fail OPS_SCHEMA_IMPORT_FAILED
+fi
 phase=offline-migration
 if output=$(docker run --rm --network none --read-only -e DB_PASSWORD -e DB_HOST=127.0.0.1 -e COREPACK_HOME=/unwritable-corepack "$image" db:migrate 2>&1); then
   fail OFFLINE_UNEXPECTED_SUCCESS

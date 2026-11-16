@@ -11,6 +11,7 @@ WORKDIR /app
 COPY --from=build --chown=node:node /app/node_modules ./node_modules
 COPY --chown=node:node package.json pnpm-lock.yaml pnpm-workspace.yaml drizzle.config.ts ./
 COPY --chown=node:node server/db/schema.ts ./server/db/schema.ts
+COPY --chown=node:node server/db/schema ./server/db/schema
 COPY --chown=node:node server/db/migrations ./server/db/migrations
 COPY --chown=node:node server/services/credentials.ts ./server/services/credentials.ts
 COPY --chown=node:node shared/utils/enums.ts ./shared/utils/enums.ts

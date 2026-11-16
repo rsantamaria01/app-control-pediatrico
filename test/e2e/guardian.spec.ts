@@ -365,8 +365,10 @@ test.describe('verified guardian invitation and isolated portal', () => {
       await db.update(guardianGrant).set({ status: 'REVOKED', revokedAt: new Date() }).where(eq(guardianGrant.patientId, ownId))
       expect((await page.request.get(`/api/hijos/${ownId}/crecimiento`)).status()).toBe(404)
       expect((await page.request.get(`/api/hijos/${ownId}`)).status()).toBe(404)
-      await page.reload()
-      await expect(page.getByText('No se pudo consultar esta información')).toBeVisible()
+      const revoked = await page.reload()
+      expect(revoked?.status()).toBe(404)
+      expect(revoked?.headers()['cache-control']).toContain('no-store')
+      await expect(page.locator('#__nuxt').getByRole('heading', { name: 'No disponible' })).toBeVisible()
       expect(await page.locator('body').innerText()).not.toContain('Conversar en consulta')
       await page.context().clearCookies()
     }

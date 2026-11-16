@@ -32,6 +32,17 @@ describe('built production ops image', () => {
     }
   }, 360_000)
 
+  it.skipIf(!docker)('loads every schema module in the offline read-only ops image', () => {
+    const image = `pediatrico-ops-schema-${process.pid}`
+    try {
+      execFileSync('docker', ['build', '--target', 'ops', '-t', image, '.'], { stdio: 'pipe', timeout: 300_000 })
+      const result = spawnSync('docker', ['run', '--rm', '--network', 'none', '--read-only', '--entrypoint', 'node', image, '--experimental-transform-types', '--input-type=module', '-e', `import { readdir } from 'node:fs/promises'; import { pathToFileURL } from 'node:url'; const root = '/app/server/db/schema'; for (const name of await readdir(root, { recursive: true })) if (name.endsWith('.ts')) await import(pathToFileURL(root + '/' + name).href); const schema = await import(pathToFileURL('/app/server/db/schema.ts').href); if (!Object.keys(schema).length) process.exit(1)`], { encoding: 'utf8', timeout: 120_000 })
+      expect(result.status, result.stderr.replace(/postgres(?:ql)?:\/\/[^\s]+/gi, '[redacted]')).toBe(0)
+    } finally {
+      spawnSync('docker', ['image', 'rm', image], { stdio: 'ignore' })
+    }
+  }, 360_000)
+
   it.skipIf(!docker)('runs migrations then bootstraps exactly once in a disposable database', async () => {
     const admin = new Pool({ connectionString: adminUrl.href })
     const image = `pediatrico-ops-test-${process.pid}`

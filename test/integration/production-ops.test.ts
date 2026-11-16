@@ -61,9 +61,9 @@ describe('built production ops image', () => {
       try {
         const migrated = await db.query('SELECT count(*)::int AS count FROM drizzle.__drizzle_migrations')
         expect(migrated.rows[0].count).toBeGreaterThan(0)
-        expect((await db.query("SELECT count(*)::int AS count FROM catalog_item WHERE release_id IN (SELECT id FROM catalog_release WHERE kind = 'VACCINE')")).rows[0].count).toBe(21)
-        expect((await db.query("SELECT count(*)::int AS count FROM catalog_item WHERE release_id IN (SELECT id FROM catalog_release WHERE kind = 'CHECKUP')")).rows[0].count).toBe(31)
-        expect((await db.query("SELECT count(*)::int AS count FROM catalog_release WHERE kind = 'MILESTONE'")).rows[0].count).toBe(0)
+        expect((await db.query(`SELECT count(*)::int AS count FROM catalog_item WHERE release_id IN (SELECT id FROM catalog_release WHERE kind = 'VACCINE')`)).rows[0].count).toBe(21)
+        expect((await db.query(`SELECT count(*)::int AS count FROM catalog_item WHERE release_id IN (SELECT id FROM catalog_release WHERE kind = 'CHECKUP')`)).rows[0].count).toBe(31)
+        expect((await db.query(`SELECT count(*)::int AS count FROM catalog_release WHERE kind = 'MILESTONE'`)).rows[0].count).toBe(0)
         run('prepare')
         expect((await db.query('SELECT count(*)::int AS count FROM catalog_release')).rows[0].count).toBe(2)
         const link = run('bootstrap-admin')

@@ -147,6 +147,18 @@ describe('booking with isolated database', () => {
     await expect(decideBookingRequest(adminOnly, first.id, 'APPROVE')).rejects.toMatchObject({ statusCode: 403 })
   })
 
+  it('shows only own staff-scheduled appointments alongside parent requests', async () => {
+    const { scheduleAppointment } = await import('../../server/services/appointments')
+    const created = await scheduleAppointment(doctor, { date: '2027-03-08', time: '09:00', name: input.childName, contact: input.phone, reason: 'Control', patientId: child })
+    const secondChild = randomUUID()
+    await pool.query('INSERT INTO patient (id, name, birth_date, sex, created_by) VALUES ($1,$2,$3,$4,$5)', [secondChild, 'Otra familia', input.birthDate, input.sex, doctor.id])
+    await scheduleAppointment(doctor, { date: '2027-03-08', time: '09:30', name: 'Otra familia', contact: input.phone, reason: 'Privado', patientId: secondChild })
+    const own = await listParentAppointments(parent)
+    expect(own).toContainEqual({ id: created.id, name: input.childName, date: '2027-03-08', time: '09:00', status: 'APPROVED' })
+    expect(own.some(item => item.name === 'Otra familia')).toBe(false)
+    expect(await listParentAppointments(stranger)).toEqual([])
+  })
+
   it('rejects stale parent approval after relationship revocation and rolls back a failed decision audit', async () => {
     const owned = (await listBookingRequests(doctor)).find(row => row.time === '09:30' && row.childName === input.childName)!
     await pool.query('UPDATE guardian_grant SET status = \'REVOKED\' WHERE patient_id = $1 AND guardian_id = $2', [child, parent.id])
@@ -170,8 +182,8 @@ describe('booking with isolated database', () => {
     const approved = await decideBookingRequest(doctor, item.id, 'APPROVE')
     expect(approved.status).toBe('APPROVED')
     const appointmentId = approved.appointmentId!
-    await rescheduleAppointment(assistant, appointmentId, { date: '2027-03-08', time: '09:30' })
-    expect((await listParentAppointments(parent))[0]).toMatchObject({ status: 'RESCHEDULED', date: '2027-03-08' })
+    await rescheduleAppointment(assistant, appointmentId, { date: '2027-03-15', time: '09:30' })
+    expect((await listParentAppointments(parent))[0]).toMatchObject({ status: 'RESCHEDULED', date: '2027-03-15' })
     await cancelAppointment(doctor, appointmentId)
     expect((await listParentAppointments(parent))[0]?.status).toBe('CANCELLED')
     expect((await listParentAppointments(stranger))).toEqual([])

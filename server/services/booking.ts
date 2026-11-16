@@ -1,5 +1,5 @@
 import { createHash, randomBytes, randomInt, randomUUID } from 'node:crypto'
-import { and, eq, gt, inArray, isNull, sql } from 'drizzle-orm'
+import { and, eq, gt, isNull, sql } from 'drizzle-orm'
 import { createError } from 'nuxt/server'
 import type { Actor } from '../../shared/types/access'
 import { bookingContactSchema, bookingCodeSchema, parentBookingSchema, publicBookingSchema, type BookingDecision, type BookingRequestView, type ParentAppointment, type PendingRequest, type VerifiedBookingInput } from '../../shared/types/booking'
@@ -68,7 +68,7 @@ export async function submitBookingRequest(input: VerifiedBookingInput): Promise
     const [proof] = await tx.update(bookingProof).set({ usedAt: new Date() }).where(and(eq(bookingProof.email, values.email), eq(bookingProof.kind, 'TOKEN'), eq(bookingProof.digest, digest(values.verificationToken)), isNull(bookingProof.usedAt), gt(bookingProof.expiresAt, new Date()))).returning()
     if (!proof) throw unavailable()
     if (startsAt < new Date() || !(await availableSlots({ from: values.date, to: values.date }, undefined, tx)).some(slot => slot.time === values.time && slot.free)) throw conflict()
-    const duplicate = await tx.select({ id: bookingRequest.id }).from(bookingRequest).where(and(eq(bookingRequest.email, values.email), eq(bookingRequest.childName, values.childName), inArray(bookingRequest.status, ['PENDING', 'APPROVED']))).limit(1)
+    const duplicate = await tx.select({ id: bookingRequest.id }).from(bookingRequest).where(and(eq(bookingRequest.email, values.email), eq(bookingRequest.childName, values.childName), eq(bookingRequest.birthDate, values.birthDate), eq(bookingRequest.status, 'PENDING'))).limit(1)
     if (duplicate.length) throw conflict()
     const id = randomUUID()
     await tx.insert(bookingRequest).values({ id, source: 'PUBLIC', childName: values.childName, birthDate: values.birthDate, sex: values.sex, guardianName: values.guardianName, relationship: values.relationship, email: values.email, phone: values.phone, startsAt, consentVersion: values.consentVersion })
@@ -86,7 +86,7 @@ export async function submitParentBooking(actor: Actor, input: unknown): Promise
     if (!owned) throw createError({ statusCode: 404, statusMessage: 'Not found' })
     const startsAt = instant(values.date, values.time)
     if (startsAt < new Date() || !(await availableSlots({ from: values.date, to: values.date }, undefined, tx)).some(slot => slot.time === values.time && slot.free)) throw conflict()
-    const duplicate = await tx.select({ id: bookingRequest.id }).from(bookingRequest).where(and(eq(bookingRequest.patientId, values.patientId), inArray(bookingRequest.status, ['PENDING', 'APPROVED']))).limit(1)
+    const duplicate = await tx.select({ id: bookingRequest.id }).from(bookingRequest).where(and(eq(bookingRequest.patientId, values.patientId), eq(bookingRequest.status, 'PENDING'))).limit(1)
     if (duplicate.length) throw conflict()
     const id = randomUUID()
     await tx.insert(bookingRequest).values({ id, source: 'PARENT', patientId: values.patientId, guardianId: actor.id, childName: owned.name, guardianName: owned.guardianName, email: owned.email, startsAt, consentVersion: values.consentVersion })
@@ -137,12 +137,14 @@ export async function decideBookingRequest(actor: Actor, requestId: string, deci
 
 export async function listParentAppointments(actor: Actor): Promise<ParentAppointment[]> {
   if (actor.roles.length !== 1 || !actor.roles.includes('PATIENT')) throw createError({ statusCode: 403, statusMessage: 'Access denied' })
-  const rows = await useDb().select({ id: bookingRequest.id, name: bookingRequest.childName, startsAt: bookingRequest.startsAt, status: bookingRequest.status, appointmentId: bookingRequest.appointmentId, currentStart: appointment.startsAt, currentStatus: appointment.status }).from(bookingRequest).innerJoin(guardianGrant, and(eq(guardianGrant.patientId, bookingRequest.patientId), eq(guardianGrant.guardianId, actor.id), eq(guardianGrant.status, 'ACTIVE'))).leftJoin(appointment, eq(appointment.id, bookingRequest.appointmentId)).where(and(eq(bookingRequest.guardianId, actor.id), eq(bookingRequest.source, 'PARENT'))).orderBy(sql`${bookingRequest.createdAt} DESC`)
-  return rows.map((row) => {
+  const db = useDb()
+  const rows = await db.select({ id: bookingRequest.id, name: bookingRequest.childName, startsAt: bookingRequest.startsAt, status: bookingRequest.status, appointmentId: bookingRequest.appointmentId, currentStart: appointment.startsAt, currentStatus: appointment.status }).from(bookingRequest).innerJoin(guardianGrant, and(eq(guardianGrant.patientId, bookingRequest.patientId), eq(guardianGrant.guardianId, actor.id), eq(guardianGrant.status, 'ACTIVE'))).leftJoin(appointment, eq(appointment.id, bookingRequest.appointmentId)).where(and(eq(bookingRequest.guardianId, actor.id), eq(bookingRequest.source, 'PARENT'))).orderBy(sql`${bookingRequest.createdAt} DESC`)
+  const scheduled = await db.select({ id: appointment.id, name: appointment.name, startsAt: appointment.startsAt, status: appointment.status }).from(appointment).innerJoin(guardianGrant, and(eq(guardianGrant.patientId, appointment.patientId), eq(guardianGrant.guardianId, actor.id), eq(guardianGrant.status, 'ACTIVE'))).where(sql`NOT EXISTS (SELECT 1 FROM booking_request WHERE booking_request.appointment_id = ${appointment.id})`)
+  return [...rows.map((row) => {
     const date = row.currentStart ?? row.startsAt
     const status = row.currentStatus === 'CANCELLED' ? 'CANCELLED' : row.currentStatus === 'ATTENDED' ? 'ATTENDED' : row.currentStart && row.currentStart.getTime() !== row.startsAt.getTime() ? 'RESCHEDULED' : row.status
     return { id: row.id, name: row.name, date: localDate(date), time: localTime(date), status: status as ParentAppointment['status'] }
-  })
+  }), ...scheduled.map(row => ({ id: row.id, name: row.name, date: localDate(row.startsAt), time: localTime(row.startsAt), status: (row.status === 'CONFIRMED' ? 'APPROVED' : row.status === 'PENDING' ? 'PENDING' : row.status === 'ATTENDED' ? 'ATTENDED' : 'CANCELLED') as ParentAppointment['status'] }))]
 }
 
 export async function recordBookingAppointmentChange(tx: Parameters<Parameters<ReturnType<typeof useDb>['transaction']>[0]>[0], appointmentId: string, status: 'RESCHEDULED' | 'CANCELLED') {

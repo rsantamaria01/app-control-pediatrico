@@ -172,6 +172,12 @@ async function submit() {
         <p class="mt-2 text-sm tabular-nums">
           {{ dateFormat.format(new Date(`${item.date}T12:00:00Z`)) }} · {{ item.time }}
         </p>
+        <p
+          v-if="item.status === 'PENDING' || item.status === 'DECLINED'"
+          class="mt-2 text-sm text-muted"
+        >
+          {{ item.status === 'PENDING' ? 'La clínica aún no ha aprobado esta cita.' : 'La solicitud no fue aprobada; puede solicitar otro horario.' }}
+        </p>
       </UCard>
     </section>
   </UContainer>

@@ -2,16 +2,19 @@ import { createHash, randomUUID } from 'node:crypto'
 import { and, eq, inArray, lte, sql } from 'drizzle-orm'
 import type { Actor } from '../../shared/types/access'
 import type { DeliveryOutcome, DomainEvent, NotificationChannel, OutboxId, Recipient, Tx } from '../../shared/types/notification'
-import { bookingRequest, completedCheckup, guardianGrant, inAppNotice, individualCheckup, notificationAttempt, notificationOutbox, notificationPreference, user, visit, visitSharing } from '../db/schema'
+import { bookingRequest, completedCheckup, guardianGrant, guardianPhone, inAppNotice, individualCheckup, notificationAttempt, notificationOutbox, notificationPreference, user, visit, visitSharing } from '../db/schema'
 import { useDb } from '../utils/db'
 import { emailProviderHealth, sendNotificationEmail } from './email'
+import { sendMetaTemplate } from './providers/meta'
+import { sendTwilioTemplate } from './providers/twilio'
+import { resolveWhatsAppTransport, setWhatsAppHealth, whatsappProviderHealth } from './whatsapp-settings'
 
 export type ProviderStatus = 'READY' | 'NOT_CONFIGURED' | 'FAILED'
-export type ProviderAdapter = { channel: 'EMAIL' | 'WHATSAPP', status(): ProviderStatus, send(input: { outboxId: OutboxId, address: string, event: DomainEvent, idempotencyKey: string }): Promise<'SENT' | 'RETRY' | 'FAILED'> }
+export type ProviderAdapter = { channel: 'EMAIL' | 'WHATSAPP', status(): ProviderStatus, send(input: { outboxId: OutboxId, address: string, event: DomainEvent, idempotencyKey: string }): Promise<'SENT' | 'ACCEPTED' | 'RETRY' | 'FAILED'> }
 
 export async function providerStatus(channel: NotificationChannel): Promise<ProviderStatus> {
   if (channel === 'IN_APP') return 'READY'
-  if (channel !== 'EMAIL') return 'NOT_CONFIGURED'
+  if (channel === 'WHATSAPP') return whatsappProviderHealth()
   const health = await emailProviderHealth()
   return health === 'CONFIGURED' ? 'READY' : health === 'FAILING' ? 'FAILED' : 'NOT_CONFIGURED'
 }
@@ -31,14 +34,43 @@ async function smtpAdapter(): Promise<ProviderAdapter> {
   }
 }
 
+async function whatsappAdapter(): Promise<ProviderAdapter> {
+  let config: Awaited<ReturnType<typeof resolveWhatsAppTransport>>
+  try {
+    config = await resolveWhatsAppTransport()
+  } catch {
+    config = null
+  }
+  return {
+    channel: 'WHATSAPP', status: () => config ? 'READY' : 'NOT_CONFIGURED',
+    async send({ address, event }) {
+      if (!config) return 'FAILED'
+      try {
+        const result = config.provider === 'META' ? await sendMetaTemplate(config, address, event) : await sendTwilioTemplate(config, address, event)
+        await setWhatsAppHealth(config, result === 'ACCEPTED' ? 'READY' : 'FAILING')
+        return result
+      } catch {
+        await setWhatsAppHealth(config, 'FAILING')
+        return 'FAILED'
+      }
+    }
+  }
+}
+
 export async function queueNotification(tx: Tx, event: DomainEvent, recipient: Recipient): Promise<OutboxId> {
   if (!['BOOKING_PENDING', 'BOOKING_APPROVED', 'BOOKING_DECLINED', 'BOOKING_RESCHEDULED', 'BOOKING_CANCELLED', 'VISIT_RECORDED', 'CHECKUP_DUE'].includes(event.kind) || !event.subjectId || (event.occurrenceId && !['BOOKING_RESCHEDULED', 'BOOKING_CANCELLED'].includes(event.kind))) throw new Error('Invalid notification event')
   if (!['EMAIL', 'WHATSAPP', 'IN_APP'].includes(recipient.channel) || (recipient.channel === 'IN_APP' ? !recipient.userId : !recipient.address?.trim())) throw new Error('Invalid notification recipient')
   if (recipient.channel === 'EMAIL' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient.address.trim())) throw new Error('Invalid email recipient')
   if (recipient.channel === 'WHATSAPP' && !/^\+[1-9]\d{7,14}$/.test(recipient.address.trim())) throw new Error('Invalid WhatsApp recipient')
-  if (recipient.channel !== 'IN_APP' && recipient.userId) {
+  if (recipient.channel === 'WHATSAPP') {
+    if (event.kind !== 'CHECKUP_DUE' || !recipient.userId) throw new Error('WhatsApp requires a verified guardian reminder')
+    const [phone] = await tx.select({ phone: guardianPhone.phone }).from(guardianPhone).where(eq(guardianPhone.guardianId, recipient.userId))
+    const [consent] = await tx.select({ enabled: notificationPreference.enabled }).from(notificationPreference).where(and(eq(notificationPreference.userId, recipient.userId), eq(notificationPreference.channel, 'WHATSAPP')))
+    if (phone?.phone !== recipient.address || !consent?.enabled) throw new Error('WhatsApp requires a verified opted-in number')
+  }
+  if (recipient.channel === 'EMAIL' && recipient.userId) {
     const [account] = await tx.select({ email: user.email }).from(user).where(eq(user.id, recipient.userId))
-    if (recipient.channel !== 'EMAIL' || account?.email !== recipient.address.trim().toLowerCase()) throw new Error('Notification recipient does not match account')
+    if (account?.email !== recipient.address.trim().toLowerCase()) throw new Error('Notification recipient does not match account')
   }
   if (event.kind.startsWith('BOOKING_')) {
     const [booking] = await tx.select({ guardianId: bookingRequest.guardianId, email: bookingRequest.email }).from(bookingRequest).where(eq(bookingRequest.id, event.subjectId))
@@ -50,9 +82,13 @@ export async function queueNotification(tx: Tx, event: DomainEvent, recipient: R
     if (!access) throw new Error('Notification recipient has no shared visit')
   }
   if (event.kind === 'CHECKUP_DUE') {
-    if (!recipient.userId || recipient.channel === 'WHATSAPP') throw new Error('Checkup reminder requires a guardian')
+    if (!recipient.userId) throw new Error('Checkup reminder requires a guardian')
     const [eligible] = await tx.select({ id: individualCheckup.id }).from(individualCheckup).innerJoin(guardianGrant, and(eq(guardianGrant.patientId, individualCheckup.patientId), eq(guardianGrant.guardianId, recipient.userId), eq(guardianGrant.status, 'ACTIVE'))).where(and(eq(individualCheckup.id, event.subjectId), sql`NOT EXISTS (SELECT 1 FROM ${completedCheckup} c WHERE c.individual_id = ${individualCheckup.id})`))
     if (!eligible) throw new Error('Checkup reminder is not available')
+    if (recipient.channel === 'WHATSAPP') {
+      const [grant] = await tx.select({ phone: guardianGrant.contactPhone }).from(individualCheckup).innerJoin(guardianGrant, and(eq(guardianGrant.patientId, individualCheckup.patientId), eq(guardianGrant.guardianId, recipient.userId), eq(guardianGrant.status, 'ACTIVE'))).where(eq(individualCheckup.id, event.subjectId))
+      if (grant?.phone !== recipient.address) throw new Error('WhatsApp number does not match patient grant')
+    }
     if (recipient.channel === 'EMAIL') {
       const [consent] = await tx.select({ enabled: notificationPreference.enabled }).from(notificationPreference).where(and(eq(notificationPreference.userId, recipient.userId), eq(notificationPreference.channel, 'EMAIL')))
       if (!consent?.enabled) throw new Error('Checkup email requires explicit consent')
@@ -72,20 +108,22 @@ export async function queueNotification(tx: Tx, event: DomainEvent, recipient: R
 }
 
 export async function deliver(outboxId: OutboxId, now = new Date(), adapter?: ProviderAdapter, timeoutMs = 15000): Promise<DeliveryOutcome> {
-  const claimed = await prepareDelivery(outboxId, now, adapter ?? await smtpAdapter())
+  const [channelRow] = adapter ? [] : await useDb().select({ channel: notificationOutbox.channel }).from(notificationOutbox).where(eq(notificationOutbox.id, outboxId))
+  const chosen = adapter ?? (channelRow?.channel === 'WHATSAPP' ? await whatsappAdapter() : await smtpAdapter())
+  const claimed = await prepareDelivery(outboxId, now, chosen)
   if ('outcome' in claimed) return claimed.outcome
   if (claimed.event.kind === 'CHECKUP_DUE') {
     const allowed = await useDb().transaction(async (tx) => {
       const [row] = await tx.select().from(notificationOutbox).where(eq(notificationOutbox.id, outboxId)).for('update')
       if (!row || row.state !== 'SENDING' || !row.recipientUserId) return false
-      const [eligible] = await tx.select({ id: individualCheckup.id }).from(individualCheckup).innerJoin(guardianGrant, and(eq(guardianGrant.patientId, individualCheckup.patientId), eq(guardianGrant.guardianId, row.recipientUserId), eq(guardianGrant.status, 'ACTIVE'))).innerJoin(notificationPreference, and(eq(notificationPreference.userId, row.recipientUserId), eq(notificationPreference.channel, 'EMAIL'), eq(notificationPreference.enabled, true))).where(and(eq(individualCheckup.id, row.subjectId), sql`NOT EXISTS (SELECT 1 FROM ${completedCheckup} c WHERE c.individual_id = ${individualCheckup.id})`))
+      const [eligible] = await tx.select({ id: individualCheckup.id }).from(individualCheckup).innerJoin(guardianGrant, and(eq(guardianGrant.patientId, individualCheckup.patientId), eq(guardianGrant.guardianId, row.recipientUserId), eq(guardianGrant.status, 'ACTIVE'))).innerJoin(notificationPreference, and(eq(notificationPreference.userId, row.recipientUserId), eq(notificationPreference.channel, row.channel), eq(notificationPreference.enabled, true))).where(and(eq(individualCheckup.id, row.subjectId), sql`NOT EXISTS (SELECT 1 FROM ${completedCheckup} c WHERE c.individual_id = ${individualCheckup.id})`))
       if (eligible) return true
       await tx.update(notificationOutbox).set({ state: 'OPTED_OUT' }).where(eq(notificationOutbox.id, outboxId))
       return false
     })
     if (!allowed) return { id: outboxId, status: 'OPTED_OUT' }
   }
-  let outcome: 'SENT' | 'RETRY' | 'FAILED'
+  let outcome: 'SENT' | 'ACCEPTED' | 'RETRY' | 'FAILED'
   let timer: ReturnType<typeof setTimeout> | undefined
   try {
     const result = await Promise.race([
@@ -94,7 +132,7 @@ export async function deliver(outboxId: OutboxId, now = new Date(), adapter?: Pr
         timer = setTimeout(() => resolve('FAILED'), timeoutMs)
       })
     ])
-    outcome = result === 'SENT' || result === 'RETRY' || result === 'FAILED' ? result : 'FAILED'
+    outcome = result === 'SENT' || result === 'ACCEPTED' || result === 'RETRY' || result === 'FAILED' ? result : 'FAILED'
   } catch {
     outcome = 'FAILED'
   } finally {
@@ -115,7 +153,7 @@ async function prepareDelivery(outboxId: OutboxId, now: Date, adapter?: Provider
   return useDb().transaction(async (tx) => {
     const [row] = await tx.select().from(notificationOutbox).where(eq(notificationOutbox.id, outboxId)).for('update')
     if (!row) return { outcome: { id: outboxId, status: 'NOT_FOUND' } }
-    if (row.state === 'SENT' || row.state === 'NOT_CONFIGURED' || row.state === 'OPTED_OUT' || row.state === 'FAILED') return { outcome: { id: outboxId, status: row.state as DeliveryOutcome['status'] } }
+    if (row.state === 'SENT' || row.state === 'ACCEPTED' || row.state === 'NOT_CONFIGURED' || row.state === 'OPTED_OUT' || row.state === 'FAILED') return { outcome: { id: outboxId, status: row.state as DeliveryOutcome['status'] } }
     if (row.state === 'SENDING' || row.nextAttemptAt > now) return { outcome: { id: outboxId, status: 'DEFERRED' } }
     const channel = row.channel as NotificationChannel
     if (row.eventKind === 'CHECKUP_DUE') {
@@ -141,6 +179,13 @@ async function prepareDelivery(outboxId: OutboxId, now: Date, adapter?: Provider
       }
     }
     const [preference] = row.recipientUserId ? await tx.select().from(notificationPreference).where(and(eq(notificationPreference.userId, row.recipientUserId), eq(notificationPreference.channel, channel))) : []
+    if (channel === 'WHATSAPP') {
+      const [verified] = row.recipientUserId && row.eventKind === 'CHECKUP_DUE' ? await tx.select({ phone: guardianPhone.phone, contactPhone: guardianGrant.contactPhone }).from(guardianPhone).innerJoin(guardianGrant, and(eq(guardianGrant.guardianId, guardianPhone.guardianId), eq(guardianGrant.status, 'ACTIVE'))).innerJoin(individualCheckup, eq(individualCheckup.patientId, guardianGrant.patientId)).where(and(eq(individualCheckup.id, row.subjectId), eq(guardianPhone.guardianId, row.recipientUserId))) : []
+      if (!verified || verified.phone !== verified.contactPhone || createHash('sha256').update(`whatsapp:${verified.phone.toLowerCase()}`).digest('hex') !== row.recipientKey || !preference?.enabled) {
+        await tx.update(notificationOutbox).set({ state: 'OPTED_OUT' }).where(eq(notificationOutbox.id, outboxId))
+        return { outcome: { id: outboxId, status: 'OPTED_OUT' } }
+      }
+    }
     if (channel !== 'IN_APP' && (adapter?.channel !== channel || adapter.status() !== 'READY')) {
       const failed = adapter?.channel === channel && adapter.status() === 'FAILED'
       const state = failed ? 'FAILED' : 'NOT_CONFIGURED'
@@ -165,10 +210,11 @@ async function prepareDelivery(outboxId: OutboxId, now: Date, adapter?: Provider
       }
     }
     if (channel !== 'IN_APP') {
-      const [account] = row.recipientUserId ? await tx.select({ email: user.email }).from(user).where(eq(user.id, row.recipientUserId)) : []
+      const [account] = row.recipientUserId && channel === 'EMAIL' ? await tx.select({ email: user.email }).from(user).where(eq(user.id, row.recipientUserId)) : []
+      const [phone] = row.recipientUserId && channel === 'WHATSAPP' ? await tx.select({ phone: guardianPhone.phone }).from(guardianPhone).where(eq(guardianPhone.guardianId, row.recipientUserId)) : []
       const [booking] = !row.recipientUserId && row.eventKind.startsWith('BOOKING_') ? await tx.select({ email: bookingRequest.email }).from(bookingRequest).where(eq(bookingRequest.id, row.subjectId)) : []
-      const address = account?.email ?? booking?.email
-      if (!address || channel !== 'EMAIL' || createHash('sha256').update(`email:${address.trim().toLowerCase()}`).digest('hex') !== row.recipientKey) {
+      const address = channel === 'WHATSAPP' ? phone?.phone : account?.email ?? booking?.email
+      if (!address || createHash('sha256').update(`${channel.toLowerCase()}:${address.trim().toLowerCase()}`).digest('hex') !== row.recipientKey) {
         await tx.update(notificationOutbox).set({ state: 'FAILED', errorClass: 'RecipientUnavailable' }).where(eq(notificationOutbox.id, outboxId))
         await tx.insert(notificationAttempt).values({ id: randomUUID(), outboxId, outcome: 'FAILED', errorClass: 'RecipientUnavailable', attemptedAt: now })
         return { outcome: { id: outboxId, status: 'FAILED' } }
@@ -196,8 +242,8 @@ export async function reconcileNotificationOutbox(now = new Date()): Promise<num
 
 export async function processNotificationOutbox(now = new Date(), limit = 50): Promise<number> {
   await reconcileNotificationOutbox(now)
-  if (await providerStatus('EMAIL') === 'READY') {
-    await useDb().update(notificationOutbox).set({ state: 'QUEUED', errorClass: null }).where(and(eq(notificationOutbox.channel, 'EMAIL'), eq(notificationOutbox.state, 'NOT_CONFIGURED'), eq(notificationOutbox.errorClass, 'ProviderNotConfigured')))
+  for (const channel of ['EMAIL', 'WHATSAPP'] as const) {
+    if (await providerStatus(channel) === 'READY') await useDb().update(notificationOutbox).set({ state: 'QUEUED', errorClass: null }).where(and(eq(notificationOutbox.channel, channel), eq(notificationOutbox.state, 'NOT_CONFIGURED'), eq(notificationOutbox.errorClass, 'ProviderNotConfigured')))
   }
   let processed = 0
   for (const channel of ['IN_APP', 'EMAIL', 'WHATSAPP'] as const) {

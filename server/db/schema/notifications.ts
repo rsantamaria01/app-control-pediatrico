@@ -22,9 +22,30 @@ export const notificationOutbox = pgTable('notification_outbox', {
   uniqueIndex('notification_intent_idx').on(table.eventKind, table.subjectId, table.occurrenceId, table.channel, table.recipientKey),
   index('notification_pending_idx').on(table.state, table.nextAttemptAt),
   check('notification_channel_ck', sql`${table.channel} IN ('EMAIL', 'WHATSAPP', 'IN_APP')`),
-  check('notification_state_ck', sql`${table.state} IN ('QUEUED', 'RETRY', 'SENDING', 'SENT', 'NOT_CONFIGURED', 'OPTED_OUT', 'FAILED')`),
+  check('notification_state_ck', sql`${table.state} IN ('QUEUED', 'RETRY', 'SENDING', 'SENT', 'ACCEPTED', 'NOT_CONFIGURED', 'OPTED_OUT', 'FAILED')`),
   check('notification_recipient_ck', sql`(${table.channel} = 'IN_APP' AND ${table.recipientUserId} IS NOT NULL AND ${table.address} IS NULL) OR (${table.channel} <> 'IN_APP' AND ${table.address} IS NULL)`)
 ])
+
+export const whatsappSettings = pgTable('whatsapp_settings', {
+  id: text('id').primaryKey(),
+  provider: text('provider').notNull(),
+  sender: text('sender').notNull(),
+  accountSid: text('account_sid'),
+  template: text('template').notNull(),
+  language: text('language'),
+  encryptedSecret: text('encrypted_secret').notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
+  secretChangedAt: timestamp('secret_changed_at', { withTimezone: true }).notNull()
+}, table => [
+  check('whatsapp_settings_singleton_ck', sql`${table.id} = 'whatsapp'`),
+  check('whatsapp_settings_provider_ck', sql`${table.provider} IN ('META', 'TWILIO')`)
+])
+
+export const whatsappHealth = pgTable('whatsapp_health', {
+  id: text('id').primaryKey(),
+  state: text('state').notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow()
+})
 
 export const notificationAttempt = pgTable('notification_attempt', {
   id: text('id').primaryKey(),

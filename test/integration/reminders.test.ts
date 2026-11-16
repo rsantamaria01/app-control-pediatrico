@@ -5,10 +5,10 @@ import { migrate } from 'drizzle-orm/node-postgres/migrator'
 import { Pool } from 'pg'
 import { eq, sql } from 'drizzle-orm'
 import type { Actor } from '../../shared/types/access'
-import { completedCheckup, guardianGrant, individualCheckup, notificationOutbox, notificationPreference, patient, user } from '../../server/db/schema'
+import { completedCheckup, guardianGrant, guardianPhone, individualCheckup, notificationOutbox, notificationPreference, patient, user } from '../../server/db/schema'
 import { deliver, listInAppNotices, markInAppNoticeRead, processNotificationOutbox, queueNotification } from '../../server/services/outbox'
 import { scanCheckupReminders } from '../../server/services/reminders'
-import { getNoticePreferences, setEmailNoticePreference } from '../../server/services/notice-preferences'
+import { getNoticePreferences, noticePreferencesSchema, setEmailNoticePreference, setWhatsAppNoticePreference } from '../../server/services/notice-preferences'
 
 const configured = process.env.DATABASE_URL
 if (!configured || !new URL(configured).pathname.includes('pediatrico')) throw new Error('Dedicated pediatric test server required')
@@ -40,7 +40,7 @@ beforeAll(async () => {
 }, 120000)
 
 beforeEach(async () => {
-  await db.execute(sql`TRUNCATE TABLE completed_checkup, individual_checkup, notification_attempt, in_app_notice, notification_outbox, notification_preference RESTART IDENTITY CASCADE`)
+  await db.execute(sql`TRUNCATE TABLE completed_checkup, individual_checkup, notification_attempt, in_app_notice, notification_outbox, notification_preference, guardian_phone RESTART IDENTITY CASCADE`)
   await db.update(guardianGrant).set({ status: 'ACTIVE' }).where(eq(guardianGrant.patientId, child))
   await db.insert(individualCheckup).values({ id: checkupId, patientId: child, date: '2027-03-01', reason: 'Revisión indicada', authorId: doctor.id })
 })
@@ -58,11 +58,95 @@ afterAll(async () => {
 })
 
 it('defaults to email off and permits only the guardian to set their own explicit consent', async () => {
-  expect(await getNoticePreferences(guardian)).toEqual({ inApp: true, email: false })
+  expect(await getNoticePreferences(guardian)).toEqual({ inApp: true, email: false, whatsapp: false })
   await expect(setEmailNoticePreference(doctor, true)).rejects.toThrow()
-  expect(await setEmailNoticePreference(guardian, true)).toEqual({ inApp: true, email: true })
-  expect(await getNoticePreferences(other)).toEqual({ inApp: true, email: false })
-  expect(await setEmailNoticePreference(guardian, false)).toEqual({ inApp: true, email: false })
+  expect(await setEmailNoticePreference(guardian, true)).toEqual({ inApp: true, email: true, whatsapp: false })
+  expect(await getNoticePreferences(other)).toEqual({ inApp: true, email: false, whatsapp: false })
+  expect(await setEmailNoticePreference(guardian, false)).toEqual({ inApp: true, email: false, whatsapp: false })
+})
+
+it('accepts explicit WhatsApp preference updates without implicitly switching email or in-app', () => {
+  expect(noticePreferencesSchema.parse({ whatsapp: true })).toEqual({ whatsapp: true })
+  expect(noticePreferencesSchema.parse({ email: false, whatsapp: true })).toEqual({ email: false, whatsapp: true })
+  expect(noticePreferencesSchema.safeParse({ inApp: false }).success).toBe(false)
+  expect(noticePreferencesSchema.safeParse({ whatsapp: 'true' }).success).toBe(false)
+  expect(noticePreferencesSchema.safeParse({}).success).toBe(false)
+})
+
+it('defaults WhatsApp off, isolates consent by guardian and keeps in-app available', async () => {
+  expect(await getNoticePreferences(guardian)).toEqual({ inApp: true, email: false, whatsapp: false })
+  await expect(setWhatsAppNoticePreference(doctor, true)).rejects.toThrow()
+  expect(await setWhatsAppNoticePreference(guardian, true)).toEqual({ inApp: true, email: false, whatsapp: true })
+  expect(await getNoticePreferences(other)).toEqual({ inApp: true, email: false, whatsapp: false })
+  expect(await setWhatsAppNoticePreference(guardian, false)).toEqual({ inApp: true, email: false, whatsapp: false })
+})
+
+it('queues WhatsApp only for opted-in verified guardian with matching active grant phone', async () => {
+  await setWhatsAppNoticePreference(guardian, true)
+  expect(await scanCheckupReminders(due)).toBe(1)
+  await db.insert(guardianPhone).values({ guardianId: guardian.id, phone: '+593991234567' })
+  expect(await scanCheckupReminders(due)).toBe(0)
+  await db.update(guardianGrant).set({ contactPhone: '+593991234567' }).where(eq(guardianGrant.patientId, child))
+  expect(await scanCheckupReminders(due)).toBe(1)
+  expect(await scanCheckupReminders(due)).toBe(0)
+  expect(await db.select().from(notificationOutbox).where(eq(notificationOutbox.channel, 'WHATSAPP'))).toMatchObject([
+    { eventKind: 'CHECKUP_DUE', subjectId: checkupId, channel: 'WHATSAPP', recipientUserId: guardian.id, address: null }
+  ])
+})
+
+it('requeues opted-out WhatsApp only after renewed consent while verified and due, never after accepted delivery', async () => {
+  await db.insert(guardianPhone).values({ guardianId: guardian.id, phone: '+593991234567' })
+  await db.update(guardianGrant).set({ contactPhone: '+593991234567' }).where(eq(guardianGrant.patientId, child))
+  await setWhatsAppNoticePreference(guardian, true)
+  expect(await scanCheckupReminders(due)).toBe(2)
+  const [whatsapp] = await db.select().from(notificationOutbox).where(eq(notificationOutbox.channel, 'WHATSAPP'))
+  await setWhatsAppNoticePreference(guardian, false)
+  const sent: string[] = []
+  const adapter = { channel: 'WHATSAPP' as const, status: () => 'READY' as const, send: async ({ address }: { address: string }) => {
+    sent.push(address)
+    return 'ACCEPTED' as const
+  } }
+  expect(await deliver(whatsapp!.id, due, adapter)).toMatchObject({ status: 'OPTED_OUT' })
+  await setWhatsAppNoticePreference(guardian, true)
+  await db.update(guardianPhone).set({ phone: '+593998888888' }).where(eq(guardianPhone.guardianId, guardian.id))
+  expect(await scanCheckupReminders(due)).toBe(0)
+  await db.update(guardianPhone).set({ phone: '+593991234567' }).where(eq(guardianPhone.guardianId, guardian.id))
+  expect(await scanCheckupReminders(due)).toBe(1)
+  expect(await deliver(whatsapp!.id, due, adapter)).toMatchObject({ status: 'ACCEPTED' })
+  expect(sent).toEqual(['+593991234567'])
+  expect(await scanCheckupReminders(due)).toBe(0)
+})
+
+it('does not queue WhatsApp for completed controls or revoked guardian grants', async () => {
+  await db.insert(guardianPhone).values({ guardianId: guardian.id, phone: '+593991234567' })
+  await db.update(guardianGrant).set({ contactPhone: '+593991234567', status: 'REVOKED' }).where(eq(guardianGrant.patientId, child))
+  await setWhatsAppNoticePreference(guardian, true)
+  expect(await scanCheckupReminders(due)).toBe(0)
+  await db.update(guardianGrant).set({ status: 'ACTIVE' }).where(eq(guardianGrant.patientId, child))
+  await db.insert(completedCheckup).values({ id: randomUUID(), patientId: child, individualId: checkupId, completedAt: '2027-03-01', authorId: doctor.id })
+  expect(await scanCheckupReminders(due)).toBe(0)
+  expect(await db.select().from(notificationOutbox)).toEqual([])
+})
+
+it('queues a new WhatsApp intent for a newly verified grant number without reusing the former address', async () => {
+  await db.insert(guardianPhone).values({ guardianId: guardian.id, phone: '+593991234567' })
+  await db.update(guardianGrant).set({ contactPhone: '+593991234567' }).where(eq(guardianGrant.patientId, child))
+  await setWhatsAppNoticePreference(guardian, true)
+  expect(await scanCheckupReminders(due)).toBe(2)
+  await db.update(guardianPhone).set({ phone: '+593998888888' }).where(eq(guardianPhone.guardianId, guardian.id))
+  await db.update(guardianGrant).set({ contactPhone: '+593998888888' }).where(eq(guardianGrant.patientId, child))
+  expect(await scanCheckupReminders(due)).toBe(1)
+  const rows = await db.select().from(notificationOutbox).where(eq(notificationOutbox.channel, 'WHATSAPP'))
+  expect(rows).toHaveLength(2)
+  expect(rows[0]?.recipientKey).not.toBe(rows[1]?.recipientKey)
+  const sent: string[] = []
+  const adapter = { channel: 'WHATSAPP' as const, status: () => 'READY' as const, send: async ({ address }: { address: string }) => {
+    sent.push(address)
+    return 'ACCEPTED' as const
+  } }
+  expect(await deliver(rows[0]!.id, due, adapter)).toMatchObject({ status: 'OPTED_OUT' })
+  expect(await deliver(rows[1]!.id, due, adapter)).toMatchObject({ status: 'ACCEPTED' })
+  expect(sent).toEqual(['+593998888888'])
 })
 
 it('queues a due individual reminder once for an active guardian, in app without email consent', async () => {

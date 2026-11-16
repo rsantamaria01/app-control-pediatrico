@@ -91,6 +91,25 @@ describe('doctor-only preventive record and draft review', () => {
     expect(after.pending.some(item => item.key === 'fixture-2')).toBe(true)
   })
 
+  it('keeps sourced bOPV boosters unavailable until the preceding bOPV product dose is recorded', async () => {
+    const bopvRelease = '2'.repeat(64)
+    await db.insert(catalogRelease).values({ id: bopvRelease, kind: 'VACCINE', publisher: 'MSP Ecuador', title: 'bOPV fixture', version: '2026-bOPV', retrievedAt: '2026-11-16', url: 'https://www.salud.gob.ec/bopv.pdf', sha256: bopvRelease })
+    await db.insert(catalogItem).values([
+      { releaseId: bopvRelease, key: 'bopv-1', label: 'bOPV oral', domain: 'MSP', minAgeMonths: '6', maxAgeMonths: '6', doseLabel: 'bOPV oral a los 6 meses (IPV en hexavalente)', sourcePage: 'p. 164' },
+      { releaseId: bopvRelease, key: 'bopv-2', label: 'bOPV oral', domain: 'MSP', minAgeMonths: '18', maxAgeMonths: '18', doseLabel: 'bOPV oral: primer refuerzo', sourcePage: 'p. 164' },
+      { releaseId: bopvRelease, key: 'bopv-3', label: 'bOPV oral', domain: 'MSP', minAgeMonths: '60', maxAgeMonths: '60', doseLabel: 'bOPV oral: segundo refuerzo', sourcePage: 'p. 164' }
+    ])
+    const older = randomUUID()
+    await db.insert(patient).values({ id: older, name: 'Niña bOPV', birthDate: '2020-01-01', sex: 'FEMALE', createdBy: doctor.id })
+    expect((await listVaccines(doctor, older)).pending.filter(row => row.key.startsWith('bopv-')).map(row => row.key)).toEqual(['bopv-1'])
+    await expect(recordDose(doctor, older, { releaseId: bopvRelease, key: 'bopv-3', appliedAt: '2026-11-16', external: false })).rejects.toMatchObject({ statusCode: 400 })
+    await expect(recordDose(doctor, older, { releaseId: bopvRelease, key: 'bopv-2', appliedAt: '2026-11-16', external: false })).rejects.toMatchObject({ statusCode: 400 })
+    await recordDose(doctor, older, { releaseId: bopvRelease, key: 'bopv-1', appliedAt: '2026-01-01', external: true })
+    expect((await listVaccines(doctor, older)).pending.filter(row => row.key.startsWith('bopv-')).map(row => row.key)).toEqual(['bopv-2'])
+    await recordDose(doctor, older, { releaseId: bopvRelease, key: 'bopv-2', appliedAt: '2026-02-01', external: true })
+    expect((await listVaccines(doctor, older)).pending.filter(row => row.key.startsWith('bopv-')).map(row => row.key)).toEqual(['bopv-3'])
+  })
+
   it('retains a dose snapshot and private lot after a catalog revision; guardian sees only applied public fields', async () => {
     await expect(recordDose(assistant, child, { releaseId: release, key: 'fixture-1', appliedAt: '2026-01-02', lot: 'PRIVATE_LOT', privateNote: 'PRIVATE_NOTE', external: true })).rejects.toMatchObject({ statusCode: 403 })
     const dose = await recordDose(doctor, child, { releaseId: release, key: 'fixture-1', appliedAt: '2026-01-02', lot: 'PRIVATE_LOT', privateNote: 'PRIVATE_NOTE', external: true })

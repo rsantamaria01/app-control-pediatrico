@@ -37,9 +37,11 @@ function isApplied(item: typeof catalogItem.$inferSelect, release: typeof catalo
 
 function eligibleDate(item: typeof catalogItem.$inferSelect, siblings: (typeof catalogItem.$inferSelect)[], doses: Pick<DoseRecord, 'releaseId' | 'key' | 'appliedAt'>[], birth: string, releases: (typeof catalogRelease.$inferSelect)[], release: typeof catalogRelease.$inferSelect) {
   let date = addMonths(birth, Number(item.minAgeMonths))
-  if (item.doseNumber && Number(item.doseNumber) > 1) {
-    const previousKey = item.key.replace(/-(?:\d+|refuerzo)$/, `-${Number(item.doseNumber) - 1}`)
-    const previous = siblings.find(row => row.key === previousKey && Number(row.doseNumber) === Number(item.doseNumber) - 1)
+  const bopvNumber = item.label === 'bOPV oral' && /^bopv-[123]$/.test(item.key) ? Number(item.key.slice(-1)) : null
+  const doseNumber = item.doseNumber ? Number(item.doseNumber) : bopvNumber
+  if (doseNumber && doseNumber > 1) {
+    const previousKey = item.key.replace(/-(?:\d+|refuerzo)$/, `-${doseNumber - 1}`)
+    const previous = siblings.find(row => row.key === previousKey && (row.doseNumber ? Number(row.doseNumber) === doseNumber - 1 : bopvNumber !== null && row.label === 'bOPV oral'))
     if (!previous) return null
     const prior = doses.filter(dose => dose.key === previous.key && dose.releaseId !== null && releases.some(row => row.id === dose.releaseId && releaseIdentity(row) === releaseIdentity(release))).sort((a, b) => b.appliedAt.localeCompare(a.appliedAt))[0]
     if (!prior) return null

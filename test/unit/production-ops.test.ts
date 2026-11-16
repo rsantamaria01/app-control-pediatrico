@@ -23,6 +23,41 @@ const { acquireRecoveryWorker, reconcileRecoveryJobs, processRecoveryJobs } = aw
 const { reconcileGuardianDeliveries, processQueuedGuardianDeliveries } = await import('../../server/services/invitations')
 
 describe('production operations', () => {
+  it('loads the catalog importer dependency graph with native Node in a no-write process', () => {
+    const result = spawnSync(process.execPath, ['--permission', '--allow-fs-read=*', '--experimental-transform-types', '--input-type=module', '-e', `import { importDraftCatalog } from './server/services/catalog-import.ts'; if (typeof importDraftCatalog !== 'function') process.exit(1)`], {
+      cwd: new URL('../..', import.meta.url).pathname,
+      env: { ...process.env, NODE_OPTIONS: undefined }, encoding: 'utf8', timeout: 30_000
+    })
+    expect(result.status, result.stderr).toBe(0)
+  })
+  it('runs migration then native Node catalog import without a writable CLI runtime', () => {
+    const preload = `import childProcess from 'node:child_process'; import { syncBuiltinESMExports } from 'node:module'; childProcess.spawnSync = (_node, args) => { process.stdout.write(JSON.stringify(args) + '\\n'); return { status: 0 } }; syncBuiltinESMExports()`
+    const result = spawnSync(process.execPath, ['--import', `data:text/javascript,${encodeURIComponent(preload)}`, 'scripts/prepare-catalogs.mjs'], {
+      cwd: new URL('../..', import.meta.url).pathname,
+      env: { ...process.env, NODE_OPTIONS: undefined }, encoding: 'utf8'
+    })
+    expect(result.status, result.stderr).toBe(0)
+    expect(result.stdout.trim().split('\n').map(line => JSON.parse(line))).toEqual([
+      ['scripts/migrate.mjs'],
+      ['--experimental-transform-types', 'scripts/import-preventive-catalogs.ts', 'import']
+    ])
+  })
+  it('routes the default production ops command through migration and verified draft import before app startup', () => {
+    const preload = `import childProcess from 'node:child_process'; import { syncBuiltinESMExports } from 'node:module'; import { EventEmitter } from 'node:events'; childProcess.spawn = (_node, args) => { process.stdout.write(JSON.stringify(args)); const child = new EventEmitter(); queueMicrotask(() => child.emit('exit', 0, null)); return child }; syncBuiltinESMExports()`
+    const result = spawnSync('node', ['--import', `data:text/javascript,${encodeURIComponent(preload)}`, 'scripts/ops.mjs'], { env: { ...process.env, NODE_OPTIONS: undefined }, encoding: 'utf8' })
+    expect(result.status).toBe(0)
+    expect(JSON.parse(result.stdout)).toEqual(['scripts/database-env.mjs', 'node', 'scripts/prepare-catalogs.mjs'])
+    const ops = dockerfile.split('FROM node:24-alpine AS ops')[1]?.split('FROM node:24-alpine AS app')[0]
+    expect(ops).toContain('docs/clinical/sources/msp-vaccination-schedule-2026.pdf')
+    expect(ops).toContain('docs/clinical/sources/msp-immunization-manual-2026.pdf')
+    expect(ops).toContain('scripts/preventive-catalog-entries.json')
+    expect(ops).toContain('server/utils/db.ts')
+    expect(ops).toContain('server/services/catalog-import.ts')
+    expect(ops).toContain('server/db/schema')
+    expect(ops).toContain('scripts/prepare-catalogs.mjs')
+    expect(ops).toContain('CMD ["prepare"]')
+    expect(dockerfile.split('FROM node:24-alpine AS app')[1]).not.toContain('docs/clinical/sources')
+  })
   it('runs an unconditional Docker ops and Compose smoke on pushes and PRs', () => {
     expect(ci).toMatch(/on:\s*\[push, pull_request\]/)
     expect(ci).toMatch(/runs-on: ubuntu-latest/)
@@ -36,6 +71,12 @@ describe('production operations', () => {
     expect(content).toMatch(/--read-only/)
     expect(content).toMatch(/docker compose --env-file \/dev\/null --project-name "\$project" --profile full/)
     expect(content).toMatch(/compose up -d --build/)
+    expect(content).toContain('phase=catalog-seed')
+    expect(content).toContain('SELECT count(*) FROM catalog_item')
+    expect(content).toContain('SELECT count(*) FROM catalog_release')
+    expect(content).toContain('VACCINE')
+    expect(content).toContain('CHECKUP')
+    expect(content).toContain('DRAFT_PENDING_PEDIATRICIAN_REVIEW')
     expect(content).toMatch(/compose ps -a -q ops/)
     expect(content).toMatch(/compose ps --status running -q app/)
     expect(content).toMatch(/\[ ! -e \.env \]/)
@@ -73,7 +114,7 @@ describe('production operations', () => {
     const app = dockerfile.split('FROM node:24-alpine AS app')[1]
     for (const path of ['node_modules', 'drizzle.config.ts', 'server/db/schema.ts', 'server/db/migrations', 'server/services/credentials.ts', 'scripts/bootstrap-admin.ts']) expect(ops).toContain(path)
     expect(ops).toContain('ENTRYPOINT ["node", "scripts/ops.mjs"]')
-    expect(ops).toContain('CMD ["db:migrate"]')
+    expect(ops).toContain('CMD ["prepare"]')
     expect(ops).toContain('scripts/migrate.mjs')
     expect(app).toContain('/app/.output')
     expect(app).toContain('scripts/database-env.mjs')

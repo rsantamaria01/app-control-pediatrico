@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test'
 import { randomUUID } from 'node:crypto'
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
+import type { CatalogView } from '../../shared/types/catalog'
 
 const enabled = process.env.ALPHA_COMPOSE_E2E === '1'
 const email = `family-${randomUUID()}@example.test`
@@ -73,8 +74,61 @@ test('production image journeys from bootstrapped admin through two children and
     await expect(page).toHaveURL('/acceso')
   }
   try {
+    const anonymousCatalog = await context.request.get('/api/admin/catalogos/MOTOR')
+    expect(anonymousCatalog.status()).toBe(401)
+    expect(anonymousCatalog.headers()['cache-control']).toContain('no-store')
+    const anonymousCatalogPage = await context.request.get('/admin/catalogos')
+    expect(anonymousCatalogPage.status()).toBe(401)
+    expect(anonymousCatalogPage.headers()['cache-control']).toContain('no-store')
+    expect(await anonymousCatalogPage.text()).not.toContain('Sin entradas verificadas para')
     await signIn('firstadmin', adminPassword)
     expect((await context.request.get('/api/clinical/access-check')).status()).toBe(403)
+    expect((await context.request.get('/api/catalogos/VACCINE')).status()).toBe(403)
+    expect((await context.request.post('/api/catalogos/hitos', { data: { label: 'No', domain: 'Motor', minAgeMonths: 1, maxAgeMonths: 2, source: 'No' } })).status()).toBe(403)
+    await page.setViewportSize({ width: 375, height: 850 })
+    const adminCatalogPage = await context.request.get('/admin/catalogos')
+    expect(adminCatalogPage.status()).toBe(200)
+    expect(adminCatalogPage.headers()['cache-control']).toContain('no-store')
+    expect(await adminCatalogPage.text()).toContain('Catálogos preventivos')
+    await page.goto('/admin/catalogos')
+    await page.waitForLoadState('networkidle')
+    await expect(page.getByRole('heading', { name: 'Catálogos preventivos' })).toBeVisible()
+    const adminNavigation = await context.request.get('/api/auth/navigation')
+    expect(adminNavigation.status()).toBe(200)
+    expect(await adminNavigation.json()).toContainEqual(expect.objectContaining({ to: '/admin/catalogos' }))
+    for (const [kind, label] of [['MOTOR', 'Hitos motores OMS'], ['MILESTONE', 'Hitos CDC'], ['SCREENING', 'Tamizajes'], ['CHECKUP', 'Controles AAP'], ['VACCINE', 'Vacunas MSP']] as const) {
+      await page.getByRole('navigation', { name: 'Tipos de catálogo' }).getByRole('button', { name: label }).click()
+      await expect(page.getByRole('button', { name: label })).toHaveAttribute('aria-pressed', 'true')
+      const response = await context.request.get(`/api/admin/catalogos/${kind}`)
+      expect(response.status(), kind).toBe(200)
+      expect(response.headers()['cache-control']).toContain('no-store')
+      const view = await response.json() as CatalogView
+      expect(view.kind).toBe(kind)
+      if (kind === 'VACCINE' || kind === 'CHECKUP') {
+        expect(view.versions).toHaveLength(1)
+        expect(view.versions[0]?.entries).toHaveLength(kind === 'VACCINE' ? 21 : 31)
+        expect(view.versions[0]?.entries.every(row => row.badge === 'Borrador - pendiente de revisión')).toBe(true)
+        expect(view.versions[0]?.entries.every(row => row.sourcePages?.length === (kind === 'VACCINE' ? 2 : 1))).toBe(true)
+        if (kind === 'VACCINE') {
+          expect(view.versions[0]?.entries.find(row => row.key === 'rotavirus-2')?.minimumInterval).toBe('1 mes')
+          expect(view.versions[0]?.entries.find(row => row.key === 'pcv-2')?.minimumInterval).toBeNull()
+          expect(view.versions[0]?.entries.find(row => row.key === 'bopv-2')?.doseLabel).toBe('bOPV oral: primer refuerzo')
+        } else expect(view.versions[0]?.entries.find(row => row.key === 'day-3-5')).toMatchObject({ minAgeDays: 3, maxAgeDays: 5 })
+        const seededSection = page.getByRole('region', { name: `${view.versions[0]!.title} · ${view.versions[0]!.version}` })
+        await expect(seededSection.getByText('Borrador - pendiente de revisión')).toHaveCount(view.versions[0]!.entries.length)
+      } else {
+        expect(view.versions).toEqual([])
+        await expect(page.getByText(`Sin entradas verificadas para ${label}`)).toBeVisible()
+      }
+      await expect(page.getByText(/Revisado ·|Aprobado ·|REVIEWED/)).toHaveCount(0)
+      expect(await page.evaluate(() => document.documentElement.scrollWidth), kind).toBeLessThanOrEqual(376)
+    }
+    await page.setViewportSize({ width: 1440, height: 850 })
+    await page.goto('/admin/catalogos')
+    await page.waitForLoadState('networkidle')
+    await page.getByRole('navigation', { name: 'Tipos de catálogo' }).getByRole('button', { name: 'Vacunas MSP' }).click()
+    await expect(page.getByRole('region', { name: 'Esquema Nacional de Vacunación 2026 · 2026-07' }).getByText('Borrador - pendiente de revisión')).toHaveCount(21)
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1441)
     for (const [address, role] of [[doctorEmail, 'DOCTOR'], [assistantEmail, 'ASSISTANT']] as const) {
       expect((await context.request.post('/api/auth/invite-staff', { data: { email: address, name: role, role } })).status()).toBe(200)
       await tokenFor(address)
@@ -83,6 +137,18 @@ test('production image journeys from bootstrapped admin through two children and
     await setup(doctorEmail, 'journey-doctor', password)
     await setup(assistantEmail, 'journey-assistant', 'unique assistant setup phrase')
     await signIn('journey-assistant', 'unique assistant setup phrase')
+    const assistantCatalog = await context.request.get('/api/admin/catalogos/MOTOR')
+    expect(assistantCatalog.status()).toBe(403)
+    expect(assistantCatalog.headers()['cache-control']).toContain('no-store')
+    expect((await context.request.get('/api/catalogos/VACCINE')).status()).toBe(403)
+    expect((await context.request.post('/api/catalogos/hitos', { data: { label: 'No', domain: 'Motor', minAgeMonths: 1, maxAgeMonths: 2, source: 'No' } })).status()).toBe(403)
+    const assistantCatalogPage = await context.request.get('/admin/catalogos')
+    expect(assistantCatalogPage.status()).toBe(403)
+    expect(assistantCatalogPage.headers()['cache-control']).toContain('no-store')
+    expect(await assistantCatalogPage.text()).not.toMatch(/Sin entradas verificadas para|Borrador - pendiente de revisión/)
+    const assistantNavigation = await context.request.get('/api/auth/navigation')
+    expect(assistantNavigation.status()).toBe(200)
+    expect(await assistantNavigation.json()).not.toContainEqual(expect.objectContaining({ to: '/admin/catalogos' }))
     const bookingDate = new Date()
     bookingDate.setUTCDate(bookingDate.getUTCDate() + (8 - bookingDate.getUTCDay()) % 7 + 35)
     const bookingDay = bookingDate.toISOString().slice(0, 10)
@@ -126,6 +192,27 @@ test('production image journeys from bootstrapped admin through two children and
     expect(bookingAppointments.some(item => item.name === 'Reserva Prueba')).toBe(true)
     expect((await assistantContext!.request.get('/api/pacientes')).status()).toBe(403)
     await signIn('journey-doctor', password)
+    expect((await context.request.get('/api/admin/catalogos/MOTOR')).status()).toBe(403)
+    expect((await context.request.get('/admin/catalogos')).status()).toBe(403)
+    await page.setViewportSize({ width: 375, height: 850 })
+    await page.goto('/catalogos')
+    await page.waitForLoadState('networkidle')
+    const doctorVaccines = await context.request.get('/api/catalogos/VACCINE')
+    expect(doctorVaccines.status()).toBe(200)
+    expect((await doctorVaccines.json() as CatalogView).versions[0]?.entries).toHaveLength(21)
+    await expect(page.getByText('Borrador - pendiente de revisión')).toHaveCount(21)
+    await page.getByRole('button', { name: 'Hitos del desarrollo' }).click()
+    await expect(page.getByText('Aún no hay hitos del desarrollo registrados')).toBeVisible()
+    await page.getByRole('button', { name: 'Agregar hito' }).click()
+    await page.getByRole('textbox', { name: 'Descripción' }).fill('Observación de la doctora')
+    await page.getByRole('textbox', { name: 'Área' }).fill('Motor')
+    await page.getByRole('spinbutton', { name: 'Edad mínima (meses)' }).fill('4')
+    await page.getByRole('spinbutton', { name: 'Edad máxima (meses)' }).fill('6')
+    await page.getByRole('textbox', { name: 'Fuente indicada por la doctora' }).fill('Registro de la doctora')
+    await page.getByRole('button', { name: 'Guardar borrador' }).click()
+    await expect(page.getByRole('heading', { name: 'Observación de la doctora' })).toBeVisible()
+    await expect(page.getByText('Borrador - pendiente de revisión')).toHaveCount(1)
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(376)
     const phone = `09${String(Math.floor(Math.random() * 1e8)).padStart(8, '0')}`
     let guardianId: string | undefined
     const createChild = async (given: string, nationalId?: string) => {
@@ -203,6 +290,9 @@ test('production image journeys from bootstrapped admin through two children and
     expect((await context.request.get(`/api/hijos/${first}`)).status()).toBe(404)
     await context.clearCookies()
     await signIn('journey-family', 'unique guardian setup phrase')
+    expect((await context.request.get('/api/admin/catalogos/MOTOR')).status()).toBe(403)
+    expect((await context.request.get('/api/catalogos/VACCINE')).status()).toBe(403)
+    expect((await context.request.get('/admin/catalogos')).status()).toBe(403)
     await expect(page.getByRole('heading', { name: 'Mis hijos' })).toBeVisible()
     const children = await context.request.get('/api/hijos')
     const visibleChildren = (await children.json()).map((item: { id: string }) => item.id)

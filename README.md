@@ -14,7 +14,8 @@ Nuxt 4 · Nuxt UI v4 · PostgreSQL 18 + Drizzle · Valkey · RustFS (S3) · Bett
    with VS Code Remote-SSH, then **Reopen in Container**.
    CLI alternative: `devcontainer up --workspace-folder .`
 2. The devcontainer starts `db`, `cache` and `storage` from `compose.yaml` and installs dependencies.
-3. `pnpm dev` → http://localhost:3000 (VS Code forwards the port to your machine).
+3. Run `pnpm db:migrate`, then `pnpm exec tsx scripts/import-preventive-catalogs.ts import` with `DATABASE_URL` set to the dev database before `pnpm dev`. The importer checks both tracked MSP originals and downloads/hash-verifies the pinned AAP original; a failure must be investigated, not replaced with sample facts. Re-running is idempotent. WHO clinical reference import remains separate and explicitly gated.
+4. `pnpm dev` → http://localhost:3000 (VS Code forwards the port to your machine).
 
 Agent keys (`OMNIROUTE_API_KEY`, `HINDSIGHT_API_KEY`) are read from
 `/root/.config/app-monitoreo-pediatrico/secrets.env` on the dev host. Never commit secrets.

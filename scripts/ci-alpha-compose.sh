@@ -55,6 +55,11 @@ export AUTH_TRUSTED_PROXY_CIDR="${ALPHA_PROXY_IP}/32"
 compose up -d app
 [ "$(compose exec -T db psql -U pediatrico -d "$DB_NAME" -Atqc 'SELECT count(*) FROM who_dataset')" = 0 ]
 [ "$(compose exec -T db psql -U pediatrico -d "$DB_NAME" -Atqc 'SELECT count(*) FROM drizzle.__drizzle_migrations')" -gt 0 ]
+phase=catalog-seed
+[ "$(compose exec -T db psql -U pediatrico -d "$DB_NAME" -Atqc "SELECT count(*) FROM catalog_item WHERE release_id IN (SELECT id FROM catalog_release WHERE kind = 'VACCINE')")" = 21 ]
+[ "$(compose exec -T db psql -U pediatrico -d "$DB_NAME" -Atqc "SELECT count(*) FROM catalog_item WHERE release_id IN (SELECT id FROM catalog_release WHERE kind = 'CHECKUP')")" = 31 ]
+[ "$(compose exec -T db psql -U pediatrico -d "$DB_NAME" -Atqc "SELECT count(*) FROM catalog_release WHERE kind = 'MILESTONE'")" = 0 ]
+[ "$(compose exec -T db psql -U pediatrico -d "$DB_NAME" -Atqc "SELECT count(*) FROM catalog_item WHERE status <> 'DRAFT_PENDING_PEDIATRICIAN_REVIEW'")" = 0 ]
 phase=tls
 proxy_cert=$(mktemp)
 proxy_key=$(mktemp)

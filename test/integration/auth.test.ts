@@ -890,7 +890,7 @@ describe('username/password access', () => {
     const key = `auth:login:user:${createHash('sha256').update(username).digest('hex')}`
     try {
       expect(await client.get(key)).toBe('2')
-      await client.del(`${key}:attempts`)
+      expect(await client.get(`${key}:attempts`)).toBe('2')
     } finally {
       await client.quit()
     }
@@ -938,7 +938,7 @@ describe('username/password access', () => {
     const { createHash } = await import('node:crypto')
     const username = `window-${crypto.randomUUID().slice(0, 8)}`
     const addresses = Array.from({ length: 4 }, (_, i) => `203.0.114.${i + 1}`)
-    for (let i = 0; i < 3; i++) expect(await reserveLoginAttempt(username, addresses[i]!)).toBe(true)
+    for (let i = 0; i < 3; i++) expect(await reserveLoginAttempt(username, addresses[i]!)).toBeTruthy()
     expect(await reserveLoginAttempt(username, addresses[3]!)).toBe(false)
     const client = createClient({ url: process.env.REDIS_URL })
     client.on('error', () => {})
@@ -948,7 +948,7 @@ describe('username/password access', () => {
     } finally {
       await client.quit()
     }
-    expect(await reserveLoginAttempt(username, addresses[3]!)).toBe(true)
+    expect(await reserveLoginAttempt(username, addresses[3]!)).toBeTruthy()
   })
 
   it('limits simultaneous guesses across distinct usernames from one IP', async () => {
@@ -958,7 +958,7 @@ describe('username/password access', () => {
     expect(attempts.filter(Boolean)).toHaveLength(20)
   })
 
-  it('does not clear the reservation budget after a successful login or allow parallel guesses past the lock', async () => {
+  it('does not charge successful sign-ins against the username failure budget', async () => {
     const id = crypto.randomUUID()
     const username = `mixed-${id.slice(0, 8)}`
     const password = 'a unique mixed password phrase'
@@ -966,11 +966,75 @@ describe('username/password access', () => {
     await db.insert(userRole).values({ userId: id, role: 'DOCTOR' })
     const { hashPassword } = await import('better-auth/crypto')
     await db.insert(account).values({ id: crypto.randomUUID(), userId: id, accountId: id, providerId: 'credential', password: await hashPassword(password) })
+    for (let i = 0; i < 5; i++) expect((await post('sign-in/username', { username, password })).status).toBe(200)
+    const { createClient } = await import('redis')
+    const { createHash } = await import('node:crypto')
+    const client = createClient({ url: process.env.REDIS_URL })
+    client.on('error', () => {})
+    await client.connect()
+    try {
+      const key = `auth:login:user:${createHash('sha256').update(username).digest('hex')}:attempts`
+      expect(Number(await client.get(key))).toBe(0)
+    } finally {
+      await client.quit()
+    }
+    expect((await post('sign-in/username', { username, password: 'incorrect mixed password' })).status).toBe(401)
     expect((await post('sign-in/username', { username, password })).status).toBe(200)
-    const responses = await Promise.all(Array.from({ length: 12 }, () => post('sign-in/username', { username, password: 'incorrect mixed password' })))
-    expect(responses.filter(response => response.status === 401)).toHaveLength(12)
-    expect((await post('sign-in/username', { username, password })).status).toBe(401)
-    expect(await db.select().from(session).where(eq(session.userId, id))).toHaveLength(1)
+    expect(await db.select().from(session).where(eq(session.userId, id))).toHaveLength(6)
+  })
+
+  it('does not release failures from a newer reservation window when an older sign-in finishes', async () => {
+    const { reserveLoginAttempt, releaseSuccessfulLogin, recordLoginFailure } = await import('../../server/services/otp-rate-limit')
+    const { createClient } = await import('redis')
+    const { createHash } = await import('node:crypto')
+    const username = `expiry-${crypto.randomUUID().slice(0, 8)}`
+    const address = '198.51.100.211'
+    const otherAddress = '198.51.100.212'
+    const oldReservation = await reserveLoginAttempt(username, address)
+    expect(oldReservation).toBeTruthy()
+    const client = createClient({ url: process.env.REDIS_URL })
+    client.on('error', () => {})
+    await client.connect()
+    try {
+      const userKey = `auth:login:user:${createHash('sha256').update(username).digest('hex')}:attempts`
+      const ipKey = `auth:login:ip:${createHash('sha256').update(address).digest('hex')}:attempts`
+      await client.del([userKey, ipKey, userKey.replace(':attempts', ':generation'), ipKey.replace(':attempts', ':generation')])
+      expect(await reserveLoginAttempt(username, address)).toBeTruthy()
+      await recordLoginFailure(username, address)
+      expect(await reserveLoginAttempt(username, otherAddress)).toBeTruthy()
+      await recordLoginFailure(username, otherAddress)
+      await releaseSuccessfulLogin(username, address, oldReservation)
+      expect(await client.get(userKey)).toBe('2')
+      expect(await reserveLoginAttempt(username, otherAddress)).toBeTruthy()
+      expect(await reserveLoginAttempt(username, otherAddress)).toBeFalsy()
+    } finally {
+      await client.quit()
+    }
+  })
+
+  it('does not release a newer failure if only the attempt counters expire before an older success', async () => {
+    const { reserveLoginAttempt, releaseSuccessfulLogin, recordLoginFailure } = await import('../../server/services/otp-rate-limit')
+    const { createClient } = await import('redis')
+    const { createHash } = await import('node:crypto')
+    const username = `partial-${crypto.randomUUID().slice(0, 8)}`
+    const address = '198.51.100.213'
+    const oldReservation = await reserveLoginAttempt(username, address)
+    expect(oldReservation).toBeTruthy()
+    const client = createClient({ url: process.env.REDIS_URL })
+    client.on('error', () => {})
+    await client.connect()
+    try {
+      const userKey = `auth:login:user:${createHash('sha256').update(username).digest('hex')}:attempts`
+      const ipKey = `auth:login:ip:${createHash('sha256').update(address).digest('hex')}:attempts`
+      await client.del([userKey, ipKey])
+      expect(await reserveLoginAttempt(username, address)).toBeTruthy()
+      await recordLoginFailure(username, address)
+      await releaseSuccessfulLogin(username, address, oldReservation)
+      expect(await client.get(userKey)).toBe('1')
+      expect(await client.get(ipKey)).toBe('1')
+    } finally {
+      await client.quit()
+    }
   })
 
   it('keeps the reservation limit during a failing-username lock across a second IP', async () => {
@@ -980,11 +1044,11 @@ describe('username/password access', () => {
     const octet = (ipBlock % 254) + 1
     const firstAddress = `198.18.${octet}.1`
     const secondIp = `198.19.${octet}.4`
-    expect(await reserveLoginAttempt(name, firstAddress)).toBe(true)
+    expect(await reserveLoginAttempt(name, firstAddress)).toBeTruthy()
     await recordLoginFailure(name, firstAddress)
     for (let i = 1; i < 3; i++) {
       const address = `198.18.${octet}.${i + 1}`
-      expect(await reserveLoginAttempt(name, address)).toBe(true)
+      expect(await reserveLoginAttempt(name, address)).toBeTruthy()
       await recordLoginFailure(name, address)
     }
     expect(await reserveLoginAttempt(name, secondIp)).toBe(false)

@@ -6,6 +6,7 @@ const entries: Record<Role, Item[]> = {
   DOCTOR: [
     { label: 'Inicio', to: '/' },
     { label: 'Pacientes', to: '/pacientes' },
+    { label: 'Catálogos', to: '/catalogos' },
     { label: 'Agenda', to: '/agenda' },
     { label: 'Solicitudes', to: '/agenda/solicitudes' }
   ],
@@ -19,7 +20,7 @@ const entries: Record<Role, Item[]> = {
     { label: 'Inicio', to: '/' },
     { label: 'Citas', to: '/citas' }
   ],
-  ADMIN: [{ label: 'Usuarios', to: '/admin/usuarios' }]
+  ADMIN: [{ label: 'Usuarios', to: '/admin/usuarios' }, { label: 'Catálogos', to: '/admin/catalogos' }]
 }
 
 export function shellNavigation(actor: Actor | null, availableRoutes: readonly string[]): Item[] {

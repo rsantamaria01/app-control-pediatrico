@@ -1,15 +1,16 @@
 import { spawn } from 'node:child_process'
 
-const [command = 'db:migrate', ...actions] = process.argv.slice(2)
+const [command = 'prepare', ...actions] = process.argv.slice(2)
 const action = actions[0]
 const paths = {
+  'prepare': ['scripts/prepare-catalogs.mjs'],
   'db:migrate': ['scripts/migrate.mjs'],
   'bootstrap-admin': ['--experimental-strip-types', 'scripts/bootstrap-admin.ts', ...actions],
   'who-import': ['node_modules/tsx/dist/cli.mjs', 'scripts/import-who.ts', action]
 }
 
 if (!(command in paths) || (command === 'who-import' && !['download', 'import'].includes(action))) {
-  process.stderr.write('Usage: ops db:migrate|bootstrap-admin|who-import download|import\n')
+  process.stderr.write('Usage: ops prepare|db:migrate|bootstrap-admin|who-import download|import\n')
   process.exit(1)
 }
 if (command === 'who-import' && action === 'import' && process.env.WHO_ALLOW_CLINICAL_IMPORT !== 'yes') {

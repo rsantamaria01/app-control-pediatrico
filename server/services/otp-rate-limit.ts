@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { isIP } from 'node:net'
 import { createClient } from 'redis'
 
@@ -47,20 +47,34 @@ async function useRedis() {
 }
 
 const loginReservationScript = `
-if redis.call('EXISTS', KEYS[3], KEYS[4]) > 0 then return 0 end
+if redis.call('EXISTS', KEYS[5], KEYS[6]) > 0 then return nil end
 local userCount = tonumber(redis.call('GET', KEYS[1]) or '0')
 local ipCount = tonumber(redis.call('GET', KEYS[2]) or '0')
-if userCount >= 3 or ipCount >= 20 then return 0 end
+if userCount >= 3 or ipCount >= 20 then return nil end
+local userGeneration = redis.call('GET', KEYS[3])
+if userCount == 0 or not userGeneration then
+  userGeneration = ARGV[1]
+  redis.call('SET', KEYS[3], userGeneration, 'EX', 60)
+end
+local ipGeneration = redis.call('GET', KEYS[4])
+if ipCount == 0 or not ipGeneration then
+  ipGeneration = ARGV[2]
+  redis.call('SET', KEYS[4], ipGeneration, 'EX', 60)
+end
 local userReserved = redis.call('INCR', KEYS[1])
 if userReserved == 1 then redis.call('EXPIRE', KEYS[1], 60) end
 local ipReserved = redis.call('INCR', KEYS[2])
 if ipReserved == 1 then redis.call('EXPIRE', KEYS[2], 60) end
-return 1
+return {userGeneration, ipGeneration}
 `
 
-const releaseIpReservationScript = `
-local count = tonumber(redis.call('GET', KEYS[1]) or '0')
-if count > 0 then redis.call('DECR', KEYS[1]) end
+const releaseLoginReservationScript = `
+for i = 1, 2 do
+  if redis.call('GET', KEYS[i + 2]) == ARGV[i] then
+    local count = tonumber(redis.call('GET', KEYS[i]) or '0')
+    if count > 0 then redis.call('DECR', KEYS[i]) end
+  end
+end
 return 1
 `
 
@@ -81,16 +95,23 @@ function loginKeys(username: string, address: string): [string, string] {
   return [userKey, ipKey]
 }
 
-export async function reserveLoginAttempt(username: string, address: string) {
+export async function reserveLoginAttempt(username: string, address: string): Promise<false | [string, string]> {
   const redis = await useRedis()
   const [userKey, ipKey] = loginKeys(username, address)
-  return Number(await redis.eval(loginReservationScript, { keys: [`${userKey}:attempts`, `${ipKey}:attempts`, `${userKey}:locked`, `${ipKey}:locked`], arguments: [] })) === 1
+  const result = await redis.eval(loginReservationScript, {
+    keys: [`${userKey}:attempts`, `${ipKey}:attempts`, `${userKey}:generation`, `${ipKey}:generation`, `${userKey}:locked`, `${ipKey}:locked`],
+    arguments: [randomUUID(), randomUUID()]
+  })
+  return Array.isArray(result) && result.length === 2 ? [String(result[0]), String(result[1])] : false
 }
 
-export async function releaseSuccessfulLoginIp(address: string) {
+export async function releaseSuccessfulLogin(username: string, address: string, reservation: [string, string]) {
   const redis = await useRedis()
-  const [, ipKey] = loginKeys('unused', address)
-  await redis.eval(releaseIpReservationScript, { keys: [`${ipKey}:attempts`], arguments: [] })
+  const [userKey, ipKey] = loginKeys(username, address)
+  await redis.eval(releaseLoginReservationScript, {
+    keys: [`${userKey}:attempts`, `${ipKey}:attempts`, `${userKey}:generation`, `${ipKey}:generation`],
+    arguments: reservation
+  })
 }
 
 export async function checkLoginLock(username: string, address: string) {

@@ -114,6 +114,13 @@ app_id=$(compose ps --status running -q app)
 [ "$(docker inspect --format '{{.State.Running}}' "$app_id")" = true ]
 [ "$(compose exec -T db psql -U pediatrico -d pediatrico -Atqc 'SELECT count(*) FROM drizzle.__drizzle_migrations')" -gt 0 ]
 [ "$(compose exec -T db psql -U pediatrico -d pediatrico -Atqc 'SELECT count(*) FROM who_dataset')" = 0 ]
+phase=catalog-seed
+[ "$(compose exec -T db psql -U pediatrico -d pediatrico -Atqc "SELECT count(*) FROM catalog_release WHERE kind = 'VACCINE'")" = 1 ]
+[ "$(compose exec -T db psql -U pediatrico -d pediatrico -Atqc "SELECT count(*) FROM catalog_release WHERE kind = 'CHECKUP'")" = 1 ]
+[ "$(compose exec -T db psql -U pediatrico -d pediatrico -Atqc "SELECT count(*) FROM catalog_item WHERE release_id IN (SELECT id FROM catalog_release WHERE kind = 'VACCINE')")" = 21 ]
+[ "$(compose exec -T db psql -U pediatrico -d pediatrico -Atqc "SELECT count(*) FROM catalog_item WHERE release_id IN (SELECT id FROM catalog_release WHERE kind = 'CHECKUP')")" = 31 ]
+[ "$(compose exec -T db psql -U pediatrico -d pediatrico -Atqc "SELECT count(*) FROM catalog_release WHERE kind = 'MILESTONE'")" = 0 ]
+[ "$(compose exec -T db psql -U pediatrico -d pediatrico -Atqc "SELECT count(*) FROM catalog_item WHERE status <> 'DRAFT_PENDING_PEDIATRICIAN_REVIEW'")" = 0 ]
 
 ready=false
 for attempt in $(seq 1 30); do

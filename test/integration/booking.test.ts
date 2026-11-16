@@ -189,4 +189,52 @@ describe('booking with isolated database', () => {
     expect((await listParentAppointments(stranger))).toEqual([])
     expect((await db.select().from(bookingNotice)).map(row => row.status)).toEqual(expect.arrayContaining(['RESCHEDULED', 'CANCELLED']))
   })
+
+  it('does not approve a parent request while a concurrent revocation is uncommitted', async () => {
+    const request = await submitParentBooking(parent, { patientId: child, date: '2027-04-05', time: '09:00', consent: true, consentVersion: 'DRAFT-2026-11' })
+    const blocker = await pool.connect()
+    await blocker.query('BEGIN')
+    let released = false
+    try {
+      await blocker.query('UPDATE guardian_grant SET status = $1 WHERE patient_id = $2 AND guardian_id = $3', ['REVOKED', child, parent.id])
+      let settled = false
+      const approval = decideBookingRequest(doctor, request.id, 'APPROVE').then((value) => {
+        settled = true
+        return value
+      }, (error: unknown) => {
+        settled = true
+        throw error
+      })
+      const outcome = approval.then(value => ({ value }), (error: unknown) => ({ error }))
+      await new Promise(resolve => setTimeout(resolve, 100))
+      expect(settled).toBe(false)
+      await blocker.query('COMMIT')
+      released = true
+      const result = await outcome
+      expect(result).toMatchObject({ error: { statusCode: 409 } })
+      expect((await db.select().from(bookingRequest).where(eq(bookingRequest.id, request.id)))[0]?.status).toBe('PENDING')
+      expect((await db.select().from(appointment).where(eq(appointment.startsAt, new Date('2027-04-05T14:00:00Z'))))).toEqual([])
+    } finally {
+      if (!released) await blocker.query('ROLLBACK')
+      blocker.release()
+      await pool.query('UPDATE guardian_grant SET status = $1 WHERE patient_id = $2 AND guardian_id = $3', ['ACTIVE', child, parent.id])
+    }
+  })
+
+  it('rejects the same verified child and slot despite name case and whitespace changes', async () => {
+    const address = `case-${randomUUID()}@example.test`
+    let code = ''
+    await issueBookingCode(address, '127.18.0.1', async (_, value) => {
+      code = value
+    })
+    const proof = await verifyBookingContact(address, code, '127.18.0.2')
+    const first = await submitBookingRequest({ ...input, date: '2027-04-12', childName: 'Alma  Prueba', email: address, verificationToken: proof })
+    let secondCode = ''
+    await issueBookingCode(address, '127.18.0.3', async (_, value) => {
+      secondCode = value
+    })
+    const secondProof = await verifyBookingContact(address, secondCode, '127.18.0.4')
+    await expect(submitBookingRequest({ ...input, date: '2027-04-12', childName: 'alma prueba', email: address.toUpperCase(), verificationToken: secondProof })).rejects.toMatchObject({ statusCode: 409 })
+    expect((await db.select().from(bookingRequest).where(eq(bookingRequest.email, address))).map(row => row.id)).toEqual([first.id])
+  })
 })

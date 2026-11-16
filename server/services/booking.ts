@@ -68,7 +68,8 @@ export async function submitBookingRequest(input: VerifiedBookingInput): Promise
     const [proof] = await tx.update(bookingProof).set({ usedAt: new Date() }).where(and(eq(bookingProof.email, values.email), eq(bookingProof.kind, 'TOKEN'), eq(bookingProof.digest, digest(values.verificationToken)), isNull(bookingProof.usedAt), gt(bookingProof.expiresAt, new Date()))).returning()
     if (!proof) throw unavailable()
     if (startsAt < new Date() || !(await availableSlots({ from: values.date, to: values.date }, undefined, tx)).some(slot => slot.time === values.time && slot.free)) throw conflict()
-    const duplicate = await tx.select({ id: bookingRequest.id }).from(bookingRequest).where(and(eq(bookingRequest.email, values.email), eq(bookingRequest.childName, values.childName), eq(bookingRequest.birthDate, values.birthDate), eq(bookingRequest.status, 'PENDING'))).limit(1)
+    const childIdentity = values.childName.trim().replace(/\s+/g, ' ').toLowerCase()
+    const duplicate = await tx.select({ id: bookingRequest.id }).from(bookingRequest).where(and(eq(bookingRequest.email, values.email), sql`lower(regexp_replace(btrim(${bookingRequest.childName}), '[[:space:]]+', ' ', 'g')) = ${childIdentity}`, eq(bookingRequest.birthDate, values.birthDate), eq(bookingRequest.status, 'PENDING'))).limit(1)
     if (duplicate.length) throw conflict()
     const id = randomUUID()
     await tx.insert(bookingRequest).values({ id, source: 'PUBLIC', childName: values.childName, birthDate: values.birthDate, sex: values.sex, guardianName: values.guardianName, relationship: values.relationship, email: values.email, phone: values.phone, startsAt, consentVersion: values.consentVersion })
@@ -115,7 +116,7 @@ export async function decideBookingRequest(actor: Actor, requestId: string, deci
     const [row] = await tx.select().from(bookingRequest).where(eq(bookingRequest.id, requestId)).for('update')
     if (!row || row.status !== 'PENDING') throw conflict()
     if (row.source === 'PARENT') {
-      const [active] = await tx.select({ patientId: guardianGrant.patientId }).from(guardianGrant).where(and(eq(guardianGrant.patientId, row.patientId!), eq(guardianGrant.guardianId, row.guardianId!), eq(guardianGrant.status, 'ACTIVE')))
+      const [active] = await tx.select({ patientId: guardianGrant.patientId }).from(guardianGrant).where(and(eq(guardianGrant.patientId, row.patientId!), eq(guardianGrant.guardianId, row.guardianId!), eq(guardianGrant.status, 'ACTIVE'))).for('update')
       if (!active) throw conflict()
     }
     let appointmentId: string | undefined

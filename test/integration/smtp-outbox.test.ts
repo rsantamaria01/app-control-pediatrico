@@ -6,8 +6,8 @@ import { migrate } from 'drizzle-orm/node-postgres/migrator'
 import { eq, sql } from 'drizzle-orm'
 import { Pool } from 'pg'
 import { bookingRequest, emailHealth, notificationAttempt, notificationOutbox } from '../../server/db/schema'
-import { deliver, providerStatus, queueNotification } from '../../server/services/outbox'
-import { emailProviderHealth } from '../../server/services/email'
+import { deliver, processNotificationOutbox, providerStatus, queueNotification } from '../../server/services/outbox'
+import { emailProviderHealth, markEmailFailure, sendBookingCode } from '../../server/services/email'
 import { saveSmtpSettings } from '../../server/services/smtp-settings'
 
 const source = process.env.DATABASE_URL
@@ -59,9 +59,12 @@ afterAll(async () => {
   }
 })
 
-async function queued() {
+async function queued(channel: 'EMAIL' | 'WHATSAPP' = 'EMAIL') {
   const subjectId = randomUUID()
   await db.insert(bookingRequest).values({ id: subjectId, source: 'PUBLIC', childName: 'Paciente', guardianName: 'Familia', email: 'family@example.test', startsAt: new Date('2027-03-02T14:00:00Z'), consentVersion: 'DRAFT-2026-11' })
+  if (channel === 'WHATSAPP') {
+    return db.insert(notificationOutbox).values({ id: randomUUID(), eventKind: 'BOOKING_PENDING', subjectId, channel, recipientKey: randomUUID() }).returning({ id: notificationOutbox.id }).then(rows => rows[0]!.id)
+  }
   return db.transaction(tx => queueNotification(tx, { kind: 'BOOKING_PENDING', subjectId }, { channel: 'EMAIL', address: 'family@example.test' }))
 }
 
@@ -176,6 +179,89 @@ it('fails closed on missing admin encryption key rather than using environment S
     expect(await deliver(id, now)).toEqual({ id, status: 'NOT_CONFIGURED' })
     expect(server.messages).toHaveLength(0)
     expect(JSON.stringify(await db.select().from(notificationAttempt))).not.toContain('private-password')
+  } finally { await server.close() }
+})
+
+it('requeues only unsent unconfigured email on the first healthy poll after admin saves SMTP', async () => {
+  const server = await smtpServer('250 OK')
+  try {
+    const id = await queued()
+    expect(await deliver(id, now)).toMatchObject({ status: 'NOT_CONFIGURED' })
+    const [before] = await db.select().from(notificationOutbox).where(eq(notificationOutbox.id, id))
+    expect(before).toMatchObject({ state: 'NOT_CONFIGURED', attempts: 1, deliveredAt: null })
+    const whatsapp = await queued('WHATSAPP')
+    await db.update(notificationOutbox).set({ state: 'NOT_CONFIGURED', errorClass: 'ProviderNotConfigured' }).where(eq(notificationOutbox.id, whatsapp))
+    const uncertain = await queued()
+    await db.update(notificationOutbox).set({ state: 'FAILED', errorClass: 'DeliveryUncertain' }).where(eq(notificationOutbox.id, uncertain))
+    await saveSmtpSettings({ id: randomUUID(), roles: ['ADMIN'] }, { host: '127.0.0.1', port: server.port, security: 'NONE', username: '', password: '', fromName: 'Clínica', fromAddress: 'clinic@example.test' })
+    expect((await db.select().from(notificationOutbox).where(eq(notificationOutbox.id, id)))[0]).toMatchObject({ state: 'NOT_CONFIGURED', attempts: 1, deliveredAt: null })
+    expect((await db.select().from(notificationOutbox).where(eq(notificationOutbox.id, whatsapp)))[0]).toMatchObject({ state: 'NOT_CONFIGURED' })
+    expect((await db.select().from(notificationOutbox).where(eq(notificationOutbox.id, uncertain)))[0]).toMatchObject({ state: 'FAILED', errorClass: 'DeliveryUncertain' })
+    expect(await processNotificationOutbox(now)).toBe(1)
+    expect(server.messages).toHaveLength(1)
+    expect(await processNotificationOutbox(now)).toBe(0)
+    expect(await db.select().from(notificationAttempt).where(eq(notificationAttempt.outboxId, id))).toMatchObject([{ outcome: 'NOT_CONFIGURED' }, { outcome: 'SENT' }])
+  } finally { await server.close() }
+})
+
+it('requeues unconfigured email when SMTP is supplied by environment at worker startup, never uncertain email', async () => {
+  const server = await smtpServer('250 OK')
+  try {
+    const id = await queued()
+    expect(await deliver(id, now)).toMatchObject({ status: 'NOT_CONFIGURED' })
+    const uncertain = await queued()
+    await db.update(notificationOutbox).set({ state: 'FAILED', errorClass: 'InterruptedDelivery' }).where(eq(notificationOutbox.id, uncertain))
+    env(server.port)
+    expect(await processNotificationOutbox(now)).toBe(1)
+    expect((await db.select().from(notificationOutbox).where(eq(notificationOutbox.id, id)))[0]).toMatchObject({ state: 'SENT' })
+    expect((await db.select().from(notificationOutbox).where(eq(notificationOutbox.id, uncertain)))[0]).toMatchObject({ state: 'FAILED', errorClass: 'InterruptedDelivery' })
+    expect(server.messages).toHaveLength(1)
+  } finally { await server.close() }
+})
+
+it('keeps parked email parked while effective SMTP health is failing and requeues only after READY', async () => {
+  const server = await smtpServer('250 OK')
+  try {
+    const id = await queued()
+    expect(await deliver(id, now)).toMatchObject({ status: 'NOT_CONFIGURED' })
+    env(server.port)
+    await markEmailFailure()
+    expect(await providerStatus('EMAIL')).toBe('FAILED')
+    expect(await processNotificationOutbox(now)).toBe(0)
+    expect((await db.select().from(notificationOutbox).where(eq(notificationOutbox.id, id)))[0]).toMatchObject({ state: 'NOT_CONFIGURED', errorClass: 'ProviderNotConfigured' })
+    await sendBookingCode('family@example.test', '654321')
+    expect(await providerStatus('EMAIL')).toBe('READY')
+    expect(await processNotificationOutbox(now)).toBe(1)
+    expect((await db.select().from(notificationOutbox).where(eq(notificationOutbox.id, id)))[0]).toMatchObject({ state: 'SENT' })
+    expect(server.messages).toHaveLength(2)
+  } finally { await server.close() }
+})
+
+it('admin SMTP save leaves parked email for the next healthy worker poll', async () => {
+  const server = await smtpServer('250 OK')
+  try {
+    const id = await queued()
+    expect(await deliver(id, now)).toMatchObject({ status: 'NOT_CONFIGURED' })
+    await saveSmtpSettings({ id: randomUUID(), roles: ['ADMIN'] }, { host: '127.0.0.1', port: server.port, security: 'NONE', username: '', password: '', fromName: 'Clínica', fromAddress: 'clinic@example.test' })
+    expect((await db.select().from(notificationOutbox).where(eq(notificationOutbox.id, id)))[0]).toMatchObject({ state: 'NOT_CONFIGURED' })
+    await markEmailFailure()
+    expect(await processNotificationOutbox(now)).toBe(0)
+    expect((await db.select().from(notificationOutbox).where(eq(notificationOutbox.id, id)))[0]).toMatchObject({ state: 'NOT_CONFIGURED' })
+    await sendBookingCode('family@example.test', '654321')
+    expect(await processNotificationOutbox(now)).toBe(1)
+    expect(server.messages).toHaveLength(2)
+  } finally { await server.close() }
+})
+
+it('does not let an unconfigured WhatsApp backlog consume the email worker batch', async () => {
+  const server = await smtpServer('250 OK')
+  try {
+    for (let i = 0; i < 3; i++) await queued('WHATSAPP')
+    env(server.port)
+    const id = await queued()
+    expect(await processNotificationOutbox(now, 1)).toBe(2)
+    expect((await db.select().from(notificationOutbox).where(eq(notificationOutbox.id, id)))[0]).toMatchObject({ state: 'SENT' })
+    expect(server.messages).toHaveLength(1)
   } finally { await server.close() }
 })
 

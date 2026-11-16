@@ -21,6 +21,7 @@ vi.mock('../../server/services/outbox', () => ({
   reconcileNotificationOutbox: vi.fn().mockResolvedValue(0),
   processNotificationOutbox: vi.fn().mockResolvedValue(0)
 }))
+vi.mock('../../server/services/reminders', () => ({ scanCheckupReminders: vi.fn().mockResolvedValue(0) }))
 
 const { default: recoveryPlugin } = await import('../../server/plugins/recovery-worker')
 const { acquireRecoveryWorker, reconcileRecoveryJobs, processRecoveryJobs } = await import('../../server/services/recovery')

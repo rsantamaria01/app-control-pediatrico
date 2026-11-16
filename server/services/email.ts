@@ -75,7 +75,7 @@ export async function sendNotificationEmail(address: string, event: DomainEvent)
   const subjects: Record<DomainEvent['kind'], string> = {
     BOOKING_PENDING: 'Solicitud de cita recibida', BOOKING_APPROVED: 'Cita aprobada',
     BOOKING_DECLINED: 'Solicitud de cita rechazada', BOOKING_RESCHEDULED: 'Cita reprogramada',
-    BOOKING_CANCELLED: 'Cita cancelada', VISIT_RECORDED: 'Nueva consulta compartida'
+    BOOKING_CANCELLED: 'Cita cancelada', VISIT_RECORDED: 'Nueva consulta compartida', CHECKUP_DUE: 'Recordatorio de control indicado por su médico'
   }
   const subject = subjects[event.kind]
   await sendMail(address, `${subject} · Control Pediátrico`, `${subject}. Consulte el portal de Control Pediátrico para más información.`)

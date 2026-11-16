@@ -2,6 +2,7 @@
 import type { PendingControl } from '../../../server/services/controls-review'
 
 const { data: controls, error, refresh } = await useFetch<PendingControl[]>('/api/clinical/controles-pendientes')
+if (import.meta.server && (error.value?.statusCode === 401 || error.value?.statusCode === 403)) throw createError({ statusCode: error.value.statusCode, statusMessage: 'Acceso denegado' })
 </script>
 
 <template>

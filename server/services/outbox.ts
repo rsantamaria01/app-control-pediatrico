@@ -2,7 +2,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import { and, eq, inArray, lte, sql } from 'drizzle-orm'
 import type { Actor } from '../../shared/types/access'
 import type { DeliveryOutcome, DomainEvent, NotificationChannel, OutboxId, Recipient, Tx } from '../../shared/types/notification'
-import { bookingRequest, guardianGrant, inAppNotice, notificationAttempt, notificationOutbox, notificationPreference, user, visit, visitSharing } from '../db/schema'
+import { bookingRequest, completedCheckup, guardianGrant, inAppNotice, individualCheckup, notificationAttempt, notificationOutbox, notificationPreference, user, visit, visitSharing } from '../db/schema'
 import { useDb } from '../utils/db'
 import { emailProviderHealth, sendNotificationEmail } from './email'
 
@@ -32,7 +32,7 @@ async function smtpAdapter(): Promise<ProviderAdapter> {
 }
 
 export async function queueNotification(tx: Tx, event: DomainEvent, recipient: Recipient): Promise<OutboxId> {
-  if (!['BOOKING_PENDING', 'BOOKING_APPROVED', 'BOOKING_DECLINED', 'BOOKING_RESCHEDULED', 'BOOKING_CANCELLED', 'VISIT_RECORDED'].includes(event.kind) || !event.subjectId || (event.occurrenceId && !['BOOKING_RESCHEDULED', 'BOOKING_CANCELLED'].includes(event.kind))) throw new Error('Invalid notification event')
+  if (!['BOOKING_PENDING', 'BOOKING_APPROVED', 'BOOKING_DECLINED', 'BOOKING_RESCHEDULED', 'BOOKING_CANCELLED', 'VISIT_RECORDED', 'CHECKUP_DUE'].includes(event.kind) || !event.subjectId || (event.occurrenceId && !['BOOKING_RESCHEDULED', 'BOOKING_CANCELLED'].includes(event.kind))) throw new Error('Invalid notification event')
   if (!['EMAIL', 'WHATSAPP', 'IN_APP'].includes(recipient.channel) || (recipient.channel === 'IN_APP' ? !recipient.userId : !recipient.address?.trim())) throw new Error('Invalid notification recipient')
   if (recipient.channel === 'EMAIL' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient.address.trim())) throw new Error('Invalid email recipient')
   if (recipient.channel === 'WHATSAPP' && !/^\+[1-9]\d{7,14}$/.test(recipient.address.trim())) throw new Error('Invalid WhatsApp recipient')
@@ -48,6 +48,15 @@ export async function queueNotification(tx: Tx, event: DomainEvent, recipient: R
   if (recipient.userId && event.kind === 'VISIT_RECORDED') {
     const [access] = await tx.select({ id: visit.id }).from(visit).innerJoin(guardianGrant, and(eq(guardianGrant.patientId, visit.patientId), eq(guardianGrant.guardianId, recipient.userId), eq(guardianGrant.status, 'ACTIVE'))).leftJoin(visitSharing, eq(visitSharing.visitId, visit.id)).where(and(eq(visit.id, event.subjectId), sql`coalesce(${visitSharing.shared}, ${visit.shareWithFamily}) = true`))
     if (!access) throw new Error('Notification recipient has no shared visit')
+  }
+  if (event.kind === 'CHECKUP_DUE') {
+    if (!recipient.userId || recipient.channel === 'WHATSAPP') throw new Error('Checkup reminder requires a guardian')
+    const [eligible] = await tx.select({ id: individualCheckup.id }).from(individualCheckup).innerJoin(guardianGrant, and(eq(guardianGrant.patientId, individualCheckup.patientId), eq(guardianGrant.guardianId, recipient.userId), eq(guardianGrant.status, 'ACTIVE'))).where(and(eq(individualCheckup.id, event.subjectId), sql`NOT EXISTS (SELECT 1 FROM ${completedCheckup} c WHERE c.individual_id = ${individualCheckup.id})`))
+    if (!eligible) throw new Error('Checkup reminder is not available')
+    if (recipient.channel === 'EMAIL') {
+      const [consent] = await tx.select({ enabled: notificationPreference.enabled }).from(notificationPreference).where(and(eq(notificationPreference.userId, recipient.userId), eq(notificationPreference.channel, 'EMAIL')))
+      if (!consent?.enabled) throw new Error('Checkup email requires explicit consent')
+    }
   }
   const key = recipient.channel === 'IN_APP' ? recipient.userId : createHash('sha256').update(`${recipient.channel.toLowerCase()}:${recipient.address.trim().toLowerCase()}`).digest('hex')
   const [inserted] = await tx.insert(notificationOutbox).values({
@@ -65,6 +74,17 @@ export async function queueNotification(tx: Tx, event: DomainEvent, recipient: R
 export async function deliver(outboxId: OutboxId, now = new Date(), adapter?: ProviderAdapter, timeoutMs = 15000): Promise<DeliveryOutcome> {
   const claimed = await prepareDelivery(outboxId, now, adapter ?? await smtpAdapter())
   if ('outcome' in claimed) return claimed.outcome
+  if (claimed.event.kind === 'CHECKUP_DUE') {
+    const allowed = await useDb().transaction(async (tx) => {
+      const [row] = await tx.select().from(notificationOutbox).where(eq(notificationOutbox.id, outboxId)).for('update')
+      if (!row || row.state !== 'SENDING' || !row.recipientUserId) return false
+      const [eligible] = await tx.select({ id: individualCheckup.id }).from(individualCheckup).innerJoin(guardianGrant, and(eq(guardianGrant.patientId, individualCheckup.patientId), eq(guardianGrant.guardianId, row.recipientUserId), eq(guardianGrant.status, 'ACTIVE'))).innerJoin(notificationPreference, and(eq(notificationPreference.userId, row.recipientUserId), eq(notificationPreference.channel, 'EMAIL'), eq(notificationPreference.enabled, true))).where(and(eq(individualCheckup.id, row.subjectId), sql`NOT EXISTS (SELECT 1 FROM ${completedCheckup} c WHERE c.individual_id = ${individualCheckup.id})`))
+      if (eligible) return true
+      await tx.update(notificationOutbox).set({ state: 'OPTED_OUT' }).where(eq(notificationOutbox.id, outboxId))
+      return false
+    })
+    if (!allowed) return { id: outboxId, status: 'OPTED_OUT' }
+  }
   let outcome: 'SENT' | 'RETRY' | 'FAILED'
   let timer: ReturnType<typeof setTimeout> | undefined
   try {
@@ -98,6 +118,13 @@ async function prepareDelivery(outboxId: OutboxId, now: Date, adapter?: Provider
     if (row.state === 'SENT' || row.state === 'NOT_CONFIGURED' || row.state === 'OPTED_OUT' || row.state === 'FAILED') return { outcome: { id: outboxId, status: row.state as DeliveryOutcome['status'] } }
     if (row.state === 'SENDING' || row.nextAttemptAt > now) return { outcome: { id: outboxId, status: 'DEFERRED' } }
     const channel = row.channel as NotificationChannel
+    if (row.eventKind === 'CHECKUP_DUE') {
+      const [eligible] = row.recipientUserId ? await tx.select({ id: individualCheckup.id }).from(individualCheckup).innerJoin(guardianGrant, and(eq(guardianGrant.patientId, individualCheckup.patientId), eq(guardianGrant.guardianId, row.recipientUserId), eq(guardianGrant.status, 'ACTIVE'))).where(and(eq(individualCheckup.id, row.subjectId), sql`NOT EXISTS (SELECT 1 FROM ${completedCheckup} c WHERE c.individual_id = ${individualCheckup.id})`)) : []
+      if (!eligible) {
+        await tx.update(notificationOutbox).set({ state: 'OPTED_OUT' }).where(eq(notificationOutbox.id, outboxId))
+        return { outcome: { id: outboxId, status: 'OPTED_OUT' } }
+      }
+    }
     if (row.eventKind.startsWith('BOOKING_')) {
       const [booking] = await tx.select({ guardianId: bookingRequest.guardianId, patientId: bookingRequest.patientId, email: bookingRequest.email }).from(bookingRequest).where(eq(bookingRequest.id, row.subjectId))
       const allowed = booking && (row.recipientUserId ? booking.guardianId === row.recipientUserId && !!booking.patientId && await tx.select({ guardianId: guardianGrant.guardianId }).from(guardianGrant).where(and(eq(guardianGrant.patientId, booking.patientId), eq(guardianGrant.guardianId, row.recipientUserId), eq(guardianGrant.status, 'ACTIVE'))).then(rows => rows.length > 0) : booking.guardianId === null && row.channel === 'EMAIL' && createHash('sha256').update(`email:${booking.email.trim().toLowerCase()}`).digest('hex') === row.recipientKey)
@@ -122,7 +149,7 @@ async function prepareDelivery(outboxId: OutboxId, now: Date, adapter?: Provider
       await tx.update(notificationOutbox).set({ state, attempts: row.attempts + 1, errorClass }).where(eq(notificationOutbox.id, outboxId))
       return { outcome: { id: outboxId, status: state } }
     }
-    const optedOut = preference ? !preference.enabled : channel !== 'IN_APP' && !(channel === 'EMAIL' && !row.recipientUserId && row.eventKind.startsWith('BOOKING_'))
+    const optedOut = channel === 'IN_APP' && row.eventKind === 'CHECKUP_DUE' ? false : preference ? !preference.enabled : channel !== 'IN_APP' && !(channel === 'EMAIL' && !row.recipientUserId && row.eventKind.startsWith('BOOKING_'))
     if (optedOut) {
       await tx.update(notificationOutbox).set({ state: 'OPTED_OUT' }).where(eq(notificationOutbox.id, outboxId))
       return { outcome: { id: outboxId, status: 'OPTED_OUT' } }
@@ -169,12 +196,33 @@ export async function reconcileNotificationOutbox(now = new Date()): Promise<num
 
 export async function processNotificationOutbox(now = new Date(), limit = 50): Promise<number> {
   await reconcileNotificationOutbox(now)
-  const rows = await useDb().select({ id: notificationOutbox.id }).from(notificationOutbox).where(and(inArray(notificationOutbox.state, ['QUEUED', 'RETRY']), lte(notificationOutbox.nextAttemptAt, now))).orderBy(notificationOutbox.createdAt).limit(limit)
-  for (const row of rows) await deliver(row.id, now)
-  return rows.length
+  if (await providerStatus('EMAIL') === 'READY') {
+    await useDb().update(notificationOutbox).set({ state: 'QUEUED', errorClass: null }).where(and(eq(notificationOutbox.channel, 'EMAIL'), eq(notificationOutbox.state, 'NOT_CONFIGURED'), eq(notificationOutbox.errorClass, 'ProviderNotConfigured')))
+  }
+  let processed = 0
+  for (const channel of ['IN_APP', 'EMAIL', 'WHATSAPP'] as const) {
+    const rows = await useDb().select({ id: notificationOutbox.id }).from(notificationOutbox).where(and(eq(notificationOutbox.channel, channel), inArray(notificationOutbox.state, ['QUEUED', 'RETRY']), lte(notificationOutbox.nextAttemptAt, now))).orderBy(notificationOutbox.createdAt).limit(limit)
+    for (const row of rows) await deliver(row.id, now)
+    processed += rows.length
+  }
+  return processed
+}
+
+export async function markInAppNoticeRead(actor: Actor, id: string): Promise<void> {
+  const visible = await listInAppNotices(actor)
+  if (!visible.some(row => row.id === id)) throw new Error('Notice not available')
+  await useDb().transaction(async (tx) => {
+    const [notice] = await tx.select().from(inAppNotice).where(and(eq(inAppNotice.id, id), eq(inAppNotice.userId, actor.id))).for('update')
+    if (!notice) throw new Error('Notice not available')
+    if (notice.eventKind === 'CHECKUP_DUE') {
+      const [allowed] = await tx.select({ id: individualCheckup.id }).from(individualCheckup).innerJoin(guardianGrant, and(eq(guardianGrant.patientId, individualCheckup.patientId), eq(guardianGrant.guardianId, actor.id), eq(guardianGrant.status, 'ACTIVE'))).where(and(eq(individualCheckup.id, notice.subjectId), sql`NOT EXISTS (SELECT 1 FROM ${completedCheckup} c WHERE c.individual_id = ${individualCheckup.id})`))
+      if (!allowed) throw new Error('Notice not available')
+    }
+    await tx.update(inAppNotice).set({ readAt: notice.readAt ?? new Date() }).where(eq(inAppNotice.id, id))
+  })
 }
 
 export async function listInAppNotices(actor: Actor) {
   if (actor.roles.length !== 1 || !actor.roles.includes('PATIENT')) return []
-  return useDb().select({ id: inAppNotice.id, outboxId: inAppNotice.outboxId, userId: inAppNotice.userId, eventKind: inAppNotice.eventKind, subjectId: inAppNotice.subjectId, createdAt: inAppNotice.createdAt, readAt: inAppNotice.readAt }).from(inAppNotice).where(and(eq(inAppNotice.userId, actor.id), sql`(${inAppNotice.eventKind} <> 'VISIT_RECORDED' OR EXISTS (SELECT 1 FROM ${visit} v JOIN ${guardianGrant} g ON g.patient_id = v.patient_id AND g.guardian_id = ${actor.id} AND g.status = 'ACTIVE' LEFT JOIN ${visitSharing} s ON s.visit_id = v.id WHERE v.id = ${inAppNotice.subjectId} AND coalesce(s.shared, v.share_with_family) = true))`, sql`(${inAppNotice.eventKind} NOT LIKE 'BOOKING_%' OR EXISTS (SELECT 1 FROM ${bookingRequest} b JOIN ${guardianGrant} g ON g.patient_id = b.patient_id AND g.guardian_id = ${actor.id} AND g.status = 'ACTIVE' WHERE b.id = ${inAppNotice.subjectId} AND b.guardian_id = ${actor.id}))`)).orderBy(sql`${inAppNotice.createdAt} DESC`)
+  return useDb().select({ id: inAppNotice.id, outboxId: inAppNotice.outboxId, userId: inAppNotice.userId, eventKind: inAppNotice.eventKind, subjectId: inAppNotice.subjectId, dueDate: individualCheckup.date, createdAt: inAppNotice.createdAt, readAt: inAppNotice.readAt }).from(inAppNotice).leftJoin(individualCheckup, and(eq(individualCheckup.id, inAppNotice.subjectId), eq(inAppNotice.eventKind, 'CHECKUP_DUE'))).where(and(eq(inAppNotice.userId, actor.id), sql`(${inAppNotice.eventKind} <> 'VISIT_RECORDED' OR EXISTS (SELECT 1 FROM ${visit} v JOIN ${guardianGrant} g ON g.patient_id = v.patient_id AND g.guardian_id = ${actor.id} AND g.status = 'ACTIVE' LEFT JOIN ${visitSharing} s ON s.visit_id = v.id WHERE v.id = ${inAppNotice.subjectId} AND coalesce(s.shared, v.share_with_family) = true))`, sql`(${inAppNotice.eventKind} <> 'CHECKUP_DUE' OR EXISTS (SELECT 1 FROM ${individualCheckup} c JOIN ${guardianGrant} g ON g.patient_id = c.patient_id AND g.guardian_id = ${actor.id} AND g.status = 'ACTIVE' WHERE c.id = ${inAppNotice.subjectId} AND NOT EXISTS (SELECT 1 FROM ${completedCheckup} done WHERE done.individual_id = c.id)))`, sql`(${inAppNotice.eventKind} NOT LIKE 'BOOKING_%' OR EXISTS (SELECT 1 FROM ${bookingRequest} b JOIN ${guardianGrant} g ON g.patient_id = b.patient_id AND g.guardian_id = ${actor.id} AND g.status = 'ACTIVE' WHERE b.id = ${inAppNotice.subjectId} AND b.guardian_id = ${actor.id}))`)).orderBy(sql`${inAppNotice.createdAt} DESC`)
 }

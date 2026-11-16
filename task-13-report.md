@@ -17,3 +17,7 @@ The existing auth and agenda E2E tests wait for `networkidle` after opening `/ac
 The catalog fixture now waits for `networkidle` before filling either login form. The same command then passed all 3 tests, including 375px and 1440px: `3 passed (22.9s)`.
 
 No auth source change was required and no clinical catalog seed was added.
+
+## Verification
+
+`pnpm lint && pnpm typecheck && pnpm test` exited 0: lint had 18 existing Vue style warnings and no errors; typecheck passed; 162 unit tests passed across 15 files. Commit: `537395e`.

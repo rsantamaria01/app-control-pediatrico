@@ -3,7 +3,7 @@ import { hashPassword } from 'better-auth/crypto'
 import { drizzle } from 'drizzle-orm/node-postgres'
 import { migrate } from 'drizzle-orm/node-postgres/migrator'
 import { Pool } from 'pg'
-import { account, catalogItem, catalogRelease, guardianGrant, patient, user, userRole } from '../../server/db/schema'
+import { account, catalogItem, catalogRelease, doctorCatalogEntry, guardianGrant, patient, user, userRole } from '../../server/db/schema'
 
 const enabled = process.env.AUTH_E2E === '1' && process.env.CLINICAL_E2E === '1' && process.env.CLINICAL_E2E_DATABASE_URL === process.env.TEST_DATABASE_URL
 const url = process.env.TEST_DATABASE_URL
@@ -70,7 +70,18 @@ test.describe('preventive main flow on isolated database', () => {
     await page.getByRole('button', { name: 'Guardar dosis' }).click()
     await expect(page.getByText('PRIVATE_NOTE')).toBeVisible()
     await page.getByRole('button', { name: 'Desarrollo' }).click()
-    await expect(page.getByText('No hay hitos OMS o CDC importados')).toBeVisible()
+    const authored = await db.select({ id: doctorCatalogEntry.id }).from(doctorCatalogEntry)
+    const developmentResponse = await context.request.get(`/api/pacientes/${childId}/preventivo/desarrollo`)
+    expect(developmentResponse.status()).toBe(200)
+    const development = await developmentResponse.json() as { assessments: unknown[], milestones: { id: string, authorId: string, source: string, status: string }[], reminders: unknown[], remindersAvailable: boolean }
+    expect(development.assessments).toEqual([])
+    expect(development.milestones).toHaveLength(authored.length)
+    expect(development.milestones.map(item => item.id).sort()).toEqual(authored.map(item => item.id).sort())
+    expect(development.milestones.every(item => Boolean(item.authorId) && item.status === 'DRAFT_PENDING_PEDIATRICIAN_REVIEW' && item.source.length > 0)).toBe(true)
+    expect(development.reminders).toEqual([])
+    expect(development.remindersAvailable).toBe(false)
+    await expect(page.getByText('Recordatorios no disponibles: no hay catálogo de tamizajes importado con procedencia.', { exact: false })).toBeVisible()
+    await expect(page.getByText('Sin hitos de referencia validados')).toHaveCount(0)
     await page.getByRole('button', { name: 'Controles', exact: true }).click()
     await expect(page.getByText('Fechas derivadas de las edades AAP en borrador', { exact: false })).toBeVisible()
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(376)

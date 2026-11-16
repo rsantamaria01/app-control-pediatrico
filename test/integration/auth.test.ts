@@ -988,8 +988,9 @@ describe('username/password access', () => {
     const { createClient } = await import('redis')
     const { createHash } = await import('node:crypto')
     const username = `expiry-${crypto.randomUUID().slice(0, 8)}`
-    const address = '198.51.100.211'
-    const otherAddress = '198.51.100.212'
+    const ipSuffix = Number.parseInt(crypto.randomUUID().slice(0, 4), 16)
+    const address = `10.${Math.floor(ipSuffix / 256)}.${ipSuffix % 256}.211`
+    const otherAddress = `10.${Math.floor(ipSuffix / 256)}.${ipSuffix % 256}.212`
     const oldReservation = await reserveLoginAttempt(username, address)
     expect(oldReservation).toBeTruthy()
     const client = createClient({ url: process.env.REDIS_URL })

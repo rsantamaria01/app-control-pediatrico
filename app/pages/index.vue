@@ -9,6 +9,7 @@ const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Guayaquil', 
 const { data: appointments, error, refresh } = await useFetch<Appointment[]>('/api/agenda', { query: { from: today, to: today }, immediate: isDoctor.value, default: () => [] })
 const { data: requestsCount, error: requestsError, refresh: refreshRequests } = await useFetch<{ count: number }>('/api/agenda/solicitudes/count', { immediate: isDoctor.value })
 const { data: growthReview, error: growthError, refresh: refreshGrowth } = await useFetch<{ id: string }[]>('/api/clinical/crecimiento-por-revisar', { immediate: isDoctor.value, default: () => [] })
+const { data: vaccineReview, error: vaccineError, refresh: refreshVaccines } = await useFetch<{ id: string }[]>('/api/clinical/vacunacion-por-revisar', { immediate: isDoctor.value, default: () => [] })
 const active = computed(() => appointments.value?.filter(item => item.status !== 'CANCELLED') ?? [])
 const upcoming = computed(() => active.value.filter(item => item.status !== 'ATTENDED' && new Date(`${item.date}T${item.time}:00-05:00`) >= new Date()))
 const { data: children, error: childrenError, refresh: refreshChildren } = await useFetch<FamilyChildSummary[]>('/api/hijos', { immediate: isParent.value, default: () => [] })
@@ -139,7 +140,19 @@ function age(birthDate: string) {
         </h2>
         <ul class="mt-2 divide-y divide-default">
           <li class="flex min-h-12 items-center justify-between gap-2 text-sm">
-            <span>Vacunación por revisar</span><span class="text-muted">No disponible aún</span>
+            <NuxtLink
+              to="/pacientes/vacunacion-por-revisar"
+              class="text-primary underline focus-visible:outline-2 focus-visible:outline-primary"
+            >Vacunación por revisar</NuxtLink><UButton
+              v-if="vaccineError"
+              variant="link"
+              @click="refreshVaccines()"
+            >
+              Reintentar
+            </UButton><strong
+              v-else
+              class="tabular-nums"
+            >{{ vaccineReview?.length ?? 0 }}</strong>
           </li>
           <li class="flex min-h-12 items-center justify-between gap-2 text-sm">
             <NuxtLink

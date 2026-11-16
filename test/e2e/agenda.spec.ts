@@ -156,7 +156,7 @@ test.describe('agenda by role and viewport', () => {
     await context.close()
   })
 
-  test('doctor home shows real today counts and links only the available growth queue', async ({ browser }) => {
+  test('doctor home shows real today counts and links available growth and vaccination queues', async ({ browser }) => {
     const id = crypto.randomUUID()
     const username = `agenda-${id.slice(0, 8)}`
     const db = drizzle(pool)
@@ -176,7 +176,12 @@ test.describe('agenda by role and viewport', () => {
     await expect(page.getByRole('heading', { name: 'Mis pacientes' })).toBeVisible()
     await expect(page.getByRole('link', { name: 'Ver agenda completa' })).toHaveAttribute('href', '/agenda?vista=dia')
     await expect(page.getByRole('link', { name: 'Crecimiento por revisar' })).toBeVisible()
-    await expect(page.getByRole('link', { name: 'Vacunación por revisar' })).toHaveCount(0)
+    const vaccineLink = page.getByRole('link', { name: 'Vacunación por revisar' })
+    await expect(vaccineLink).toHaveAttribute('href', '/pacientes/vacunacion-por-revisar')
+    const vaccineQueue = await context.request.get('/api/clinical/vacunacion-por-revisar')
+    expect(vaccineQueue.status()).toBe(200)
+    const vaccineRows = await vaccineQueue.json() as { id: string }[]
+    await expect(vaccineLink.locator('xpath=..').locator('strong')).toHaveText(String(vaccineRows.length))
     await expect(page.getByRole('link', { name: 'Controles pendientes' })).toHaveCount(0)
     await context.close()
   })

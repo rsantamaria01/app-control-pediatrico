@@ -35,10 +35,12 @@ export default defineServerAuth({
         }
         const ip = loginClientAddress(ctx.request?.headers.get('x-real-ip') || undefined, ctx.request?.headers.get('x-forwarded-for') || undefined, process.env.AUTH_TRUSTED_PROXY_CIDR)
         try {
-          if (!await reserveLoginAttempt(input, ip)) {
+          const reservation = await reserveLoginAttempt(input, ip)
+          if (!reservation) {
             await recordAudit('SIGN_IN', 'DENIED')
             throw new APIError('UNAUTHORIZED', { message: 'Usuario o contraseña incorrectos' })
           }
+          return { context: { context: { loginReservation: reservation } } }
         } catch (error) {
           if (error instanceof APIError) throw error
           throw new APIError('SERVICE_UNAVAILABLE', { message: 'Acceso no disponible' })
@@ -58,7 +60,7 @@ export default defineServerAuth({
         const success = Boolean(ctx.context.newSession?.user?.id)
         const input = String(ctx.body?.username || '').toLowerCase()
         const ip = loginClientAddress(ctx.request?.headers.get('x-real-ip') || undefined, ctx.request?.headers.get('x-forwarded-for') || undefined, process.env.AUTH_TRUSTED_PROXY_CIDR)
-        if (success) await releaseSuccessfulLogin(input, ip)
+        if (success) await releaseSuccessfulLogin(input, ip, (ctx.context as typeof ctx.context & { loginReservation: [string, string] }).loginReservation)
         else await recordLoginFailure(input, ip)
         await recordAudit('SIGN_IN', success ? 'ALLOWED' : 'DENIED', success ? ctx.context.newSession!.user.id : undefined)
         if (!success) throw new APIError('UNAUTHORIZED', { message: 'Usuario o contraseña incorrectos' })

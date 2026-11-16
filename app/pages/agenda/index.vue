@@ -100,6 +100,12 @@ function openDetail(item: Appointment) {
       </h1>
       <div class="flex gap-2">
         <UButton
+          to="/agenda/solicitudes"
+          variant="outline"
+        >
+          Solicitudes
+        </UButton>
+        <UButton
           to="/agenda/horarios"
           variant="outline"
         >

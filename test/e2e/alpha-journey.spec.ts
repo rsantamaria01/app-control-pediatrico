@@ -36,6 +36,16 @@ test('production image journeys from bootstrapped admin through two children and
     expect(token).toBeTruthy()
     return token!
   }
+  const bookingCodeFor = async (address: string) => {
+    await expect.poll(async () => (await messages(address)).length).toBeGreaterThan(0)
+    const [message] = await messages(address)
+    const response = await request.get(`http://127.0.0.1:8025/api/v1/message/${message!.ID}`)
+    expect(response.ok()).toBe(true)
+    const body = await response.json() as { Text?: string }
+    const code = body.Text?.match(/\b\d{6}\b/)?.[0]
+    expect(code).toBeTruthy()
+    return code!
+  }
   const context = await browser.newContext({ baseURL: origin, ignoreHTTPSErrors: true })
   const page = await context.newPage()
   const workerErrors: string[] = []
@@ -68,6 +78,46 @@ test('production image journeys from bootstrapped admin through two children and
     await setup(doctorEmail, 'journey-doctor', password)
     await setup(assistantEmail, 'journey-assistant', 'unique assistant setup phrase')
     await signIn('journey-assistant', 'unique assistant setup phrase')
+    const bookingDate = new Date()
+    bookingDate.setUTCDate(bookingDate.getUTCDate() + (8 - bookingDate.getUTCDay()) % 7 + 35)
+    const bookingDay = bookingDate.toISOString().slice(0, 10)
+    expect((await context.request.put('/api/agenda/horarios', { data: { days: [{ weekday: 1, open: '09:00', close: '11:00' }], durationMinutes: 30, blocked: [] } })).status()).toBe(200)
+    await context.clearCookies()
+    const bookingEmail = `booking-${randomUUID()}@example.test`
+    const bookingPhone = '0991234567'
+    await page.goto('/reservar')
+    await page.waitForLoadState('networkidle')
+    await page.getByLabel('Fecha', { exact: true }).fill(bookingDay)
+    await expect(page.getByText('09:00', { exact: true })).toBeVisible()
+    await page.getByText('09:00', { exact: true }).click()
+    await page.getByRole('button', { name: 'Continuar' }).click()
+    await page.getByRole('textbox', { name: 'Nombres y apellidos del niño/a' }).fill('Reserva Prueba')
+    await page.getByLabel('Fecha de nacimiento').fill('2024-01-01')
+    await page.getByLabel('Femenino').check()
+    await page.getByRole('textbox', { name: 'Nombre del representante' }).fill('Familia Reserva')
+    await page.getByRole('textbox', { name: 'Parentesco' }).fill('Madre')
+    await page.getByRole('textbox', { name: 'Correo electrónico' }).fill(bookingEmail)
+    await page.getByRole('textbox', { name: 'Teléfono / WhatsApp' }).fill(bookingPhone)
+    await page.getByRole('button', { name: 'Continuar' }).click()
+    await page.getByRole('checkbox').check()
+    await page.getByRole('button', { name: 'Verificar correo' }).click()
+    await expect(page.getByRole('heading', { name: 'Verificar correo' })).toBeVisible()
+    const code = await bookingCodeFor(bookingEmail)
+    await page.getByRole('textbox', { name: 'Código de 6 dígitos' }).fill(code)
+    await page.getByRole('button', { name: 'Verificar', exact: true }).click()
+    await page.getByRole('button', { name: 'Enviar solicitud' }).click()
+    await expect(page.getByRole('heading', { name: 'Solicitud enviada' })).toBeVisible()
+    expect((await context.request.get('/api/hijos')).status()).toBe(401)
+    await signIn('journey-assistant', 'unique assistant setup phrase')
+    const pendingResponse = await context.request.get('/api/agenda/solicitudes')
+    expect(pendingResponse.status()).toBe(200)
+    const pendingList = await pendingResponse.json() as { id: string, childName: string }[]
+    const booking = pendingList.find(item => item.childName === 'Reserva Prueba')
+    expect(booking).toBeTruthy()
+    expect((await context.request.post(`/api/agenda/solicitudes/${booking!.id}`, { data: { decision: 'APPROVE' } })).status()).toBe(200)
+    const agendaEntry = await context.request.get(`/api/agenda?from=${bookingDay}&to=${bookingDay}`)
+    const bookingAppointments = await agendaEntry.json() as { name: string }[]
+    expect(bookingAppointments.some(item => item.name === 'Reserva Prueba')).toBe(true)
     expect((await context.request.get('/api/pacientes')).status()).toBe(403)
     await context.clearCookies()
     await signIn('journey-doctor', password)

@@ -2,7 +2,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import { desc, eq } from 'drizzle-orm'
 import { isIP } from 'node:net'
 import type { CatalogEntry, CatalogKind, CatalogRow, CatalogVersion, CatalogView, DoctorMilestone, DoctorMilestoneInput, OfficialCatalogSource, SourceFile } from '../../shared/types/catalog'
-import { catalogKinds, doctorMilestoneSchema, draftBadge, draftStatus } from '../../shared/types/catalog'
+import { aapProvenance, catalogKinds, doctorMilestoneSchema, draftBadge, draftStatus } from '../../shared/types/catalog'
 import type { Actor } from '../../shared/types/access'
 import { catalogItem, catalogRelease, doctorCatalogEntry } from '../db/schema'
 import { useDb } from '../utils/db'
@@ -37,6 +37,7 @@ export function validateDraftCatalog(source: OfficialCatalogSource, entries: Cat
     if (entry.sourcePages) {
       if (!entry.sourcePages.length || entry.sourcePages.some(page => !files.some(file => file.file === page.file) || !Number.isInteger(page.page) || page.page < 1)) throw new Error('Invalid source pages')
     } else if (!entry.sourcePage?.trim()) throw new Error('Missing source page')
+    if (source.kind === 'CHECKUP' && (source.publisher !== 'AAP' || entry.provenance !== aapProvenance || entry.domain !== 'Control por edad')) throw new Error('AAP checkups must be age-only facts with provenance')
     if (source.kind === 'VACCINE' && (!entry.sourcePages || files.some(file => !entry.sourcePages!.some(page => page.file === file.file))
       || !Number.isInteger(entry.doseNumber) || (entry.doseNumber || 0) < 1 || !entry.recommendedAge?.trim()
       || entry.minimumInterval === undefined || (entry.minimumInterval !== null && !entry.minimumInterval.trim()))) throw new Error('Vaccine dose requires both sources and interval evidence')

@@ -45,6 +45,18 @@ describe('preventive draft import validation', () => {
     expect(() => validateDraftCatalog(source, [{ ...entry, sourcePage: '' }])).toThrow()
   })
 
+  it('requires schedule and manual pages for each vaccine and exact age-only AAP provenance', () => {
+    const extra = new TextEncoder().encode('manual fixture')
+    const input = { ...source, kind: 'VACCINE' as const, publisher: 'MSP', url: 'https://www.salud.gob.ec/schedule.pdf', sourceFile: 'schedule.pdf',
+      additionalSources: [{ file: 'manual.pdf', url: 'https://www.salud.gob.ec/manual.pdf', bytes: extra, sha256: createHash('sha256').update(extra).digest('hex') }] }
+    const row = { ...entry, doseNumber: 1, recommendedAge: '2 meses', minimumInterval: null,
+      sourcePages: [{ file: 'schedule.pdf', page: 1 }, { file: 'manual.pdf', page: 142 }] }
+    expect(() => validateDraftCatalog(input, [{ ...row, sourcePages: [{ file: 'schedule.pdf', page: 1 }, { file: 'missing.pdf', page: 142 }] }])).toThrow()
+    expect(() => validateDraftCatalog(input, [{ ...row, sourcePages: [{ file: 'schedule.pdf', page: 0 }, { file: 'manual.pdf', page: 142 }] }])).toThrow()
+    expect(() => validateDraftCatalog(input, [{ ...row, minimumInterval: undefined }])).toThrow()
+    expect(() => validateDraftCatalog({ ...source, kind: 'CHECKUP', publisher: 'AAP', url: 'https://downloads.aap.org/schedule.pdf' }, [{ ...entry, provenance: 'Invented' }])).toThrow()
+  })
+
   it('returns independently labelled draft rows without allowing reviewed input', () => {
     const result = validateDraftCatalog(source, [entry])
     expect(result.entries).toEqual([{ ...entry, status: 'DRAFT_PENDING_PEDIATRICIAN_REVIEW', badge: 'Borrador - pendiente de revisión' }])

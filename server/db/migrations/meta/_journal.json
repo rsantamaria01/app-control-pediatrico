@@ -218,6 +218,13 @@
       "when": 1794789774110,
       "tag": "0030_shallow_stellaris",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1794800521323,
+      "tag": "0031_nebulous_ronan",
+      "breakpoints": true
     }
   ]
 }

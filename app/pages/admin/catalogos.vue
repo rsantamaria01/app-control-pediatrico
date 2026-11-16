@@ -65,6 +65,13 @@ if (error.value?.statusCode === 401 || error.value?.statusCode === 403) {
         <h2 class="text-lg font-semibold">
           {{ version.title }} · {{ version.version }}
         </h2>
+        <UBadge
+          v-if="version.superseded"
+          color="neutral"
+          variant="soft"
+        >
+          Versión anterior · solo historial
+        </UBadge>
         <p class="mt-2 text-sm text-muted">
           {{ version.publisher }} · Publicado: {{ version.publicationDate || 'Fecha exacta no indicada' }} · Consultado: {{ version.retrievedAt }}
         </p>

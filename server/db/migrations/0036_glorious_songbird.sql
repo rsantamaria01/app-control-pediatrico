@@ -1,0 +1,5 @@
+ALTER TABLE "catalog_release" DROP CONSTRAINT "catalog_release_source_ck";--> statement-breakpoint
+DROP INDEX "catalog_release_identity_idx";--> statement-breakpoint
+ALTER TABLE "catalog_release" ADD COLUMN "revision" text DEFAULT 'legacy' NOT NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX "catalog_release_identity_idx" ON "catalog_release" USING btree ("kind","publisher","version","url","revision");--> statement-breakpoint
+ALTER TABLE "catalog_release" ADD CONSTRAINT "catalog_release_source_ck" CHECK (length(btrim("catalog_release"."publisher")) > 0 AND length(btrim("catalog_release"."title")) > 0 AND length(btrim("catalog_release"."version")) > 0 AND length(btrim("catalog_release"."revision")) > 0 AND "catalog_release"."url" LIKE 'https://%' AND "catalog_release"."sha256" ~ '^[a-f0-9]{64}$');

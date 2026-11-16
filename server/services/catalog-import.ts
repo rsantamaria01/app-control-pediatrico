@@ -52,12 +52,10 @@ export async function importDraftCatalog(input: OfficialCatalogSource, entries: 
   const sources = [{ file: input.sourceFile || input.url.split('/').at(-1) || '', url: input.url, sha256: input.sha256 }, ...(input.additionalSources || []).map(({ file, url, sha256 }) => ({ file, url, sha256 }))]
   const id = createHash('sha256').update([input.kind, input.publisher, input.version, input.url, input.sha256, JSON.stringify(sources), JSON.stringify(entries)].join('|')).digest('hex')
   const db = useDb()
-  const existing = await db.select({ id: catalogRelease.id }).from(catalogRelease).where(eq(catalogRelease.id, id))
-  if (existing.length) return (await getCatalogView(input.kind)).versions.find(version => version.id === id)!
   await db.transaction(async (tx) => {
-    await tx.insert(catalogRelease).values({ id, kind: input.kind, publisher: input.publisher, title: input.title, version: input.version,
-      publicationDate: input.publicationDate, retrievedAt: input.retrievedAt, url: input.url, sha256: input.sha256, sources, status: draftStatus })
-    await tx.insert(catalogItem).values(validated.entries.map(row => ({ releaseId: id, key: row.key, label: row.label,
+    const [inserted] = await tx.insert(catalogRelease).values({ id, kind: input.kind, publisher: input.publisher, title: input.title, version: input.version, revision: id,
+      publicationDate: input.publicationDate, retrievedAt: input.retrievedAt, url: input.url, sha256: input.sha256, sources, status: draftStatus }).onConflictDoNothing().returning({ id: catalogRelease.id })
+    if (inserted) await tx.insert(catalogItem).values(validated.entries.map(row => ({ releaseId: id, key: row.key, label: row.label,
       domain: row.domain, minAgeMonths: String(row.minAgeMonths), maxAgeMonths: String(row.maxAgeMonths), sourcePage: row.sourcePage || row.sourcePages?.map(page => `${page.file} p. ${page.page}`).join('; ') || '',
       sourcePages: row.sourcePages, minAgeDays: row.minAgeDays === undefined ? null : String(row.minAgeDays), maxAgeDays: row.maxAgeDays === undefined ? null : String(row.maxAgeDays), doseNumber: row.doseNumber === undefined ? null : String(row.doseNumber), doseLabel: row.doseLabel, recommendedAge: row.recommendedAge, minimumInterval: row.minimumInterval, provenance: row.provenance, status: draftStatus })))
   })
@@ -70,10 +68,17 @@ export async function getCatalogView(kind: CatalogKind, includeDoctorEntries = f
   const db = useDb()
   const releases = await db.select().from(catalogRelease).where(eq(catalogRelease.kind, kind)).orderBy(desc(catalogRelease.importedAt), desc(catalogRelease.id))
   const versions: CatalogVersion[] = []
+  const current = new Map<string, string>()
   for (const release of releases) {
+    const key = JSON.stringify([release.publisher, release.version, release.url])
+    if (!current.has(key)) current.set(key, release.id)
+  }
+  for (const release of releases) {
+    const key = JSON.stringify([release.publisher, release.version, release.url])
+    if (includeDoctorEntries && current.get(key) !== release.id) continue
     const items = await db.select().from(catalogItem).where(eq(catalogItem.releaseId, release.id)).orderBy(catalogItem.key)
     if (release.status !== draftStatus || items.some(row => row.status !== draftStatus)) throw new Error('Unapproved catalog status')
-    versions.push({ id: release.id, kind, publisher: release.publisher, title: release.title, version: release.version, publicationDate: release.publicationDate,
+    versions.push({ id: release.id, kind, publisher: release.publisher, title: release.title, version: release.version, revision: release.revision, superseded: current.get(key) !== release.id, publicationDate: release.publicationDate,
       retrievedAt: release.retrievedAt, url: release.url, sha256: release.sha256, sources: release.sources || [{ file: release.url.split('/').at(-1) || '', url: release.url, sha256: release.sha256 }], status: draftStatus, importedAt: release.importedAt.toISOString(),
       entries: items.map(row => ({ key: row.key, label: row.label, domain: row.domain, minAgeMonths: Number(row.minAgeMonths), maxAgeMonths: Number(row.maxAgeMonths), sourcePage: row.sourcePage,
         ...(row.sourcePages && { sourcePages: row.sourcePages }), ...(row.minAgeDays !== null && { minAgeDays: Number(row.minAgeDays), maxAgeDays: Number(row.maxAgeDays) }), ...(row.doseNumber !== null && { doseNumber: Number(row.doseNumber) }), ...(row.doseLabel && { doseLabel: row.doseLabel }), ...(row.recommendedAge && { recommendedAge: row.recommendedAge }),

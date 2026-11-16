@@ -53,6 +53,8 @@ export type CatalogVersion = {
   publisher: string
   title: string
   version: string
+  revision: string
+  superseded: boolean
   publicationDate: string | null
   retrievedAt: string
   url: string

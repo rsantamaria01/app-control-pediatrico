@@ -253,6 +253,13 @@
       "when": 1794810487976,
       "tag": "0035_left_power_man",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1794812591377,
+      "tag": "0036_glorious_songbird",
+      "breakpoints": true
     }
   ]
 }

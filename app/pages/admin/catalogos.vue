@@ -52,7 +52,7 @@ if (error.value?.statusCode === 401 || error.value?.statusCode === 403) {
         Sin entradas verificadas para {{ labels[selected] }}
       </p>
       <p class="mt-2 text-sm text-muted">
-        Pendiente de cotejar originales, permisos de reutilización y revisión pediátrica. No se generan recordatorios desde este catálogo.
+        No hay entradas importadas. Los borradores no generan recordatorios.
       </p>
     </UCard>
     <section
@@ -66,7 +66,7 @@ if (error.value?.statusCode === 401 || error.value?.statusCode === 403) {
           {{ version.title }} · {{ version.version }}
         </h2>
         <p class="mt-2 text-sm text-muted">
-          {{ version.publisher }} · Publicado: {{ version.publicationDate }} · Consultado: {{ version.retrievedAt }}
+          {{ version.publisher }} · Publicado: {{ version.publicationDate || 'Fecha exacta no indicada' }} · Consultado: {{ version.retrievedAt }}
         </p>
         <p class="mt-1 break-all text-xs text-muted">
           SHA-256: {{ version.sha256 }}
@@ -98,7 +98,13 @@ if (error.value?.statusCode === 401 || error.value?.statusCode === 403) {
               </UBadge>
             </div>
             <p class="mt-2 text-sm text-muted">
-              {{ row.domain }} · {{ row.minAgeMonths }}–{{ row.maxAgeMonths }} meses · Página {{ row.sourcePage }}
+              {{ row.domain }} · {{ row.recommendedAge || `${row.minAgeMonths}–${row.maxAgeMonths} meses` }}{{ row.minimumInterval ? ` · Intervalo mínimo: ${row.minimumInterval}` : '' }} · Fuente: {{ row.sourcePage }}
+            </p>
+            <p
+              v-if="row.provenance"
+              class="mt-1 text-xs text-muted"
+            >
+              {{ row.provenance }}
             </p>
           </UCard>
         </li>

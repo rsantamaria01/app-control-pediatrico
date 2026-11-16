@@ -5,6 +5,7 @@ import { migrate } from 'drizzle-orm/node-postgres/migrator'
 import { Pool } from 'pg'
 import { count } from 'drizzle-orm'
 import { readFile } from 'node:fs/promises'
+import { execFileSync } from 'node:child_process'
 import { catalogItem, catalogRelease, doctorCatalogEntry } from '../../server/db/schema'
 import { getCatalogView, importDraftCatalog, addDoctorMilestone } from '../../server/services/catalog-import'
 import type { OfficialCatalogSource } from '../../shared/types/catalog'
@@ -75,6 +76,21 @@ describe('immutable preventive catalogs on disposable database', () => {
     await expect(db.update(catalogItem).set({ status: 'REVIEWED' })).rejects.toThrow()
     await expect(db.update(catalogItem).set({ label: 'Changed' })).rejects.toThrow()
     await expect(db.delete(catalogRelease)).rejects.toThrow()
+  })
+
+  it('imports verified official facts by CLI and leaves milestone catalog unseeded on rerun', async () => {
+    const env = { ...process.env, DATABASE_URL: target.href }
+    const command = () => execFileSync('pnpm', ['exec', 'tsx', 'scripts/import-preventive-catalogs.ts', 'import'], { env, encoding: 'utf8' })
+    expect(command()).toContain('VACCINE')
+    const first = (await getCatalogView('VACCINE')).versions[0]!
+    expect(first.entries.length).toBeGreaterThan(10)
+    expect(first.entries.find(row => row.key === 'pcv-2')?.minimumInterval).toBeNull()
+    expect(first.entries.find(row => row.key === 'rotavirus-2')).toMatchObject({ doseNumber: 2, recommendedAge: '4 meses', minimumInterval: '1 mes' })
+    expect(first.entries.every(row => row.badge === 'Borrador - pendiente de revisión' && row.sourcePages?.length === 2)).toBe(true)
+    expect((await getCatalogView('CHECKUP')).versions[0]?.entries.some(row => row.key === 'day-3-5' && row.minAgeDays === 3 && row.maxAgeDays === 5)).toBe(true)
+    expect((await getCatalogView('MILESTONE')).versions).toHaveLength(0)
+    command()
+    expect((await getCatalogView('VACCINE')).versions).toHaveLength(1)
   })
 
   it('keeps the seeded milestone list empty and persists a doctor-authored draft separately', async () => {

@@ -29,10 +29,11 @@ export function validateDraftCatalog(source: OfficialCatalogSource, entries: Cat
   if (!entries.length) throw new Error('Catalog requires sourced entries')
   const keys = new Set<string>()
   const rows = entries.map((entry) => {
-    if (Object.keys(entry).some(key => !['key', 'label', 'domain', 'minAgeMonths', 'maxAgeMonths', 'sourcePage', 'sourcePages', 'doseNumber', 'recommendedAge', 'minimumInterval', 'provenance'].includes(key))
+    if (Object.keys(entry).some(key => !['key', 'label', 'domain', 'minAgeMonths', 'maxAgeMonths', 'minAgeDays', 'maxAgeDays', 'sourcePage', 'sourcePages', 'doseNumber', 'recommendedAge', 'minimumInterval', 'provenance'].includes(key))
       || !entry.key?.trim() || !entry.label?.trim() || !entry.domain?.trim()
       || !Number.isFinite(entry.minAgeMonths) || !Number.isFinite(entry.maxAgeMonths) || entry.minAgeMonths < 0 || entry.maxAgeMonths < entry.minAgeMonths
       || keys.has(entry.key)) throw new Error('Invalid or duplicate catalog entry')
+    if ((entry.minAgeDays !== undefined || entry.maxAgeDays !== undefined) && (!Number.isInteger(entry.minAgeDays) || !Number.isInteger(entry.maxAgeDays) || entry.minAgeDays! < 0 || entry.maxAgeDays! < entry.minAgeDays!)) throw new Error('Invalid day range')
     if (entry.sourcePages) {
       if (!entry.sourcePages.length || entry.sourcePages.some(page => !files.some(file => file.file === page.file) || !Number.isInteger(page.page) || page.page < 1)) throw new Error('Invalid source pages')
     } else if (!entry.sourcePage?.trim()) throw new Error('Missing source page')
@@ -57,7 +58,7 @@ export async function importDraftCatalog(input: OfficialCatalogSource, entries: 
       publicationDate: input.publicationDate, retrievedAt: input.retrievedAt, url: input.url, sha256: input.sha256, sources, status: draftStatus })
     await tx.insert(catalogItem).values(validated.entries.map(row => ({ releaseId: id, key: row.key, label: row.label,
       domain: row.domain, minAgeMonths: String(row.minAgeMonths), maxAgeMonths: String(row.maxAgeMonths), sourcePage: row.sourcePage || row.sourcePages?.map(page => `${page.file} p. ${page.page}`).join('; ') || '',
-      sourcePages: row.sourcePages, doseNumber: row.doseNumber === undefined ? null : String(row.doseNumber), recommendedAge: row.recommendedAge, minimumInterval: row.minimumInterval, provenance: row.provenance, status: draftStatus })))
+      sourcePages: row.sourcePages, minAgeDays: row.minAgeDays === undefined ? null : String(row.minAgeDays), maxAgeDays: row.maxAgeDays === undefined ? null : String(row.maxAgeDays), doseNumber: row.doseNumber === undefined ? null : String(row.doseNumber), recommendedAge: row.recommendedAge, minimumInterval: row.minimumInterval, provenance: row.provenance, status: draftStatus })))
   })
   const view = await getCatalogView(input.kind)
   return view.versions.find(version => version.id === id)!
@@ -74,7 +75,7 @@ export async function getCatalogView(kind: CatalogKind): Promise<CatalogView> {
     versions.push({ id: release.id, kind, publisher: release.publisher, title: release.title, version: release.version, publicationDate: release.publicationDate,
       retrievedAt: release.retrievedAt, url: release.url, sha256: release.sha256, sources: release.sources || [{ file: release.url.split('/').at(-1) || '', url: release.url, sha256: release.sha256 }], status: draftStatus, importedAt: release.importedAt.toISOString(),
       entries: items.map(row => ({ key: row.key, label: row.label, domain: row.domain, minAgeMonths: Number(row.minAgeMonths), maxAgeMonths: Number(row.maxAgeMonths), sourcePage: row.sourcePage,
-        ...(row.sourcePages && { sourcePages: row.sourcePages }), ...(row.doseNumber !== null && { doseNumber: Number(row.doseNumber) }), ...(row.recommendedAge && { recommendedAge: row.recommendedAge }),
+        ...(row.sourcePages && { sourcePages: row.sourcePages }), ...(row.minAgeDays !== null && { minAgeDays: Number(row.minAgeDays), maxAgeDays: Number(row.maxAgeDays) }), ...(row.doseNumber !== null && { doseNumber: Number(row.doseNumber) }), ...(row.recommendedAge && { recommendedAge: row.recommendedAge }),
         ...(row.sourcePages && { minimumInterval: row.minimumInterval }), ...(row.provenance && { provenance: row.provenance }), status: draftStatus, badge: draftBadge })) })
   }
   if (kind !== 'MILESTONE') return { kind, versions }

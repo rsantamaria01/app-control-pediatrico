@@ -47,6 +47,8 @@ export const catalogItem = pgTable('catalog_item', {
   maxAgeMonths: numeric('max_age_months').notNull(),
   sourcePage: text('source_page').notNull(),
   sourcePages: jsonb('source_pages').$type<{ file: string, page: number }[]>(),
+  minAgeDays: numeric('min_age_days'),
+  maxAgeDays: numeric('max_age_days'),
   doseNumber: numeric('dose_number'),
   recommendedAge: text('recommended_age'),
   minimumInterval: text('minimum_interval'),

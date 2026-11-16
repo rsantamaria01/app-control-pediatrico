@@ -25,6 +25,8 @@ export type CatalogEntry = {
   domain: string
   minAgeMonths: number
   maxAgeMonths: number
+  minAgeDays?: number
+  maxAgeDays?: number
   sourcePage?: string
   sourcePages?: SourcePage[]
   doseNumber?: number

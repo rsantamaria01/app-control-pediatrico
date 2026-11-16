@@ -1,28 +1,38 @@
 {
-  "retrievedAt": "2026-11-12",
+  "retrievedAt": "2026-11-16",
   "sources": [
     {
       "kind": "VACCINE",
+      "file": "msp-vaccination-schedule-2026.pdf",
       "publisher": "MSP Ecuador",
       "title": "Esquema Nacional de Vacunación 2026",
       "version": "2026-07",
       "publicationDate": null,
       "url": "https://www.salud.gob.ec/wp-content/uploads/2026/09/INFOGRAFIA-2026-07-VACUNACION.pdf",
       "sha256": "a8c3b8d24f89fe6fbde8c99961eb7e6f0681e9894260338685e4b5d9b5e689b0",
-      "bytes": 556964,
-      "status": "SOURCE_FILE_VERIFIED_CONTENT_NOT_RECONCILED"
+      "bytes": 556964
     },
     {
       "kind": "VACCINE",
+      "file": "msp-immunization-manual-2026.pdf",
       "publisher": "MSP Ecuador",
       "title": "Manual de Inmunizaciones 2026",
       "version": "2026-v2",
       "publicationDate": null,
       "url": "https://www.salud.gob.ec/wp-content/uploads/2026/09/Manual-Inmunizaciones_portada_18x25cm_v2_digi.pdf",
       "sha256": "ae01652bb3f48d40a923aca9692d815c0e7f9bfa613b6f77d86c052c61c49dd7",
-      "bytes": 8327826,
-      "status": "SOURCE_FILE_VERIFIED_CONTENT_NOT_RECONCILED"
+      "bytes": 8327826
+    },
+    {
+      "kind": "CHECKUP",
+      "file": "periodicity_schedule.pdf",
+      "publisher": "AAP",
+      "title": "Bright Futures/AAP periodicity schedule (ages only)",
+      "version": "approved 2024-12; published 2025-02",
+      "publicationDate": null,
+      "url": "https://downloads.aap.org/AAP/PDF/periodicity_schedule.pdf",
+      "sha256": "dcac428f111f4d02d04260eb4ba5d7004d42b4acef670d4299768701e64d54af",
+      "bytes": 317138
     }
-  ],
-  "clinicalSeedStatus": "BLOCKED_PENDING_ORIGINAL_CONTENT_RECONCILIATION_RIGHTS_AND_PEDIATRICIAN_REVIEW"
+  ]
 }

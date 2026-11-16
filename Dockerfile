@@ -16,13 +16,17 @@ COPY --chown=node:node server/db/migrations ./server/db/migrations
 COPY --chown=node:node server/services/credentials.ts ./server/services/credentials.ts
 COPY --chown=node:node shared/utils/enums.ts ./shared/utils/enums.ts
 COPY --chown=node:node shared/types/who.ts ./shared/types/who.ts
-COPY --chown=node:node scripts/bootstrap-admin.ts scripts/database-env.mjs scripts/ops.mjs scripts/migrate.mjs scripts/import-who.ts scripts/who-2006-manifest.json ./scripts/
+COPY --chown=node:node scripts/bootstrap-admin.ts scripts/database-env.mjs scripts/ops.mjs scripts/migrate.mjs scripts/prepare-catalogs.mjs scripts/import-who.ts scripts/who-2006-manifest.json scripts/import-preventive-catalogs.ts scripts/preventive-catalog-manifest.json scripts/preventive-catalog-entries.json ./scripts/
+COPY --chown=node:node server/services/catalog-import.ts ./server/services/catalog-import.ts
+COPY --chown=node:node server/utils/db.ts ./server/utils/db.ts
+COPY --chown=node:node shared/types/catalog.ts ./shared/types/catalog.ts
+COPY --chown=node:node docs/clinical/sources/msp-vaccination-schedule-2026.pdf docs/clinical/sources/msp-immunization-manual-2026.pdf ./docs/clinical/sources/
 COPY --chown=node:node server/services/who-import.ts ./server/services/who-import.ts
 RUN mkdir /who-source && chown node:node /who-source
 ENV WHO_SOURCE_DIR=/who-source
 USER node
 ENTRYPOINT ["node", "scripts/ops.mjs"]
-CMD ["db:migrate"]
+CMD ["prepare"]
 
 FROM node:24-alpine AS app
 WORKDIR /app

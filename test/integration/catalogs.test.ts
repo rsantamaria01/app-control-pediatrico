@@ -78,6 +78,25 @@ describe('immutable preventive catalogs on disposable database', () => {
     await expect(db.delete(catalogRelease)).rejects.toThrow()
   })
 
+  it('fails closed before inserting any draft when AAP original cannot be fetched', async () => {
+    const preload = `globalThis.fetch = async () => { throw new Error('AAP original unavailable') }`
+    const env = { ...process.env, DATABASE_URL: target.href, NODE_OPTIONS: `--import=data:text/javascript,${encodeURIComponent(preload)}` }
+    expect(() => execFileSync('node', ['scripts/prepare-catalogs.mjs'], { env, encoding: 'utf8', stdio: 'pipe' })).toThrow('AAP original unavailable')
+    expect((await getCatalogView('VACCINE')).versions).toEqual([])
+    expect((await getCatalogView('CHECKUP')).versions).toEqual([])
+  })
+
+  it('runs the same migration-then-import startup as production, idempotently on retry', async () => {
+    const env = { ...process.env, DATABASE_URL: target.href }
+    const start = () => execFileSync('node', ['scripts/prepare-catalogs.mjs'], { env, encoding: 'utf8' })
+    expect(start()).toContain('VACCINE')
+    expect((await getCatalogView('VACCINE')).versions[0]?.entries).toHaveLength(21)
+    expect((await getCatalogView('CHECKUP')).versions[0]?.entries).toHaveLength(31)
+    start()
+    expect((await getCatalogView('VACCINE')).versions).toHaveLength(1)
+    expect((await getCatalogView('CHECKUP')).versions).toHaveLength(1)
+  })
+
   it('imports verified official facts by CLI and leaves milestone catalog unseeded on rerun', async () => {
     const env = { ...process.env, DATABASE_URL: target.href }
     const command = () => execFileSync('pnpm', ['exec', 'tsx', 'scripts/import-preventive-catalogs.ts', 'import'], { env, encoding: 'utf8' })

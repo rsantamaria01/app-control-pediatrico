@@ -23,6 +23,18 @@ const { acquireRecoveryWorker, reconcileRecoveryJobs, processRecoveryJobs } = aw
 const { reconcileGuardianDeliveries, processQueuedGuardianDeliveries } = await import('../../server/services/invitations')
 
 describe('production operations', () => {
+  it('routes the default production ops command through migration and verified draft import before app startup', () => {
+    const preload = `import childProcess from 'node:child_process'; import { syncBuiltinESMExports } from 'node:module'; import { EventEmitter } from 'node:events'; childProcess.spawn = (_node, args) => { process.stdout.write(JSON.stringify(args)); const child = new EventEmitter(); queueMicrotask(() => child.emit('exit', 0, null)); return child }; syncBuiltinESMExports()`
+    const result = spawnSync('node', ['--import', `data:text/javascript,${encodeURIComponent(preload)}`, 'scripts/ops.mjs'], { env: { ...process.env, NODE_OPTIONS: undefined }, encoding: 'utf8' })
+    expect(result.status).toBe(0)
+    expect(JSON.parse(result.stdout)).toEqual(['scripts/database-env.mjs', 'node', 'scripts/prepare-catalogs.mjs'])
+    const ops = dockerfile.split('FROM node:24-alpine AS ops')[1]?.split('FROM node:24-alpine AS app')[0]
+    expect(ops).toContain('docs/clinical/sources/msp-vaccination-schedule-2026.pdf')
+    expect(ops).toContain('docs/clinical/sources/msp-immunization-manual-2026.pdf')
+    expect(ops).toContain('scripts/preventive-catalog-entries.json')
+    expect(ops).toContain('CMD ["prepare"]')
+    expect(dockerfile.split('FROM node:24-alpine AS app')[1]).not.toContain('docs/clinical/sources')
+  })
   it('runs an unconditional Docker ops and Compose smoke on pushes and PRs', () => {
     expect(ci).toMatch(/on:\s*\[push, pull_request\]/)
     expect(ci).toMatch(/runs-on: ubuntu-latest/)
@@ -73,7 +85,7 @@ describe('production operations', () => {
     const app = dockerfile.split('FROM node:24-alpine AS app')[1]
     for (const path of ['node_modules', 'drizzle.config.ts', 'server/db/schema.ts', 'server/db/migrations', 'server/services/credentials.ts', 'scripts/bootstrap-admin.ts']) expect(ops).toContain(path)
     expect(ops).toContain('ENTRYPOINT ["node", "scripts/ops.mjs"]')
-    expect(ops).toContain('CMD ["db:migrate"]')
+    expect(ops).toContain('CMD ["prepare"]')
     expect(ops).toContain('scripts/migrate.mjs')
     expect(app).toContain('/app/.output')
     expect(app).toContain('scripts/database-env.mjs')

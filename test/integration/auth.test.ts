@@ -890,7 +890,7 @@ describe('username/password access', () => {
     const key = `auth:login:user:${createHash('sha256').update(username).digest('hex')}`
     try {
       expect(await client.get(key)).toBe('2')
-      await client.del(`${key}:attempts`)
+      expect(await client.get(`${key}:attempts`)).toBe('2')
     } finally {
       await client.quit()
     }
@@ -958,7 +958,7 @@ describe('username/password access', () => {
     expect(attempts.filter(Boolean)).toHaveLength(20)
   })
 
-  it('does not clear the reservation budget after a successful login or allow parallel guesses past the lock', async () => {
+  it('does not charge successful sign-ins against the username failure budget', async () => {
     const id = crypto.randomUUID()
     const username = `mixed-${id.slice(0, 8)}`
     const password = 'a unique mixed password phrase'
@@ -966,11 +966,21 @@ describe('username/password access', () => {
     await db.insert(userRole).values({ userId: id, role: 'DOCTOR' })
     const { hashPassword } = await import('better-auth/crypto')
     await db.insert(account).values({ id: crypto.randomUUID(), userId: id, accountId: id, providerId: 'credential', password: await hashPassword(password) })
+    for (let i = 0; i < 5; i++) expect((await post('sign-in/username', { username, password })).status).toBe(200)
+    const { createClient } = await import('redis')
+    const { createHash } = await import('node:crypto')
+    const client = createClient({ url: process.env.REDIS_URL })
+    client.on('error', () => {})
+    await client.connect()
+    try {
+      const key = `auth:login:user:${createHash('sha256').update(username).digest('hex')}:attempts`
+      expect(Number(await client.get(key))).toBe(0)
+    } finally {
+      await client.quit()
+    }
+    expect((await post('sign-in/username', { username, password: 'incorrect mixed password' })).status).toBe(401)
     expect((await post('sign-in/username', { username, password })).status).toBe(200)
-    const responses = await Promise.all(Array.from({ length: 12 }, () => post('sign-in/username', { username, password: 'incorrect mixed password' })))
-    expect(responses.filter(response => response.status === 401)).toHaveLength(12)
-    expect((await post('sign-in/username', { username, password })).status).toBe(401)
-    expect(await db.select().from(session).where(eq(session.userId, id))).toHaveLength(1)
+    expect(await db.select().from(session).where(eq(session.userId, id))).toHaveLength(6)
   })
 
   it('keeps the reservation limit during a failing-username lock across a second IP', async () => {

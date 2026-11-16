@@ -26,30 +26,7 @@ proxy_cert=
 proxy_key=
 cleanup() {
   status=$?
-  if [ "$status" -ne 0 ]; then
-    printf 'alpha checkpoint failed phase=%s\n' "$phase" >&2
-    if [ "$phase" = journey ]; then
-      printf 'checkpoint auth diagnostic: aggregated app events (no raw logs)\n' >&2
-      compose logs --no-color --tail 100 app 2>&1 | node --input-type=module -e 'let text=""; for await (const chunk of process.stdin) text += chunk; const lines=text.split("\n"); console.error(JSON.stringify({lines:lines.length, signInEvents:lines.filter(line=>/sign-in\/username|SIGN_IN/i.test(line)).length, errorEvents:lines.filter(line=>/\b(?:error|warn)\b/i.test(line)).length}));' || true
-      printf 'checkpoint auth diagnostic: rate-limit counters (no identities or key names)\n' >&2
-      key=$(node -e 'process.stdout.write("auth:login:user:"+require("node:crypto").createHash("sha256").update("journey-assistant").digest("hex"))')
-      attempts=$(compose exec -T cache valkey-cli --raw GET "${key}:attempts" 2>/dev/null || true)
-      locked=$(compose exec -T cache valkey-cli --raw EXISTS "${key}:locked" 2>/dev/null || true)
-      case "$attempts" in ''|*[!0-9]*) attempts=unavailable;; esac
-      case "$locked" in 0|1) ;; *) locked=unavailable;; esac
-      ipkey=$(node -e 'process.stdout.write("auth:login:ip:"+require("node:crypto").createHash("sha256").update("127.0.0.1").digest("hex"))')
-      ipattempts=$(compose exec -T cache valkey-cli --raw GET "${ipkey}:attempts" 2>/dev/null || true)
-      iplocked=$(compose exec -T cache valkey-cli --raw EXISTS "${ipkey}:locked" 2>/dev/null || true)
-      case "$ipattempts" in ''|*[!0-9]*) ipattempts=unavailable;; esac
-      case "$iplocked" in 0|1) ;; *) iplocked=unavailable;; esac
-      proxykey=$(node -e 'process.stdout.write("auth:login:ip:"+require("node:crypto").createHash("sha256").update(process.env.ALPHA_PROXY_IP).digest("hex"))')
-      proxyattempts=$(compose exec -T cache valkey-cli --raw GET "${proxykey}:attempts" 2>/dev/null || true)
-      proxylocked=$(compose exec -T cache valkey-cli --raw EXISTS "${proxykey}:locked" 2>/dev/null || true)
-      case "$proxyattempts" in ''|*[!0-9]*) proxyattempts=unavailable;; esac
-      case "$proxylocked" in 0|1) ;; *) proxylocked=unavailable;; esac
-      printf 'checkpoint auth diagnostic: assistantReservations=%s assistantLocked=%s clientIpReservations=%s clientIpLocked=%s proxyIpReservations=%s proxyIpLocked=%s\n' "$attempts" "$locked" "$ipattempts" "$iplocked" "$proxyattempts" "$proxylocked" >&2
-    fi
-  fi
+  if [ "$status" -ne 0 ]; then printf 'alpha checkpoint failed phase=%s\n' "$phase" >&2; fi
   docker rm -f "${project}-proxy" "${project}-mailpit" "${project}-pgtest" >/dev/null 2>&1 || true
   compose down -v --remove-orphans >/dev/null 2>&1 || true
   if [ -n "$proxy_cert" ]; then rm -f "$proxy_cert"; fi

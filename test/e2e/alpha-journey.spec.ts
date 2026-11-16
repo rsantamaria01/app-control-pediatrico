@@ -47,30 +47,22 @@ test('production image journeys from bootstrapped admin through two children and
     return code!
   }
   const context = await browser.newContext({ baseURL: origin, ignoreHTTPSErrors: true })
+  let assistantContext: Awaited<ReturnType<typeof browser.newContext>> | undefined
   const page = await context.newPage()
   const workerErrors: string[] = []
   page.on('console', (message) => {
     if (message.type() === 'error' && /service.worker|workbox|sw\.js/i.test(message.text())) workerErrors.push(message.text().slice(0, 250))
   })
+  const signInCounts = new Map<string, number>()
   const signIn = async (username: string, secret: string) => {
+    const next = (signInCounts.get(username) ?? 0) + 1
+    expect(next, `Repeated sign-in for ${username} exceeds the production username limit`).toBeLessThanOrEqual(3)
+    signInCounts.set(username, next)
     await page.goto('/acceso')
     await page.getByRole('textbox', { name: 'Usuario' }).fill(username)
     await page.getByLabel('Contraseña').fill(secret)
-    let login: { status: number, code: string } | undefined
-    const observeLogin = (result: import('@playwright/test').Response) => {
-      if (result.request().method() !== 'POST' || !result.url().includes('/api/auth/sign-in/username')) return
-      login = { status: result.status(), code: result.status() === 200 ? 'SUCCESS' : result.status() === 401 ? 'DENIED' : result.status() === 503 ? 'UNAVAILABLE' : 'OTHER' }
-    }
-    page.on('response', observeLogin)
     await page.getByRole('button', { name: 'Ingresar' }).click()
-    try {
-      await expect(page).toHaveURL('/')
-    } catch (error) {
-      const cookies = (await context.cookies(origin)).map(cookie => ({ secure: cookie.secure, httpOnly: cookie.httpOnly, sameSite: cookie.sameSite }))
-      throw new Error(`checkpoint login diagnostic: status=${login?.status ?? 'NO_REQUEST'} class=${login?.code ?? 'NO_RESPONSE'} cookieFlags=${JSON.stringify(cookies)} uiError=${await page.getByRole('alert').isVisible().catch(() => false)}`, { cause: error })
-    } finally {
-      page.off('response', observeLogin)
-    }
+    await expect(page).toHaveURL('/')
   }
   const setup = async (address: string, username: string, secret: string) => {
     const token = await tokenFor(address)
@@ -95,6 +87,7 @@ test('production image journeys from bootstrapped admin through two children and
     bookingDate.setUTCDate(bookingDate.getUTCDate() + (8 - bookingDate.getUTCDay()) % 7 + 35)
     const bookingDay = bookingDate.toISOString().slice(0, 10)
     expect((await context.request.put('/api/agenda/horarios', { data: { days: [{ weekday: 1, open: '09:00', close: '11:00' }], durationMinutes: 30, blocked: [] } })).status()).toBe(200)
+    assistantContext = await browser.newContext({ baseURL: origin, ignoreHTTPSErrors: true, storageState: await context.storageState() })
     await context.clearCookies()
     const bookingEmail = `booking-${randomUUID()}@example.test`
     const bookingPhone = '0991234567'
@@ -121,18 +114,17 @@ test('production image journeys from bootstrapped admin through two children and
     await page.getByRole('button', { name: 'Enviar solicitud' }).click()
     await expect(page.getByRole('heading', { name: 'Solicitud enviada' })).toBeVisible()
     expect((await context.request.get('/api/hijos')).status()).toBe(401)
-    await signIn('journey-assistant', 'unique assistant setup phrase')
-    const pendingResponse = await context.request.get('/api/agenda/solicitudes')
+    expect(assistantContext).toBeDefined()
+    const pendingResponse = await assistantContext!.request.get('/api/agenda/solicitudes')
     expect(pendingResponse.status()).toBe(200)
     const pendingList = await pendingResponse.json() as { id: string, childName: string }[]
     const booking = pendingList.find(item => item.childName === 'Reserva Prueba')
     expect(booking).toBeTruthy()
-    expect((await context.request.post(`/api/agenda/solicitudes/${booking!.id}`, { data: { decision: 'APPROVE' } })).status()).toBe(200)
-    const agendaEntry = await context.request.get(`/api/agenda?from=${bookingDay}&to=${bookingDay}`)
+    expect((await assistantContext!.request.post(`/api/agenda/solicitudes/${booking!.id}`, { data: { decision: 'APPROVE' } })).status()).toBe(200)
+    const agendaEntry = await assistantContext!.request.get(`/api/agenda?from=${bookingDay}&to=${bookingDay}`)
     const bookingAppointments = await agendaEntry.json() as { name: string }[]
     expect(bookingAppointments.some(item => item.name === 'Reserva Prueba')).toBe(true)
-    expect((await context.request.get('/api/pacientes')).status()).toBe(403)
-    await context.clearCookies()
+    expect((await assistantContext!.request.get('/api/pacientes')).status()).toBe(403)
     await signIn('journey-doctor', password)
     const phone = `09${String(Math.floor(Math.random() * 1e8)).padStart(8, '0')}`
     let guardianId: string | undefined
@@ -194,17 +186,15 @@ test('production image journeys from bootstrapped admin through two children and
     const frozen = await draft.body()
     expect((await context.request.post(`/api/pacientes/${first}/informes/${reportId}/aprobar`)).status()).toBe(200)
     expect((await context.request.get(`/api/hijos/${first}/informes/${reportId}/pdf`)).status()).toBe(403)
-    await context.clearCookies()
-    await signIn('journey-assistant', 'unique assistant setup phrase')
-    expect((await context.request.get(`/api/pacientes/${first}/crecimiento`)).status()).toBe(403)
+    expect((await assistantContext!.request.get(`/api/pacientes/${first}/crecimiento`)).status()).toBe(403)
     expect(guardianId).toBeTruthy()
-    const link = await context.request.post('/api/guardian-grants', { data: { patientId: first, contact: { name: 'Familia de prueba', email, phone, relationship: 'Madre', proof: 'Identidad verificada presencialmente', confirmedGuardianId: guardianId } } })
+    const link = await assistantContext!.request.post('/api/guardian-grants', { data: { patientId: first, contact: { name: 'Familia de prueba', email, phone, relationship: 'Madre', proof: 'Identidad verificada presencialmente', confirmedGuardianId: guardianId } } })
     expect(link.status(), await link.text()).toBe(200)
     expect((await link.json()).status).toBe('PENDING')
     await context.clearCookies()
     await setup(email, 'journey-family', 'unique guardian setup phrase')
-    await signIn('journey-assistant', 'unique assistant setup phrase')
-    const sibling = await context.request.post('/api/guardian-grants', { data: { patientId: second, contact: { name: 'Familia de prueba', email, phone, relationship: 'Madre', proof: 'Identidad verificada presencialmente', confirmedGuardianId: guardianId } } })
+    expect((await assistantContext!.request.get('/api/agenda/solicitudes')).status()).toBe(200)
+    const sibling = await assistantContext!.request.post('/api/guardian-grants', { data: { patientId: second, contact: { name: 'Familia de prueba', email, phone, relationship: 'Madre', proof: 'Identidad verificada presencialmente', confirmedGuardianId: guardianId } } })
     expect(sibling.status(), await sibling.text()).toBe(200)
     await context.clearCookies()
     await setup(otherEmail, 'journey-other-family', 'unique other guardian phrase')
@@ -295,6 +285,7 @@ test('production image journeys from bootstrapped admin through two children and
     expect(await revokedView.text()).not.toContain('Regresar en febrero')
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true)
   } finally {
+    await assistantContext?.close()
     await context.close()
   }
 })

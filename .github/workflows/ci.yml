@@ -112,10 +112,10 @@ jobs:
           node --experimental-transform-types scripts/import-who.ts download
           jq -r '.files[] | "\(.sha256)  /tmp/opencode/who-2006/\(.name)-expanded.xlsx"' scripts/who-2006-manifest.json | sha256sum --check --status
 
-      - name: Run all four Docker production ops cases
+      - name: Run all five Docker production ops cases
         run: |
           pnpm exec vitest run --config vitest.integration.config.ts test/integration/production-ops.test.ts --testTimeout=360000 --reporter=json --outputFile=/tmp/opencode/production-ops-results.json || result=$?
           jq -r '.testResults[].assertionResults[] | "\(.status): \(.fullName)"' /tmp/opencode/production-ops-results.json
           jq -r '.testResults[].assertionResults[] | select(.status == "failed") | .failureMessages[] | split("\n")[] | select(test("production-ops.test.ts:[0-9]+")) | match("production-ops.test.ts:[0-9]+(:[0-9]+)?").string' /tmp/opencode/production-ops-results.json
-          jq -e '(.numPassedTests == 4) and (.numPendingTests == 0) and (.numFailedTests == 0)' /tmp/opencode/production-ops-results.json > /dev/null
+          jq -e '(.numPassedTests == 5) and (.numPendingTests == 0) and (.numFailedTests == 0)' /tmp/opencode/production-ops-results.json > /dev/null
           test "${result:-0}" -eq 0

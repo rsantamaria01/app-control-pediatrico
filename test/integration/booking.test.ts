@@ -221,6 +221,72 @@ describe('booking with isolated database', () => {
     }
   })
 
+  it('waits for an in-flight guardian revocation before accepting a parent submission', async () => {
+    const blocker = await pool.connect()
+    await blocker.query('BEGIN')
+    let released = false
+    try {
+      await blocker.query('UPDATE guardian_grant SET status = $1 WHERE patient_id = $2 AND guardian_id = $3', ['REVOKED', child, parent.id])
+      let settled = false
+      const outcome = submitParentBooking(parent, { patientId: child, date: '2027-05-03', time: '09:00', consent: true, consentVersion: 'DRAFT-2026-11' }).then((value) => {
+        settled = true
+        return { value }
+      }, (error: unknown) => {
+        settled = true
+        return { error }
+      })
+      await new Promise(resolve => setTimeout(resolve, 100))
+      const completedBeforeRevoke = settled
+      await blocker.query('COMMIT')
+      released = true
+      expect(completedBeforeRevoke).toBe(false)
+      expect(await outcome).toMatchObject({ error: { statusCode: 404 } })
+      expect((await db.select().from(bookingRequest).where(eq(bookingRequest.patientId, child))).some(row => row.startsAt.getTime() === new Date('2027-05-03T14:00:00Z').getTime())).toBe(false)
+    } finally {
+      if (!released) await blocker.query('ROLLBACK')
+      blocker.release()
+      await pool.query('UPDATE guardian_grant SET status = $1 WHERE patient_id = $2 AND guardian_id = $3', ['ACTIVE', child, parent.id])
+    }
+  })
+
+  it('lets staff decline a revoked guardian request so the queue clears and a later request is possible', async () => {
+    const standaloneChild = randomUUID()
+    await pool.query('INSERT INTO patient (id, name, birth_date, sex, created_by) VALUES ($1,$2,$3,$4,$5)', [standaloneChild, 'Paciente de prueba', input.birthDate, input.sex, doctor.id])
+    await pool.query('INSERT INTO guardian_grant (patient_id, guardian_id, contact_email, proof, verified_by, status) VALUES ($1,$2,$3,$4,$5,$6)', [standaloneChild, parent.id, `${parent.id}@example.test`, 'Identidad verificada presencialmente', doctor.id, 'ACTIVE'])
+    const request = await submitParentBooking(parent, { patientId: standaloneChild, date: '2027-05-10', time: '09:00', consent: true, consentVersion: 'DRAFT-2026-11' })
+    await pool.query('UPDATE guardian_grant SET status = $1 WHERE patient_id = $2 AND guardian_id = $3', ['REVOKED', standaloneChild, parent.id])
+    try {
+      await expect(decideBookingRequest(doctor, request.id, 'APPROVE')).rejects.toMatchObject({ statusCode: 409 })
+      expect(await decideBookingRequest(assistant, request.id, 'DECLINE')).toEqual({ requestId: request.id, status: 'DECLINED' })
+      expect((await listBookingRequests(assistant)).some(row => row.id === request.id)).toBe(false)
+      expect((await db.select().from(bookingNotice)).some(row => row.requestId === request.id && row.status === 'DECLINED')).toBe(true)
+    } finally {
+      await pool.query('UPDATE guardian_grant SET status = $1 WHERE patient_id = $2 AND guardian_id = $3', ['ACTIVE', standaloneChild, parent.id])
+    }
+    const later = await submitParentBooking(parent, { patientId: standaloneChild, date: '2027-05-17', time: '09:00', consent: true, consentVersion: 'DRAFT-2026-11' })
+    expect(later.status).toBe('PENDING')
+  })
+
+  it('shows one confirmed child appointment to both active guardians even after requester revocation', async () => {
+    const first: Actor = { id: randomUUID(), roles: ['PATIENT'] }
+    const second: Actor = { id: randomUUID(), roles: ['PATIENT'] }
+    const sibling = randomUUID()
+    await pool.query('INSERT INTO patient (id, name, birth_date, sex, created_by) VALUES ($1,$2,$3,$4,$5)', [sibling, 'Hermana de prueba', input.birthDate, input.sex, doctor.id])
+    for (const actor of [first, second]) {
+      await pool.query('INSERT INTO "user" (id, name, email) VALUES ($1,$2,$3)', [actor.id, 'Representante de prueba', `${actor.id}@example.test`])
+      await pool.query('INSERT INTO guardian_grant (patient_id, guardian_id, contact_email, proof, verified_by, status) VALUES ($1,$2,$3,$4,$5,$6)', [sibling, actor.id, `${actor.id}@example.test`, 'Identidad verificada presencialmente', doctor.id, 'ACTIVE'])
+    }
+    const request = await submitParentBooking(first, { patientId: sibling, date: '2027-05-24', time: '09:00', consent: true, consentVersion: 'DRAFT-2026-11' })
+    expect((await listParentAppointments(first)).filter(row => row.id === request.id)).toHaveLength(1)
+    expect((await listParentAppointments(second)).some(row => row.id === request.id)).toBe(false)
+    await decideBookingRequest(doctor, request.id, 'APPROVE')
+    expect((await listParentAppointments(first)).filter(row => row.id === request.id)).toHaveLength(1)
+    expect((await listParentAppointments(second)).filter(row => row.id === request.id)).toHaveLength(1)
+    await pool.query('UPDATE guardian_grant SET status = $1 WHERE patient_id = $2 AND guardian_id = $3', ['REVOKED', sibling, first.id])
+    expect((await listParentAppointments(first)).some(row => row.id === request.id)).toBe(false)
+    expect((await listParentAppointments(second)).filter(row => row.id === request.id)).toHaveLength(1)
+  })
+
   it('rejects the same verified child and slot despite name case and whitespace changes', async () => {
     const address = `case-${randomUUID()}@example.test`
     let code = ''

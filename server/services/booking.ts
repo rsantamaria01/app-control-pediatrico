@@ -1,5 +1,5 @@
 import { createHash, randomBytes, randomInt, randomUUID } from 'node:crypto'
-import { and, eq, gt, isNull, sql } from 'drizzle-orm'
+import { and, eq, gt, isNull, or, sql } from 'drizzle-orm'
 import { createError } from 'nuxt/server'
 import type { Actor } from '../../shared/types/access'
 import { bookingContactSchema, bookingCodeSchema, parentBookingSchema, publicBookingSchema, type BookingDecision, type BookingRequestView, type ParentAppointment, type PendingRequest, type VerifiedBookingInput } from '../../shared/types/booking'
@@ -83,7 +83,9 @@ export async function submitParentBooking(actor: Actor, input: unknown): Promise
   const values = parentBookingSchema.parse(input)
   return useDb().transaction(async (tx) => {
     await tx.execute('SELECT pg_advisory_xact_lock(1130011)')
-    const [owned] = await tx.select({ name: patient.name, email: user.email, guardianName: user.name }).from(guardianGrant).innerJoin(patient, eq(patient.id, guardianGrant.patientId)).innerJoin(user, eq(user.id, guardianGrant.guardianId)).where(and(eq(guardianGrant.patientId, values.patientId), eq(guardianGrant.guardianId, actor.id), eq(guardianGrant.status, 'ACTIVE')))
+    const [grant] = await tx.select({ patientId: guardianGrant.patientId }).from(guardianGrant).where(and(eq(guardianGrant.patientId, values.patientId), eq(guardianGrant.guardianId, actor.id), eq(guardianGrant.status, 'ACTIVE'))).for('update')
+    if (!grant) throw createError({ statusCode: 404, statusMessage: 'Not found' })
+    const [owned] = await tx.select({ name: patient.name, email: user.email, guardianName: user.name }).from(patient).innerJoin(user, eq(user.id, actor.id)).where(eq(patient.id, grant.patientId))
     if (!owned) throw createError({ statusCode: 404, statusMessage: 'Not found' })
     const startsAt = instant(values.date, values.time)
     if (startsAt < new Date() || !(await availableSlots({ from: values.date, to: values.date }, undefined, tx)).some(slot => slot.time === values.time && slot.free)) throw conflict()
@@ -115,7 +117,7 @@ export async function decideBookingRequest(actor: Actor, requestId: string, deci
     await tx.execute('SELECT pg_advisory_xact_lock(1130011)')
     const [row] = await tx.select().from(bookingRequest).where(eq(bookingRequest.id, requestId)).for('update')
     if (!row || row.status !== 'PENDING') throw conflict()
-    if (row.source === 'PARENT') {
+    if (decision === 'APPROVE' && row.source === 'PARENT') {
       const [active] = await tx.select({ patientId: guardianGrant.patientId }).from(guardianGrant).where(and(eq(guardianGrant.patientId, row.patientId!), eq(guardianGrant.guardianId, row.guardianId!), eq(guardianGrant.status, 'ACTIVE'))).for('update')
       if (!active) throw conflict()
     }
@@ -139,7 +141,7 @@ export async function decideBookingRequest(actor: Actor, requestId: string, deci
 export async function listParentAppointments(actor: Actor): Promise<ParentAppointment[]> {
   if (actor.roles.length !== 1 || !actor.roles.includes('PATIENT')) throw createError({ statusCode: 403, statusMessage: 'Access denied' })
   const db = useDb()
-  const rows = await db.select({ id: bookingRequest.id, name: bookingRequest.childName, startsAt: bookingRequest.startsAt, status: bookingRequest.status, appointmentId: bookingRequest.appointmentId, currentStart: appointment.startsAt, currentStatus: appointment.status }).from(bookingRequest).innerJoin(guardianGrant, and(eq(guardianGrant.patientId, bookingRequest.patientId), eq(guardianGrant.guardianId, actor.id), eq(guardianGrant.status, 'ACTIVE'))).leftJoin(appointment, eq(appointment.id, bookingRequest.appointmentId)).where(and(eq(bookingRequest.guardianId, actor.id), eq(bookingRequest.source, 'PARENT'))).orderBy(sql`${bookingRequest.createdAt} DESC`)
+  const rows = await db.select({ id: bookingRequest.id, name: bookingRequest.childName, startsAt: bookingRequest.startsAt, status: bookingRequest.status, appointmentId: bookingRequest.appointmentId, currentStart: appointment.startsAt, currentStatus: appointment.status }).from(bookingRequest).innerJoin(guardianGrant, and(eq(guardianGrant.patientId, bookingRequest.patientId), eq(guardianGrant.guardianId, actor.id), eq(guardianGrant.status, 'ACTIVE'))).leftJoin(appointment, eq(appointment.id, bookingRequest.appointmentId)).where(and(eq(bookingRequest.source, 'PARENT'), or(eq(bookingRequest.guardianId, actor.id), and(eq(bookingRequest.status, 'APPROVED'), sql`${bookingRequest.appointmentId} IS NOT NULL`)))).orderBy(sql`${bookingRequest.createdAt} DESC`)
   const scheduled = await db.select({ id: appointment.id, name: appointment.name, startsAt: appointment.startsAt, status: appointment.status }).from(appointment).innerJoin(guardianGrant, and(eq(guardianGrant.patientId, appointment.patientId), eq(guardianGrant.guardianId, actor.id), eq(guardianGrant.status, 'ACTIVE'))).where(sql`NOT EXISTS (SELECT 1 FROM booking_request WHERE booking_request.appointment_id = ${appointment.id})`)
   return [...rows.map((row) => {
     const date = row.currentStart ?? row.startsAt

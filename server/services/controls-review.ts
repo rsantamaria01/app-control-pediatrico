@@ -36,7 +36,7 @@ export async function listPendingControls(actor: Actor, now = new Date()): Promi
   }
   const result: PendingControl[] = []
   for (const person of people) {
-    const [latest] = await db.select({ measuredAt: visit.measuredAt, nextControlAt: visit.nextControlAt }).from(visit).where(eq(visit.patientId, person.id)).orderBy(desc(visit.measuredAt), desc(visit.createdAt)).limit(1)
+    const visits = await db.select({ measuredAt: visit.measuredAt, nextControlAt: visit.nextControlAt }).from(visit).where(eq(visit.patientId, person.id)).orderBy(desc(visit.measuredAt), desc(visit.createdAt))
     const individual = await db.select().from(individualCheckup).where(eq(individualCheckup.patientId, person.id))
     const completed = await db.select().from(completedCheckup).where(eq(completedCheckup.patientId, person.id))
     const due: Omit<PendingControl, 'id' | 'name'>[] = []
@@ -44,20 +44,24 @@ export async function listPendingControls(actor: Actor, now = new Date()): Promi
       if (item.date >= today || completed.some(row => row.individualId === item.id)) continue
       due.push({ date: item.date, reason: item.reason, source: 'Indicación médica', sourcePage: '', badge: draftBadge })
     }
-    if (latest?.nextControlAt) {
-      const date = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Guayaquil', year: 'numeric', month: '2-digit', day: '2-digit' }).format(latest.nextControlAt)
-      if (date < today && !completed.some(row => row.completedAt >= date)) due.push({ date, reason: 'Próximo control indicado en la visita', source: 'Visita médica', sourcePage: '', badge: draftBadge })
-    } else if (!latest && individual.length === 0) {
-      for (const release of current.values()) {
-        const items = await db.select().from(catalogItem).where(and(eq(catalogItem.releaseId, release.id), eq(catalogItem.status, draftStatus)))
-        for (const item of items) {
-          const date = dueDate(person.birthDate, Number(item.minAgeMonths), item.minAgeDays === null ? null : Number(item.minAgeDays))
-          if (date >= today || completed.some(row => row.key === item.key && releases.some(previous => previous.id === row.releaseId && previous.publisher === release.publisher && previous.version === release.version && previous.url === release.url))) continue
-          due.push({ date, reason: item.label, source: `${release.publisher} · ${release.title} · ${release.version}`, sourcePage: item.sourcePage, badge: draftBadge })
-        }
+    const recommended = visits.find(row => row.nextControlAt && !visits.some(later => later.measuredAt > row.measuredAt && later.measuredAt >= row.nextControlAt!))
+    if (recommended?.nextControlAt) {
+      const date = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Guayaquil', year: 'numeric', month: '2-digit', day: '2-digit' }).format(recommended.nextControlAt)
+      if (date < today) due.push({ date, reason: 'Próximo control indicado en la visita', source: 'Visita médica', sourcePage: '', badge: draftBadge })
+    }
+    for (const release of current.values()) {
+      const items = await db.select().from(catalogItem).where(and(eq(catalogItem.releaseId, release.id), eq(catalogItem.status, draftStatus)))
+      for (const item of items) {
+        const date = dueDate(person.birthDate, Number(item.minAgeMonths), item.minAgeDays === null ? null : Number(item.minAgeDays))
+        const end = dueDate(person.birthDate, Number(item.maxAgeMonths), item.maxAgeDays === null ? null : Number(item.maxAgeDays))
+        if (date >= today || end < today || completed.some(row => row.key === item.key && releases.some(previous => previous.id === row.releaseId && previous.publisher === release.publisher && previous.version === release.version && previous.url === release.url))) continue
+        due.push({ date, reason: item.label, source: `${release.publisher} · ${release.title} · ${release.version}`, sourcePage: item.sourcePage, badge: draftBadge })
       }
     }
-    const earliest = due.sort((a, b) => a.date.localeCompare(b.date))[0]
+    const earliest = due.sort((a, b) => {
+      const priority = (item: typeof a) => item.source === 'Visita médica' ? 0 : item.source === 'Indicación médica' ? 1 : 2
+      return priority(a) - priority(b) || a.date.localeCompare(b.date)
+    })[0]
     if (!earliest) continue
     const booked = await db.select({ id: appointment.id }).from(appointment).where(and(eq(appointment.patientId, person.id), inArray(appointment.status, ['PENDING', 'CONFIRMED']), gt(appointment.startsAt, now))).limit(1)
     if (!booked.length) result.push({ id: person.id, name: person.name, ...earliest })

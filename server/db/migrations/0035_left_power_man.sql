@@ -1,0 +1,1 @@
+ALTER TABLE "catalog_item" ADD COLUMN "dose_label" text;

@@ -87,7 +87,7 @@ if (error.value?.statusCode === 401 || error.value?.statusCode === 403) {
           <UCard class="h-full min-w-0">
             <div class="flex min-w-0 flex-wrap items-start justify-between gap-2">
               <h3 class="min-w-0 font-medium">
-                {{ row.label }}
+                {{ row.doseLabel || (row.doseNumber ? `${row.label} · dosis ${row.doseNumber} del producto` : row.label) }}
               </h3>
               <UBadge
                 color="warning"

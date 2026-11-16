@@ -104,6 +104,11 @@ describe('immutable preventive catalogs on disposable database', () => {
     const first = (await getCatalogView('VACCINE')).versions[0]!
     expect(first.entries.length).toBeGreaterThan(10)
     expect(first.entries.find(row => row.key === 'pcv-2')?.minimumInterval).toBeNull()
+    expect(first.entries.find(row => row.key === 'bopv-1')).toMatchObject({ doseLabel: 'bOPV oral a los 6 meses (IPV en hexavalente)' })
+    expect(first.entries.find(row => row.key === 'bopv-2')).toMatchObject({ doseLabel: 'bOPV oral: primer refuerzo' })
+    expect(first.entries.find(row => row.key === 'bopv-3')).toMatchObject({ doseLabel: 'bOPV oral: segundo refuerzo' })
+    expect(first.entries.find(row => row.key === 'dpt-1')).toMatchObject({ doseLabel: 'DPT: refuerzo a los 5 años' })
+    for (const key of ['bopv-1', 'bopv-2', 'bopv-3', 'dpt-1']) expect(first.entries.find(row => row.key === key)).not.toHaveProperty('doseNumber')
     expect(first.entries.find(row => row.key === 'rotavirus-2')).toMatchObject({ doseNumber: 2, recommendedAge: '4 meses', minimumInterval: '1 mes' })
     expect(first.entries.every(row => row.badge === 'Borrador - pendiente de revisión' && row.sourcePages?.length === 2)).toBe(true)
     expect((await getCatalogView('CHECKUP')).versions[0]?.entries.some(row => row.key === 'day-3-5' && row.minAgeDays === 3 && row.maxAgeDays === 5)).toBe(true)

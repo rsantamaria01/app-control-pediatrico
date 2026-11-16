@@ -197,7 +197,7 @@ async function save(event: FormSubmitEvent<DoctorMilestoneInput>) {
           >
             <UCard class="h-full min-w-0">
               <h3 class="font-medium">
-                {{ row.label }}{{ row.doseNumber ? ` · dosis ${row.doseNumber}` : '' }}
+                {{ row.doseLabel || (row.doseNumber ? `${row.label} · dosis ${row.doseNumber} del producto` : row.label) }}
               </h3>
               <UBadge
                 color="warning"

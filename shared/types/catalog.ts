@@ -30,6 +30,7 @@ export type CatalogEntry = {
   sourcePage?: string
   sourcePages?: SourcePage[]
   doseNumber?: number
+  doseLabel?: string
   recommendedAge?: string
   minimumInterval?: string | null
   provenance?: string

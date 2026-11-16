@@ -50,6 +50,7 @@ export const catalogItem = pgTable('catalog_item', {
   minAgeDays: numeric('min_age_days'),
   maxAgeDays: numeric('max_age_days'),
   doseNumber: numeric('dose_number'),
+  doseLabel: text('dose_label'),
   recommendedAge: text('recommended_age'),
   minimumInterval: text('minimum_interval'),
   provenance: text('provenance'),

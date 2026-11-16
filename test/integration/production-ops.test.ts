@@ -56,11 +56,16 @@ describe('built production ops image', () => {
       if (containerUrl.hostname !== 'host.docker.internal' && containerUrl.hostname !== '127.0.0.1' && containerUrl.hostname !== 'localhost') throw new Error('Docker integration requires a locally reachable disposable database')
       const environment = { ...process.env, DB_PASSWORD: decodeURIComponent(containerUrl.password), DB_HOST: containerUrl.hostname, DB_NAME: database, BOOTSTRAP_ADMIN_USERNAME: 'firstadmin', BOOTSTRAP_ADMIN_EMAIL: 'first@example.test', NUXT_PUBLIC_SITE_URL: 'https://clinic.example.test' }
       const run = (command: string) => execFileSync('docker', ['run', '--rm', '--network', 'host', '--add-host', 'host.docker.internal:host-gateway', '--read-only', '-e', 'COREPACK_HOME=/unwritable-corepack', '-e', 'DB_PASSWORD', '-e', 'DB_HOST', '-e', 'DB_NAME', '-e', 'BOOTSTRAP_ADMIN_USERNAME', '-e', 'BOOTSTRAP_ADMIN_EMAIL', '-e', 'NUXT_PUBLIC_SITE_URL', image, command], { env: environment, encoding: 'utf8', timeout: 120_000 })
-      run('db:migrate')
+      run('prepare')
       const db = new Pool({ connectionString: opsUrl.href })
       try {
         const migrated = await db.query('SELECT count(*)::int AS count FROM drizzle.__drizzle_migrations')
         expect(migrated.rows[0].count).toBeGreaterThan(0)
+        expect((await db.query("SELECT count(*)::int AS count FROM catalog_item WHERE release_id IN (SELECT id FROM catalog_release WHERE kind = 'VACCINE')")).rows[0].count).toBe(21)
+        expect((await db.query("SELECT count(*)::int AS count FROM catalog_item WHERE release_id IN (SELECT id FROM catalog_release WHERE kind = 'CHECKUP')")).rows[0].count).toBe(31)
+        expect((await db.query("SELECT count(*)::int AS count FROM catalog_release WHERE kind = 'MILESTONE'")).rows[0].count).toBe(0)
+        run('prepare')
+        expect((await db.query('SELECT count(*)::int AS count FROM catalog_release')).rows[0].count).toBe(2)
         const link = run('bootstrap-admin')
         expect(link).toMatch(/https:\/\/clinic\.example\.test\/invitacion\/[\w-]+\s*$/)
         const roles = await db.query('SELECT role FROM user_role')

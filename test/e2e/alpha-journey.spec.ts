@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test'
 import { randomUUID } from 'node:crypto'
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
+import type { CatalogView } from '../../shared/types/catalog'
 
 const enabled = process.env.ALPHA_COMPOSE_E2E === '1'
 const email = `family-${randomUUID()}@example.test`
@@ -73,8 +74,41 @@ test('production image journeys from bootstrapped admin through two children and
     await expect(page).toHaveURL('/acceso')
   }
   try {
+    const anonymousCatalog = await context.request.get('/api/admin/catalogos/MOTOR')
+    expect(anonymousCatalog.status()).toBe(401)
+    expect(anonymousCatalog.headers()['cache-control']).toContain('no-store')
+    const anonymousCatalogPage = await context.request.get('/admin/catalogos')
+    expect(anonymousCatalogPage.status()).toBe(401)
+    expect(anonymousCatalogPage.headers()['cache-control']).toContain('no-store')
+    expect(await anonymousCatalogPage.text()).not.toContain('Sin entradas verificadas para')
     await signIn('firstadmin', adminPassword)
     expect((await context.request.get('/api/clinical/access-check')).status()).toBe(403)
+    await page.setViewportSize({ width: 375, height: 850 })
+    const adminCatalogPage = await context.request.get('/admin/catalogos')
+    expect(adminCatalogPage.status()).toBe(200)
+    expect(adminCatalogPage.headers()['cache-control']).toContain('no-store')
+    expect(await adminCatalogPage.text()).toContain('Catálogos preventivos')
+    await page.goto('/admin/catalogos')
+    await expect(page.getByRole('heading', { name: 'Catálogos preventivos' })).toBeVisible()
+    const adminNavigation = await context.request.get('/api/auth/navigation')
+    expect(adminNavigation.status()).toBe(200)
+    expect(await adminNavigation.json()).toContainEqual(expect.objectContaining({ to: '/admin/catalogos' }))
+    for (const [kind, label] of [['MOTOR', 'Hitos motores OMS'], ['MILESTONE', 'Hitos CDC'], ['SCREENING', 'Tamizajes'], ['CHECKUP', 'Controles AAP'], ['VACCINE', 'Vacunas MSP']] as const) {
+      await page.getByRole('navigation', { name: 'Tipos de catálogo' }).getByRole('button', { name: label }).click()
+      await expect(page.getByRole('button', { name: label })).toHaveAttribute('aria-pressed', 'true')
+      const response = await context.request.get(`/api/admin/catalogos/${kind}`)
+      expect(response.status(), kind).toBe(200)
+      expect(response.headers()['cache-control']).toContain('no-store')
+      const view = await response.json() as CatalogView
+      expect(view.kind).toBe(kind)
+      expect(view.versions, `${kind}: no clinical catalog has been seeded in the checkpoint`).toEqual([])
+      await expect(page.getByText(`Sin entradas verificadas para ${label}`)).toBeVisible()
+      await expect(page.getByText('Pendiente de cotejar originales, permisos de reutilización y revisión pediátrica. No se generan recordatorios desde este catálogo.')).toBeVisible()
+      await expect(page.getByText('Borrador · pendiente de revisión pediátrica')).toHaveCount(0)
+      await expect(page.getByText(/Revisado ·|Aprobado ·|REVIEWED/)).toHaveCount(0)
+      expect(await page.evaluate(() => document.documentElement.scrollWidth), kind).toBeLessThanOrEqual(376)
+    }
+    await page.setViewportSize({ width: 1280, height: 850 })
     for (const [address, role] of [[doctorEmail, 'DOCTOR'], [assistantEmail, 'ASSISTANT']] as const) {
       expect((await context.request.post('/api/auth/invite-staff', { data: { email: address, name: role, role } })).status()).toBe(200)
       await tokenFor(address)
@@ -83,6 +117,16 @@ test('production image journeys from bootstrapped admin through two children and
     await setup(doctorEmail, 'journey-doctor', password)
     await setup(assistantEmail, 'journey-assistant', 'unique assistant setup phrase')
     await signIn('journey-assistant', 'unique assistant setup phrase')
+    const assistantCatalog = await context.request.get('/api/admin/catalogos/MOTOR')
+    expect(assistantCatalog.status()).toBe(403)
+    expect(assistantCatalog.headers()['cache-control']).toContain('no-store')
+    const assistantCatalogPage = await context.request.get('/admin/catalogos')
+    expect(assistantCatalogPage.status()).toBe(403)
+    expect(assistantCatalogPage.headers()['cache-control']).toContain('no-store')
+    expect(await assistantCatalogPage.text()).not.toMatch(/Sin entradas verificadas para|Borrador · pendiente de revisión pediátrica/)
+    const assistantNavigation = await context.request.get('/api/auth/navigation')
+    expect(assistantNavigation.status()).toBe(200)
+    expect(await assistantNavigation.json()).not.toContainEqual(expect.objectContaining({ to: '/admin/catalogos' }))
     const bookingDate = new Date()
     bookingDate.setUTCDate(bookingDate.getUTCDate() + (8 - bookingDate.getUTCDay()) % 7 + 35)
     const bookingDay = bookingDate.toISOString().slice(0, 10)
@@ -126,6 +170,8 @@ test('production image journeys from bootstrapped admin through two children and
     expect(bookingAppointments.some(item => item.name === 'Reserva Prueba')).toBe(true)
     expect((await assistantContext!.request.get('/api/pacientes')).status()).toBe(403)
     await signIn('journey-doctor', password)
+    expect((await context.request.get('/api/admin/catalogos/MOTOR')).status()).toBe(403)
+    expect((await context.request.get('/admin/catalogos')).status()).toBe(403)
     const phone = `09${String(Math.floor(Math.random() * 1e8)).padStart(8, '0')}`
     let guardianId: string | undefined
     const createChild = async (given: string, nationalId?: string) => {
@@ -203,6 +249,8 @@ test('production image journeys from bootstrapped admin through two children and
     expect((await context.request.get(`/api/hijos/${first}`)).status()).toBe(404)
     await context.clearCookies()
     await signIn('journey-family', 'unique guardian setup phrase')
+    expect((await context.request.get('/api/admin/catalogos/MOTOR')).status()).toBe(403)
+    expect((await context.request.get('/admin/catalogos')).status()).toBe(403)
     await expect(page.getByRole('heading', { name: 'Mis hijos' })).toBeVisible()
     const children = await context.request.get('/api/hijos')
     const visibleChildren = (await children.json()).map((item: { id: string }) => item.id)

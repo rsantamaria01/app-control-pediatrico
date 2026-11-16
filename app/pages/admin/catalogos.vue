@@ -4,6 +4,9 @@ import { catalogKinds, type CatalogKind, type CatalogView } from '#shared/types/
 const selected = ref<CatalogKind>('MOTOR')
 const labels: Record<CatalogKind, string> = { MOTOR: 'Hitos motores OMS', MILESTONE: 'Hitos CDC', SCREENING: 'Tamizajes', CHECKUP: 'Controles AAP', VACCINE: 'Vacunas MSP' }
 const { data, error, status, refresh } = await useFetch<CatalogView>(() => `/api/admin/catalogos/${selected.value}`, { watch: [selected] })
+if (error.value?.statusCode === 401 || error.value?.statusCode === 403) {
+  throw createError({ status: error.value.statusCode, statusText: 'Access denied' })
+}
 </script>
 
 <template>

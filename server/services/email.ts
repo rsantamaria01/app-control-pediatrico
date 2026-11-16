@@ -6,8 +6,8 @@ import { emailHealth } from '../db/schema'
 import { useDb } from '../utils/db'
 import { resolveSmtpTransport } from './smtp-settings'
 
-function healthId(config: { host: string, port: number, security: string, username: string, fromAddress: string }) {
-  return createHash('sha256').update(JSON.stringify([config.host, config.port, config.security, config.username, config.fromAddress])).digest('hex')
+function healthId(config: { host: string, port: number, security: string, username: string, password: string, fromAddress: string }) {
+  return createHash('sha256').update(JSON.stringify([config.host, config.port, config.security, config.username, config.password, config.fromAddress])).digest('hex')
 }
 
 async function setHealth(state: 'CONFIGURED' | 'FAILING', id: string) {

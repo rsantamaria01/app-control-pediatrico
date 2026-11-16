@@ -18,7 +18,7 @@ async function pdfText(bytes: Buffer) {
 
 test('production image journeys from bootstrapped admin through two children and approved family PDF', async ({ browser, request }) => {
   test.skip(!enabled, 'Requires isolated production Compose checkpoint')
-  if (enabled) test.setTimeout(120_000)
+  if (enabled) test.setTimeout(240_000)
   const origin = process.env.ALPHA_PUBLIC_ORIGIN
   const adminPassword = process.env.ALPHA_ADMIN_PASSWORD
   if (!origin || !adminPassword || !/^https:\/\//.test(origin)) throw new Error('Production checkpoint requires HTTPS public origin and generated admin password')

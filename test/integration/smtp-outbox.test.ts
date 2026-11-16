@@ -265,6 +265,18 @@ it('does not let an unconfigured WhatsApp backlog consume the email worker batch
   } finally { await server.close() }
 })
 
+it('unparks email after rotating a failing SMTP password without replaying uncertain sends', async () => {
+  const input = { host: '127.0.0.1', port: 587, security: 'STARTTLS' as const, username: 'mailer', password: 'bad-password', fromName: 'Clínica', fromAddress: 'clinic@example.test' }
+  await saveSmtpSettings({ id: randomUUID(), roles: ['ADMIN'] }, input)
+  const id = await queued()
+  await db.update(notificationOutbox).set({ state: 'NOT_CONFIGURED', errorClass: 'ProviderNotConfigured' }).where(eq(notificationOutbox.id, id))
+  await markEmailFailure()
+  expect(await providerStatus('EMAIL')).toBe('FAILED')
+  await saveSmtpSettings({ id: randomUUID(), roles: ['ADMIN'] }, { ...input, password: 'new-password' })
+  expect(await providerStatus('EMAIL')).toBe('READY')
+  expect((await db.select().from(notificationOutbox).where(eq(notificationOutbox.id, id)))[0]).toMatchObject({ state: 'NOT_CONFIGURED' })
+})
+
 it('prefers admin SMTP over environment when delivering', async () => {
   const server = await smtpServer('250 OK')
   try {

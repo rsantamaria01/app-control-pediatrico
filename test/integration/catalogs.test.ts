@@ -4,6 +4,7 @@ import { drizzle } from 'drizzle-orm/node-postgres'
 import { migrate } from 'drizzle-orm/node-postgres/migrator'
 import { Pool } from 'pg'
 import { count } from 'drizzle-orm'
+import { readFile } from 'node:fs/promises'
 import { catalogItem, catalogRelease } from '../../server/db/schema'
 import { getCatalogView, importDraftCatalog } from '../../server/services/catalog-import'
 import type { OfficialCatalogSource } from '../../shared/types/catalog'
@@ -43,6 +44,22 @@ afterAll(async () => {
 })
 
 describe('immutable preventive catalogs on disposable database', () => {
+  it('keeps migration metadata parseable and aligned with catalog date and draft constraints', async () => {
+    const snapshot = JSON.parse(await readFile('server/db/migrations/meta/0031_snapshot.json', 'utf8'))
+    const release = snapshot.tables['public.catalog_release']
+    const item = snapshot.tables['public.catalog_item']
+    const sql = await readFile('server/db/migrations/0031_nebulous_ronan.sql', 'utf8')
+    for (const [name, table] of [['catalog_release', release], ['catalog_item', item]] as const) {
+      for (const [constraint, definition] of Object.entries(table.checkConstraints) as [string, { value: string }][]) {
+        expect(sql).toContain(`CONSTRAINT "${constraint}" CHECK (${definition.value})`)
+      }
+      expect(table.name).toBe(name)
+    }
+    expect(release.checkConstraints.catalog_release_date_ck.value).toContain(`'^[0-9]{4}-[0-9]{2}-[0-9]{2}$'`)
+    expect(release.checkConstraints.catalog_release_draft_ck.value).toContain('DRAFT_PENDING_PEDIATRICIAN_REVIEW')
+    expect(item.checkConstraints.catalog_item_draft_ck.value).toContain('DRAFT_PENDING_PEDIATRICIAN_REVIEW')
+  })
+
   it('keeps prior revisions and exposes draft badges on each row', async () => {
     const first = await importDraftCatalog(source, [entry])
     const second = await importDraftCatalog({ ...source, version: 'test-2' }, [{ ...entry, label: 'Revised fixture' }])

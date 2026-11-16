@@ -7,5 +7,5 @@ export default defineEventHandler(async (event) => {
   await requireCapability(event, 'CLINICAL_READ')
   const kind = getRouterParam(event, 'kind')?.toUpperCase() as CatalogKind
   if (!catalogKinds.includes(kind)) throw createError({ statusCode: 400, statusMessage: 'Invalid catalog kind' })
-  return getCatalogView(kind)
+  return getCatalogView(kind, true)
 })

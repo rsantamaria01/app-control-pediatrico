@@ -65,7 +65,7 @@ export async function importDraftCatalog(input: OfficialCatalogSource, entries: 
   return view.versions.find(version => version.id === id)!
 }
 
-export async function getCatalogView(kind: CatalogKind): Promise<CatalogView> {
+export async function getCatalogView(kind: CatalogKind, includeDoctorEntries = false): Promise<CatalogView> {
   if (!catalogKinds.includes(kind)) throw new Error('Invalid catalog kind')
   const db = useDb()
   const releases = await db.select().from(catalogRelease).where(eq(catalogRelease.kind, kind)).orderBy(desc(catalogRelease.importedAt), desc(catalogRelease.id))
@@ -79,7 +79,7 @@ export async function getCatalogView(kind: CatalogKind): Promise<CatalogView> {
         ...(row.sourcePages && { sourcePages: row.sourcePages }), ...(row.minAgeDays !== null && { minAgeDays: Number(row.minAgeDays), maxAgeDays: Number(row.maxAgeDays) }), ...(row.doseNumber !== null && { doseNumber: Number(row.doseNumber) }), ...(row.recommendedAge && { recommendedAge: row.recommendedAge }),
         ...(row.sourcePages && { minimumInterval: row.minimumInterval }), ...(row.provenance && { provenance: row.provenance }), status: draftStatus, badge: draftBadge })) })
   }
-  if (kind !== 'MILESTONE') return { kind, versions }
+  if (kind !== 'MILESTONE' || !includeDoctorEntries) return { kind, versions }
   const doctorRows = await db.select().from(doctorCatalogEntry).orderBy(desc(doctorCatalogEntry.createdAt))
   return { kind, versions, doctorEntries: doctorRows.map(row => ({ id: row.id, label: row.label, domain: row.domain,
     minAgeMonths: Number(row.minAgeMonths), maxAgeMonths: Number(row.maxAgeMonths), source: row.source, createdAt: row.createdAt.toISOString(), badge: draftBadge, status: draftStatus })) }

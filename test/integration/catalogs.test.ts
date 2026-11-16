@@ -98,7 +98,8 @@ describe('immutable preventive catalogs on disposable database', () => {
     const doctor = { id: randomUUID(), roles: ['DOCTOR' as const] }
     const created = await addDoctorMilestone(doctor, { label: 'Observación ingresada por médico', domain: 'Motor', minAgeMonths: 4, maxAgeMonths: 6, source: 'Registro del médico' })
     expect(created.badge).toBe('Borrador - pendiente de revisión')
-    expect((await getCatalogView('MILESTONE')).doctorEntries).toContainEqual(created)
+    expect((await getCatalogView('MILESTONE')).doctorEntries).toBeUndefined()
+    expect((await getCatalogView('MILESTONE', true)).doctorEntries).toContainEqual(created)
     expect((await db.select().from(doctorCatalogEntry)).find(item => item.id === created.id)?.authorId).toBe(doctor.id)
     await expect(db.update(doctorCatalogEntry).set({ label: 'Changed' })).rejects.toThrow()
   })

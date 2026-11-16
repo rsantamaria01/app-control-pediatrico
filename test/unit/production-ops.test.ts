@@ -35,6 +35,7 @@ describe('production operations', () => {
     expect(ops).toContain('server/utils/db.ts')
     expect(ops).toContain('server/services/catalog-import.ts')
     expect(ops).toContain('server/db/schema')
+    expect(ops).toContain('scripts/prepare-catalogs.mjs')
     expect(ops).toContain('CMD ["prepare"]')
     expect(dockerfile.split('FROM node:24-alpine AS app')[1]).not.toContain('docs/clinical/sources')
   })

@@ -4,12 +4,31 @@ import type { Actor } from '../../shared/types/access'
 import type { DeliveryOutcome, DomainEvent, NotificationChannel, OutboxId, Recipient, Tx } from '../../shared/types/notification'
 import { bookingRequest, guardianGrant, inAppNotice, notificationAttempt, notificationOutbox, notificationPreference, user, visit, visitSharing } from '../db/schema'
 import { useDb } from '../utils/db'
+import { emailProviderHealth, sendNotificationEmail } from './email'
 
 export type ProviderStatus = 'READY' | 'NOT_CONFIGURED' | 'FAILED'
 export type ProviderAdapter = { channel: 'EMAIL' | 'WHATSAPP', status(): ProviderStatus, send(input: { outboxId: OutboxId, address: string, event: DomainEvent, idempotencyKey: string }): Promise<'SENT' | 'RETRY' | 'FAILED'> }
 
-export function providerStatus(channel: NotificationChannel): ProviderStatus {
-  return channel === 'IN_APP' ? 'READY' : 'NOT_CONFIGURED'
+export async function providerStatus(channel: NotificationChannel): Promise<ProviderStatus> {
+  if (channel === 'IN_APP') return 'READY'
+  if (channel !== 'EMAIL') return 'NOT_CONFIGURED'
+  const health = await emailProviderHealth()
+  return health === 'CONFIGURED' ? 'READY' : health === 'FAILING' ? 'FAILED' : 'NOT_CONFIGURED'
+}
+
+async function smtpAdapter(): Promise<ProviderAdapter> {
+  const status = await providerStatus('EMAIL')
+  return {
+    channel: 'EMAIL', status: () => status === 'FAILED' ? 'READY' : status,
+    async send({ address, event }) {
+      try {
+        await sendNotificationEmail(address, event)
+        return 'SENT'
+      } catch {
+        return 'FAILED'
+      }
+    }
+  }
 }
 
 export async function queueNotification(tx: Tx, event: DomainEvent, recipient: Recipient): Promise<OutboxId> {
@@ -44,7 +63,7 @@ export async function queueNotification(tx: Tx, event: DomainEvent, recipient: R
 }
 
 export async function deliver(outboxId: OutboxId, now = new Date(), adapter?: ProviderAdapter, timeoutMs = 15000): Promise<DeliveryOutcome> {
-  const claimed = await prepareDelivery(outboxId, now, adapter)
+  const claimed = await prepareDelivery(outboxId, now, adapter ?? await smtpAdapter())
   if ('outcome' in claimed) return claimed.outcome
   let outcome: 'SENT' | 'RETRY' | 'FAILED'
   let timer: ReturnType<typeof setTimeout> | undefined

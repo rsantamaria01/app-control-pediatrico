@@ -1,0 +1,2 @@
+ALTER TABLE "notification_outbox" DROP CONSTRAINT "notification_state_ck";--> statement-breakpoint
+ALTER TABLE "notification_outbox" ADD CONSTRAINT "notification_state_ck" CHECK ("notification_outbox"."state" IN ('QUEUED', 'RETRY', 'SENDING', 'SENT', 'NOT_CONFIGURED', 'OPTED_OUT', 'FAILED'));

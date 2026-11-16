@@ -17,10 +17,15 @@ vi.mock('../../server/services/invitations', () => ({
   reconcileGuardianDeliveries: vi.fn(),
   processQueuedGuardianDeliveries: vi.fn()
 }))
+vi.mock('../../server/services/outbox', () => ({
+  reconcileNotificationOutbox: vi.fn().mockResolvedValue(0),
+  processNotificationOutbox: vi.fn().mockResolvedValue(0)
+}))
 
 const { default: recoveryPlugin } = await import('../../server/plugins/recovery-worker')
 const { acquireRecoveryWorker, reconcileRecoveryJobs, processRecoveryJobs } = await import('../../server/services/recovery')
 const { reconcileGuardianDeliveries, processQueuedGuardianDeliveries } = await import('../../server/services/invitations')
+const { reconcileNotificationOutbox, processNotificationOutbox } = await import('../../server/services/outbox')
 
 describe('production operations', () => {
   it('loads the catalog importer dependency graph with native Node in a no-write process', () => {
@@ -210,6 +215,8 @@ describe('recovery worker before migrations', () => {
       expect(processRecoveryJobs).toHaveBeenCalled()
       expect(reconcileGuardianDeliveries).toHaveBeenCalled()
       expect(processQueuedGuardianDeliveries).toHaveBeenCalled()
+      expect(reconcileNotificationOutbox).toHaveBeenCalled()
+      expect(processNotificationOutbox).toHaveBeenCalled()
       expect(logger.mock.calls[0]?.[0]).toContain('WorkerError')
     } finally {
       await hooks.hook.mock.calls[0]?.[1]()

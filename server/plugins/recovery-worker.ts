@@ -1,6 +1,7 @@
 import { defineNitroPlugin } from 'nitropack/runtime'
 import { acquireRecoveryWorker, processRecoveryJobs, reconcileRecoveryJobs } from '../services/recovery'
 import { processQueuedGuardianDeliveries, reconcileGuardianDeliveries } from '../services/invitations'
+import { processNotificationOutbox, reconcileNotificationOutbox } from '../services/outbox'
 
 export default defineNitroPlugin((nitroApp) => {
   let running = false
@@ -27,6 +28,7 @@ export default defineNitroPlugin((nitroApp) => {
         }
         await reconcileRecoveryJobs()
         await reconcileGuardianDeliveries()
+        await reconcileNotificationOutbox()
         ready = true
       }
       if (!await isActive?.()) {
@@ -37,6 +39,7 @@ export default defineNitroPlugin((nitroApp) => {
       }
       await processRecoveryJobs()
       await processQueuedGuardianDeliveries()
+      await processNotificationOutbox()
       schemaMissing = false
     } catch (error) {
       ready = false

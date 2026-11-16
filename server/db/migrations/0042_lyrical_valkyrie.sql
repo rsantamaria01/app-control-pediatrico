@@ -1,0 +1,2 @@
+ALTER TABLE "notification_outbox" DROP CONSTRAINT "notification_recipient_ck";--> statement-breakpoint
+ALTER TABLE "notification_outbox" ADD CONSTRAINT "notification_recipient_ck" CHECK (("notification_outbox"."channel" = 'IN_APP' AND "notification_outbox"."recipient_user_id" IS NOT NULL AND "notification_outbox"."address" IS NULL) OR ("notification_outbox"."channel" <> 'IN_APP' AND "notification_outbox"."address" IS NULL));

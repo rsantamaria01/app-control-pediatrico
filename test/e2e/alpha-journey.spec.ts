@@ -56,8 +56,21 @@ test('production image journeys from bootstrapped admin through two children and
     await page.goto('/acceso')
     await page.getByRole('textbox', { name: 'Usuario' }).fill(username)
     await page.getByLabel('Contraseña').fill(secret)
+    let login: { status: number, code: string } | undefined
+    const observeLogin = (result: import('@playwright/test').Response) => {
+      if (result.request().method() !== 'POST' || !result.url().includes('/api/auth/sign-in/username')) return
+      login = { status: result.status(), code: result.status() === 200 ? 'SUCCESS' : result.status() === 401 ? 'DENIED' : result.status() === 503 ? 'UNAVAILABLE' : 'OTHER' }
+    }
+    page.on('response', observeLogin)
     await page.getByRole('button', { name: 'Ingresar' }).click()
-    await expect(page).toHaveURL('/')
+    try {
+      await expect(page).toHaveURL('/')
+    } catch (error) {
+      const cookies = (await context.cookies(origin)).map(cookie => ({ secure: cookie.secure, httpOnly: cookie.httpOnly, sameSite: cookie.sameSite }))
+      throw new Error(`checkpoint login diagnostic: status=${login?.status ?? 'NO_REQUEST'} class=${login?.code ?? 'NO_RESPONSE'} cookieFlags=${JSON.stringify(cookies)} uiError=${await page.getByRole('alert').isVisible().catch(() => false)}`, { cause: error })
+    } finally {
+      page.off('response', observeLogin)
+    }
   }
   const setup = async (address: string, username: string, secret: string) => {
     const token = await tokenFor(address)

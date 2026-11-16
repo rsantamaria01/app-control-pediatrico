@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
-import { importDraftCatalog } from '../server/services/catalog-import'
-import { aapProvenance, type CatalogEntry, type OfficialCatalogSource } from '../shared/types/catalog'
+import { importDraftCatalog } from '../server/services/catalog-import.ts'
+import { aapProvenance, type CatalogEntry, type OfficialCatalogSource } from '../shared/types/catalog.ts'
 import manifest from './preventive-catalog-manifest.json' with { type: 'json' }
 import entries from './preventive-catalog-entries.json' with { type: 'json' }
 
@@ -31,6 +31,6 @@ if (command === 'import') {
     const release = await importDraftCatalog(source, rows)
     process.stdout.write(`${release.kind}: ${release.id} (${release.entries.length} draft entries)\n`)
   }
-  const { useDb } = await import('../server/utils/db')
+  const { useDb } = await import('../server/utils/db.ts')
   await useDb().$client.end()
 }

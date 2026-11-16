@@ -1,11 +1,11 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { desc, eq } from 'drizzle-orm'
 import { isIP } from 'node:net'
-import type { CatalogEntry, CatalogKind, CatalogRow, CatalogVersion, CatalogView, DoctorMilestone, DoctorMilestoneInput, OfficialCatalogSource, SourceFile } from '../../shared/types/catalog'
-import { aapProvenance, catalogKinds, doctorMilestoneSchema, draftBadge, draftStatus } from '../../shared/types/catalog'
-import type { Actor } from '../../shared/types/access'
-import { catalogItem, catalogRelease, doctorCatalogEntry } from '../db/schema'
-import { useDb } from '../utils/db'
+import type { CatalogEntry, CatalogKind, CatalogRow, CatalogVersion, CatalogView, DoctorMilestone, DoctorMilestoneInput, OfficialCatalogSource, SourceFile } from '../../shared/types/catalog.ts'
+import { aapProvenance, catalogKinds, doctorMilestoneSchema, draftBadge, draftStatus } from '../../shared/types/catalog.ts'
+import type { Actor } from '../../shared/types/access.ts'
+import { catalogItem, catalogRelease, doctorCatalogEntry } from '../db/schema.ts'
+import { useDb } from '../utils/db.ts'
 
 function validDate(value: string): boolean {
   return /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value

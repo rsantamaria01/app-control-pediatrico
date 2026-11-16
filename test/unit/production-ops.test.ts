@@ -23,6 +23,25 @@ const { acquireRecoveryWorker, reconcileRecoveryJobs, processRecoveryJobs } = aw
 const { reconcileGuardianDeliveries, processQueuedGuardianDeliveries } = await import('../../server/services/invitations')
 
 describe('production operations', () => {
+  it('loads the catalog importer dependency graph with native Node in a no-write process', () => {
+    const result = spawnSync(process.execPath, ['--permission', '--allow-fs-read=*', '--experimental-transform-types', '--input-type=module', '-e', `import { importDraftCatalog } from './server/services/catalog-import.ts'; if (typeof importDraftCatalog !== 'function') process.exit(1)`], {
+      cwd: new URL('../..', import.meta.url).pathname,
+      env: { ...process.env, NODE_OPTIONS: undefined }, encoding: 'utf8', timeout: 30_000
+    })
+    expect(result.status, result.stderr).toBe(0)
+  })
+  it('runs migration then native Node catalog import without a writable CLI runtime', () => {
+    const preload = `import childProcess from 'node:child_process'; import { syncBuiltinESMExports } from 'node:module'; childProcess.spawnSync = (_node, args) => { process.stdout.write(JSON.stringify(args) + '\\n'); return { status: 0 } }; syncBuiltinESMExports()`
+    const result = spawnSync(process.execPath, ['--import', `data:text/javascript,${encodeURIComponent(preload)}`, 'scripts/prepare-catalogs.mjs'], {
+      cwd: new URL('../..', import.meta.url).pathname,
+      env: { ...process.env, NODE_OPTIONS: undefined }, encoding: 'utf8'
+    })
+    expect(result.status, result.stderr).toBe(0)
+    expect(result.stdout.trim().split('\n').map(line => JSON.parse(line))).toEqual([
+      ['scripts/migrate.mjs'],
+      ['--experimental-transform-types', 'scripts/import-preventive-catalogs.ts', 'import']
+    ])
+  })
   it('routes the default production ops command through migration and verified draft import before app startup', () => {
     const preload = `import childProcess from 'node:child_process'; import { syncBuiltinESMExports } from 'node:module'; import { EventEmitter } from 'node:events'; childProcess.spawn = (_node, args) => { process.stdout.write(JSON.stringify(args)); const child = new EventEmitter(); queueMicrotask(() => child.emit('exit', 0, null)); return child }; syncBuiltinESMExports()`
     const result = spawnSync('node', ['--import', `data:text/javascript,${encodeURIComponent(preload)}`, 'scripts/ops.mjs'], { env: { ...process.env, NODE_OPTIONS: undefined }, encoding: 'utf8' })

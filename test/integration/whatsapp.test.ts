@@ -169,6 +169,20 @@ it('refuses delivery when the patient grant phone differs from the account verif
   expect(await deliver(id, now)).toMatchObject({ status: 'OPTED_OUT' })
 })
 
+it('retries a definite provider rate limit at most three times, without duplicate acceptance', async () => {
+  await saveWhatsAppSettings(admin, meta)
+  await db.insert(notificationPreference).values({ userId: guardian.id, channel: 'WHATSAPP', enabled: true })
+  const send = vi.fn(async () => new Response('{}', { status: 429 }))
+  vi.stubGlobal('fetch', send)
+  const id = await queued()
+  expect(await deliver(id, now)).toMatchObject({ status: 'RETRY' })
+  expect(await deliver(id, new Date(now.getTime() + 60000))).toMatchObject({ status: 'RETRY' })
+  expect(await deliver(id, new Date(now.getTime() + 180000))).toMatchObject({ status: 'FAILED' })
+  expect(await deliver(id, new Date(now.getTime() + 600000))).toMatchObject({ status: 'FAILED' })
+  expect(send).toHaveBeenCalledTimes(3)
+  expect((await db.select().from(notificationOutbox).where(eq(notificationOutbox.id, id)))[0]).toMatchObject({ state: 'FAILED', deliveredAt: null, errorClass: 'RetryExhausted' })
+})
+
 it('does not carry a failed health state across credential rotation', async () => {
   await saveWhatsAppSettings(admin, meta)
   await db.insert(notificationPreference).values({ userId: guardian.id, channel: 'WHATSAPP', enabled: true })

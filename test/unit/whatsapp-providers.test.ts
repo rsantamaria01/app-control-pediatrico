@@ -32,6 +32,12 @@ it('sends Twilio ContentSid only by authenticated form without free-form Body', 
   expect(body.toString()).not.toContain('checkup-1')
 })
 
+it('retries a definite rate-limit rejection without treating it as accepted', async () => {
+  vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', { status: 429 })))
+  expect(await sendMetaTemplate({ provider: 'META', sender: '123456789', template: 'control_due', language: 'es', secret: 'token-private' }, '+593991234567', event)).toBe('RETRY')
+  expect(await sendTwilioTemplate({ provider: 'TWILIO', sender: '+15551234567', accountSid: `AC${'a'.repeat(32)}`, template: `HX${'b'.repeat(32)}`, secret: 'token-private' }, '+593991234567', event)).toBe('RETRY')
+})
+
 it('treats ambiguous or rejected responses as failure rather than accepted delivery', async () => {
   vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', { status: 200 })))
   expect(await sendMetaTemplate({ provider: 'META', sender: '123456789', template: 'control_due', language: 'es', secret: 'token-private' }, '+593991234567', event)).toBe('FAILED')

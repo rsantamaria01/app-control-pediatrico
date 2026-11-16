@@ -23,7 +23,9 @@ export async function scanCheckupReminders(now = new Date()): Promise<number> {
       const inserted = await db.transaction(async (tx) => {
         await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`${row.id}:${row.guardianId}:${channel}`}))`)
         const recipientKey = channel === 'WHATSAPP' ? createHash('sha256').update(`whatsapp:${row.phone!.toLowerCase()}`).digest('hex') : null
-        const [existing] = await tx.select({ id: notificationOutbox.id, state: notificationOutbox.state }).from(notificationOutbox).where(and(eq(notificationOutbox.eventKind, 'CHECKUP_DUE'), eq(notificationOutbox.subjectId, row.id), eq(notificationOutbox.channel, channel), eq(notificationOutbox.recipientUserId, row.guardianId), ...(recipientKey ? [eq(notificationOutbox.recipientKey, recipientKey)] : [])))
+        const prior = await tx.select({ id: notificationOutbox.id, state: notificationOutbox.state, recipientKey: notificationOutbox.recipientKey }).from(notificationOutbox).where(and(eq(notificationOutbox.eventKind, 'CHECKUP_DUE'), eq(notificationOutbox.subjectId, row.id), eq(notificationOutbox.channel, channel), eq(notificationOutbox.recipientUserId, row.guardianId)))
+        if (channel === 'WHATSAPP' && prior.some(notice => notice.state === 'ACCEPTED' || notice.state === 'SENT')) return false
+        const existing = prior.find(notice => !recipientKey || notice.recipientKey === recipientKey)
         if (existing && (channel === 'IN_APP' || existing.state !== 'OPTED_OUT')) return false
         const [eligible] = await tx.select({ id: individualCheckup.id }).from(individualCheckup).innerJoin(guardianGrant, and(eq(guardianGrant.patientId, individualCheckup.patientId), eq(guardianGrant.guardianId, row.guardianId), eq(guardianGrant.status, 'ACTIVE'))).where(and(eq(individualCheckup.id, row.id), notExists(tx.select({ id: completedCheckup.id }).from(completedCheckup).where(eq(completedCheckup.individualId, row.id)))))
         if (!eligible) return false

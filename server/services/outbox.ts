@@ -47,7 +47,7 @@ async function whatsappAdapter(): Promise<ProviderAdapter> {
       if (!config) return 'FAILED'
       try {
         const result = config.provider === 'META' ? await sendMetaTemplate(config, address, event) : await sendTwilioTemplate(config, address, event)
-        await setWhatsAppHealth(config, result === 'ACCEPTED' ? 'READY' : 'FAILING')
+        await setWhatsAppHealth(config, result === 'FAILED' ? 'FAILING' : 'READY')
         return result
       } catch {
         await setWhatsAppHealth(config, 'FAILING')

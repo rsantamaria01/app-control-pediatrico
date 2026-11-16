@@ -128,6 +128,20 @@ it('does not queue WhatsApp for completed controls or revoked guardian grants', 
   expect(await db.select().from(notificationOutbox)).toEqual([])
 })
 
+it('does not queue a second WhatsApp reminder after acceptance when the verified number changes', async () => {
+  await db.insert(guardianPhone).values({ guardianId: guardian.id, phone: '+593991234567' })
+  await db.update(guardianGrant).set({ contactPhone: '+593991234567' }).where(eq(guardianGrant.patientId, child))
+  await setWhatsAppNoticePreference(guardian, true)
+  await scanCheckupReminders(due)
+  const [first] = await db.select().from(notificationOutbox).where(eq(notificationOutbox.channel, 'WHATSAPP'))
+  const adapter = { channel: 'WHATSAPP' as const, status: () => 'READY' as const, send: async () => 'ACCEPTED' as const }
+  expect(await deliver(first!.id, due, adapter)).toMatchObject({ status: 'ACCEPTED' })
+  await db.update(guardianPhone).set({ phone: '+593998888888' }).where(eq(guardianPhone.guardianId, guardian.id))
+  await db.update(guardianGrant).set({ contactPhone: '+593998888888' }).where(eq(guardianGrant.patientId, child))
+  expect(await scanCheckupReminders(due)).toBe(0)
+  expect(await db.select().from(notificationOutbox).where(eq(notificationOutbox.channel, 'WHATSAPP'))).toHaveLength(1)
+})
+
 it('queues a new WhatsApp intent for a newly verified grant number without reusing the former address', async () => {
   await db.insert(guardianPhone).values({ guardianId: guardian.id, phone: '+593991234567' })
   await db.update(guardianGrant).set({ contactPhone: '+593991234567' }).where(eq(guardianGrant.patientId, child))

@@ -225,6 +225,20 @@
       "when": 1794800521323,
       "tag": "0031_nebulous_ronan",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1794807900875,
+      "tag": "0032_luxuriant_gamora",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1794808027777,
+      "tag": "0033_little_tombstone",
+      "breakpoints": true
     }
   ]
 }

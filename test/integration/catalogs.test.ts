@@ -5,8 +5,8 @@ import { migrate } from 'drizzle-orm/node-postgres/migrator'
 import { Pool } from 'pg'
 import { count } from 'drizzle-orm'
 import { readFile } from 'node:fs/promises'
-import { catalogItem, catalogRelease } from '../../server/db/schema'
-import { getCatalogView, importDraftCatalog } from '../../server/services/catalog-import'
+import { catalogItem, catalogRelease, doctorCatalogEntry } from '../../server/db/schema'
+import { getCatalogView, importDraftCatalog, addDoctorMilestone } from '../../server/services/catalog-import'
 import type { OfficialCatalogSource } from '../../shared/types/catalog'
 
 const configured = process.env.WHO_TEST_DATABASE_URL
@@ -67,13 +67,32 @@ describe('immutable preventive catalogs on disposable database', () => {
     expect(view.versions).toHaveLength(2)
     expect(view.versions.map(version => version.id)).toContain(first.id)
     expect(view.versions.map(version => version.id)).toContain(second.id)
-    expect(view.versions.flatMap(version => version.entries).map(row => row.badge)).toEqual(['Borrador · pendiente de revisión pediátrica', 'Borrador · pendiente de revisión pediátrica'])
+    expect(view.versions.flatMap(version => version.entries).map(row => row.badge)).toEqual(['Borrador - pendiente de revisión', 'Borrador - pendiente de revisión'])
     expect(view.versions.find(version => version.id === first.id)?.entries[0]?.label).toBe('Fixture row')
-    await expect(importDraftCatalog(source, [entry])).rejects.toThrow()
+    expect((await importDraftCatalog(source, [entry])).id).toBe(first.id)
     expect((await db.select({ n: count() }).from(catalogRelease))[0]!.n).toBe(2)
     await expect(db.update(catalogRelease).set({ status: 'REVIEWED' })).rejects.toThrow()
     await expect(db.update(catalogItem).set({ status: 'REVIEWED' })).rejects.toThrow()
     await expect(db.update(catalogItem).set({ label: 'Changed' })).rejects.toThrow()
     await expect(db.delete(catalogRelease)).rejects.toThrow()
+  })
+
+  it('keeps the seeded milestone list empty and persists a doctor-authored draft separately', async () => {
+    expect((await getCatalogView('MILESTONE')).versions).toEqual([])
+    const doctor = { id: randomUUID(), roles: ['DOCTOR' as const] }
+    const created = await addDoctorMilestone(doctor, { label: 'Observación ingresada por médico', domain: 'Motor', minAgeMonths: 4, maxAgeMonths: 6, source: 'Registro del médico' })
+    expect(created.badge).toBe('Borrador - pendiente de revisión')
+    expect((await getCatalogView('MILESTONE')).doctorEntries).toContainEqual(created)
+    expect((await db.select().from(doctorCatalogEntry)).find(item => item.id === created.id)?.authorId).toBe(doctor.id)
+    await expect(db.update(doctorCatalogEntry).set({ label: 'Changed' })).rejects.toThrow()
+  })
+
+  it('stores sourced vaccine doses with nullable interval and immutable multi-file page evidence', async () => {
+    const vaccineSource = { ...source, kind: 'VACCINE' as const, publisher: 'MSP', url: 'https://www.salud.gob.ec/schedule.pdf', sourceFile: 'schedule.pdf', additionalSources: [{ file: 'manual.pdf', url: 'https://www.salud.gob.ec/manual.pdf', sha256: source.sha256, bytes }] }
+    const version = await importDraftCatalog(vaccineSource, [{ ...entry, key: 'dose-1', doseNumber: 1, recommendedAge: '2 meses', minimumInterval: null, sourcePages: [{ file: 'schedule.pdf', page: 1 }, { file: 'manual.pdf', page: 142 }] }])
+    const row = (await getCatalogView('VACCINE')).versions.find(item => item.id === version.id)!.entries[0]!
+    expect(row).toMatchObject({ doseNumber: 1, recommendedAge: '2 meses', minimumInterval: null, sourcePages: [{ file: 'schedule.pdf', page: 1 }, { file: 'manual.pdf', page: 142 }], badge: 'Borrador - pendiente de revisión' })
+    expect(version.sources).toHaveLength(2)
+    await expect(db.update(catalogItem).set({ sourcePage: '999' })).rejects.toThrow()
   })
 })

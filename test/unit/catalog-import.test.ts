@@ -28,13 +28,26 @@ describe('preventive draft import validation', () => {
     }
   })
 
-  it('rejects fake vaccine doses when no reconciled manual and schedule evidence exists', () => {
-    expect(() => validateDraftCatalog({ ...source, kind: 'VACCINE', publisher: 'MSP', url: 'https://www.salud.gob.ec/test.pdf' }, [entry])).toThrow()
+  it('accepts an evidenced vaccine dose with separate schedule and manual pages and an unknown interval', () => {
+    const manual = new TextEncoder().encode('manual fixture')
+    const vaccine = { ...entry, doseNumber: 1, recommendedAge: '2 meses', minimumInterval: null, sourcePages: [
+      { file: 'schedule.pdf', page: 1 }, { file: 'manual.pdf', page: 142 }
+    ] }
+    const input = { ...source, kind: 'VACCINE' as const, publisher: 'MSP', url: 'https://www.salud.gob.ec/test.pdf', sourceFile: 'schedule.pdf',
+      additionalSources: [{ file: 'manual.pdf', url: 'https://www.salud.gob.ec/manual.pdf', sha256: createHash('sha256').update(manual).digest('hex'), bytes: manual }] }
+    expect(validateDraftCatalog(input, [vaccine]).entries[0]).toMatchObject({ minimumInterval: null, sourcePages: vaccine.sourcePages, badge: 'Borrador - pendiente de revisión' })
+    expect(() => validateDraftCatalog(input, [{ ...vaccine, sourcePages: [{ file: 'schedule.pdf', page: 1 }] }])).toThrow()
+    expect(() => validateDraftCatalog({ ...input, additionalSources: [{ ...input.additionalSources[0]!, sha256: 'a'.repeat(64) }] }, [vaccine])).toThrow('hash')
+  })
+
+  it('accepts unknown publication day without fabricating one and requires evidence on every entry', () => {
+    expect(validateDraftCatalog({ ...source, publicationDate: null }, [entry]).source.publicationDate).toBeNull()
+    expect(() => validateDraftCatalog(source, [{ ...entry, sourcePage: '' }])).toThrow()
   })
 
   it('returns independently labelled draft rows without allowing reviewed input', () => {
     const result = validateDraftCatalog(source, [entry])
-    expect(result.entries).toEqual([{ ...entry, status: 'DRAFT_PENDING_PEDIATRICIAN_REVIEW', badge: 'Borrador · pendiente de revisión pediátrica' }])
+    expect(result.entries).toEqual([{ ...entry, status: 'DRAFT_PENDING_PEDIATRICIAN_REVIEW', badge: 'Borrador - pendiente de revisión' }])
     expect(() => validateDraftCatalog(source, [{ ...entry, status: 'REVIEWED' } as CatalogEntry])).toThrow()
   })
 })

@@ -2,7 +2,7 @@ import { bigint, boolean, check, index, integer, jsonb, numeric, pgTable, primar
 import { sql } from 'drizzle-orm'
 
 export { appointment, blockedHour, bookingNotice, bookingProof, bookingRequest, clinicSchedule, openingHour } from './schema/scheduling.ts'
-export { catalogItem, catalogRelease } from './schema/catalogs.ts'
+export { catalogItem, catalogRelease, doctorCatalogEntry } from './schema/catalogs.ts'
 
 export const user = pgTable('user', {
   id: text('id').primaryKey(),

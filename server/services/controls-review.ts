@@ -44,10 +44,12 @@ export async function listPendingControls(actor: Actor, now = new Date()): Promi
       if (item.date >= today || completed.some(row => row.individualId === item.id)) continue
       due.push({ date: item.date, reason: item.reason, source: 'Indicación médica', sourcePage: '', badge: draftBadge })
     }
-    const recommended = visits.find(row => row.nextControlAt && !visits.some(later => later.measuredAt > row.measuredAt && later.measuredAt >= row.nextControlAt!))
-    if (recommended?.nextControlAt) {
-      const date = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Guayaquil', year: 'numeric', month: '2-digit', day: '2-digit' }).format(recommended.nextControlAt)
-      if (date < today) due.push({ date, reason: 'Próximo control indicado en la visita', source: 'Visita médica', sourcePage: '', badge: draftBadge })
+    for (const row of visits) {
+      if (!row.nextControlAt || visits.some(later => later.measuredAt > row.measuredAt && later.measuredAt >= row.nextControlAt!)) continue
+      const date = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Guayaquil', year: 'numeric', month: '2-digit', day: '2-digit' }).format(row.nextControlAt)
+      if (date >= today) continue
+      due.push({ date, reason: 'Próximo control indicado en la visita', source: 'Visita médica', sourcePage: '', badge: draftBadge })
+      break
     }
     for (const release of current.values()) {
       const items = await db.select().from(catalogItem).where(and(eq(catalogItem.releaseId, release.id), eq(catalogItem.status, draftStatus)))

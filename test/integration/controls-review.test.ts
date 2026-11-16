@@ -101,6 +101,15 @@ it('retains a dated recommendation when a later unrelated visit precedes its due
   expect((await listPendingControls(doctor, new Date('2026-02-16T12:00:00Z'))).find(item => item.id === id)).toMatchObject({ date: '2026-02-15', reason: 'Próximo control indicado en la visita' })
 })
 
+it('keeps an older overdue recommendation when an early visit records a newer future date', async () => {
+  const id = randomUUID()
+  await db.insert(patient).values({ id, name: 'Niña con dos fechas', birthDate: '2024-01-01', sex: 'FEMALE', createdBy: doctor.id })
+  const row = { patientId: id, requestDigest: 'fixture', weightKg: '10', lengthHeightCm: '80', position: 'STANDING', headCircumferenceCm: '45', bmi: '15', correctionUntilMonths: 24, authorId: doctor.id }
+  await db.insert(visit).values({ ...row, id: randomUUID(), requestId: randomUUID(), measuredAt: new Date('2026-01-01T12:00:00Z'), nextControlAt: new Date('2026-02-15T12:00:00Z') })
+  await db.insert(visit).values({ ...row, id: randomUUID(), requestId: randomUUID(), measuredAt: new Date('2026-01-20T12:00:00Z'), nextControlAt: new Date('2026-04-01T12:00:00Z') })
+  expect((await listPendingControls(doctor, new Date('2026-03-01T12:00:00Z'))).find(item => item.id === id)).toMatchObject({ date: '2026-02-15', reason: 'Próximo control indicado en la visita' })
+})
+
 it('does not infer a control from a recommendation whose subsequent visit occurred on its due date', async () => {
   const id = randomUUID()
   await db.insert(patient).values({ id, name: 'Niño atendido en fecha', birthDate: '2024-01-01', sex: 'MALE', createdBy: doctor.id })

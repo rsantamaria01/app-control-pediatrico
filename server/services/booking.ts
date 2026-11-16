@@ -144,7 +144,7 @@ export async function listParentAppointments(actor: Actor): Promise<ParentAppoin
     const date = row.currentStart ?? row.startsAt
     const status = row.currentStatus === 'CANCELLED' ? 'CANCELLED' : row.currentStatus === 'ATTENDED' ? 'ATTENDED' : row.currentStart && row.currentStart.getTime() !== row.startsAt.getTime() ? 'RESCHEDULED' : row.status
     return { id: row.id, name: row.name, date: localDate(date), time: localTime(date), status: status as ParentAppointment['status'] }
-  }), ...scheduled.map(row => ({ id: row.id, name: row.name, date: localDate(row.startsAt), time: localTime(row.startsAt), status: (row.status === 'CONFIRMED' ? 'APPROVED' : row.status === 'PENDING' ? 'PENDING' : row.status === 'ATTENDED' ? 'ATTENDED' : 'CANCELLED') as ParentAppointment['status'] }))]
+  }), ...scheduled.map(row => ({ id: row.id, name: row.name, date: localDate(row.startsAt), time: localTime(row.startsAt), status: (row.status === 'CONFIRMED' ? 'APPROVED' : row.status === 'PENDING' ? 'PENDING' : row.status === 'ATTENDED' ? 'ATTENDED' : 'CANCELLED') as ParentAppointment['status'] }))].sort((a, b) => `${b.date} ${b.time}`.localeCompare(`${a.date} ${a.time}`))
 }
 
 export async function recordBookingAppointmentChange(tx: Parameters<Parameters<ReturnType<typeof useDb>['transaction']>[0]>[0], appointmentId: string, status: 'RESCHEDULED' | 'CANCELLED') {

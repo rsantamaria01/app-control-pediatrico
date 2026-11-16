@@ -98,7 +98,7 @@ if (import.meta.server && (error.value?.statusCode === 401 || error.value?.statu
         v-else
         class="text-sm text-muted"
       >
-        Sin teléfono registrado por personal clínico para contactar.
+        Sin contacto registrado.
       </p>
     </UCard>
   </UContainer>

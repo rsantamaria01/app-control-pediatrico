@@ -221,7 +221,7 @@ test('production image journeys from bootstrapped admin through two children and
       const id = (await result.json()).patient.id as string
       const grant = await context.request.get(`/api/guardian-grants/${id}`)
       expect(grant.status()).toBe(200)
-      expect((await grant.json()).guardians).toHaveLength(1)
+      expect((await grant.json()).guardians).toEqual([expect.objectContaining({ status: 'UNINVITED' })])
       if (!guardianId) {
         const identity = await context.request.get(`/api/guardian-grants/identity?phone=${phone}`)
         expect(identity.status()).toBe(200)
@@ -231,6 +231,10 @@ test('production image journeys from bootstrapped admin through two children and
     }
     const first = await createChild('Luz')
     const second = await createChild('Sol', '1710034065')
+    const withoutContactName = `Sin contacto ${randomUUID().slice(0, 8)}`
+    const withoutContactResponse = await context.request.post('/api/pacientes', { data: { name: withoutContactName, birthDate: '2024-01-01', sex: 'FEMALE' } })
+    expect(withoutContactResponse.status(), await withoutContactResponse.text()).toBe(200)
+    const withoutContact = (await withoutContactResponse.json()).id as string
     const preventive = await context.request.get(`/api/pacientes/${first}/preventivo/vacunas`)
     expect(preventive.status()).toBe(200)
     const preventiveRows = await preventive.json() as { pending: { key: string, badge: string, id: string }[] }
@@ -244,9 +248,15 @@ test('production image journeys from bootstrapped admin through two children and
     expect(rows.find(row => row.id === first)?.pending.some(item => item.kind === 'MSP')).toBe(true)
     expect(rows.find(row => row.id === first)?.pending.some(item => item.kind === 'COMPLEMENTARY')).toBe(true)
     expect(rows.find(row => row.id === first)?.contacts).toEqual([{ name: 'Familia de prueba', phone }])
+    expect(rows.find(row => row.id === second)?.contacts).toEqual([{ name: 'Familia de prueba', phone }])
+    expect(rows.find(row => row.id === withoutContact)?.pending.some(item => item.kind === 'MSP')).toBe(true)
+    expect(rows.find(row => row.id === withoutContact)?.contacts).toEqual([])
     await page.goto('/pacientes/vacunacion-por-revisar')
     await expect(page.getByText('Complementaria fixture del médico')).toBeVisible()
-    await expect(page.getByRole('link', { name: 'WhatsApp' }).first()).toHaveAttribute('href', `https://wa.me/593${phone.slice(1)}`)
+    const noContactCard = page.getByRole('link', { name: withoutContactName }).locator('xpath=ancestor::div[.//p[contains(text(), "Sin contacto registrado.")]][1]')
+    await expect(noContactCard.getByText('Sin contacto registrado.')).toBeVisible()
+    await expect(noContactCard.getByRole('link', { name: /WhatsApp|Llamar/ })).toHaveCount(0)
+    await expect(page.getByRole('link', { name: 'Abrir WhatsApp (si usa este número)' }).first()).toHaveAttribute('href', `https://wa.me/593${phone.slice(1)}`)
     expect((await assistantContext!.request.get('/api/clinical/vacunacion-por-revisar')).status()).toBe(403)
     const firstDose = preventiveRows.pending[0]!
     const applied = await context.request.post(`/api/pacientes/${first}/preventivo/dosis`, { data: { releaseId: firstDose.id.split(':')[0], key: firstDose.key, appliedAt: '2025-01-02', lot: 'PRIVATE_PREVENTIVE_LOT', privateNote: 'PRIVATE_PREVENTIVE_NOTE', external: true } })

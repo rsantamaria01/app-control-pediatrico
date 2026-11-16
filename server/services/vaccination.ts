@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { and, asc, desc, eq } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray } from 'drizzle-orm'
 import { createError } from 'nuxt/server'
 import type { Actor } from '../../shared/types/access'
 import { draftBadge, draftStatus } from '../../shared/types/catalog'
@@ -161,7 +161,7 @@ export async function listVaccinationReview(actor: Actor, today = new Date()) {
   for (const person of people) {
     const { pending } = await listVaccines(actor, person.id, today)
     if (!pending.length) continue
-    const contacts = await db.select({ name: user.name, phone: guardianGrant.contactPhone }).from(guardianGrant).innerJoin(user, eq(user.id, guardianGrant.guardianId)).where(and(eq(guardianGrant.patientId, person.id), eq(guardianGrant.status, 'ACTIVE')))
+    const contacts = await db.select({ name: user.name, phone: guardianGrant.contactPhone }).from(guardianGrant).innerJoin(user, eq(user.id, guardianGrant.guardianId)).where(and(eq(guardianGrant.patientId, person.id), inArray(guardianGrant.status, ['ACTIVE', 'PENDING', 'UNINVITED'])))
     output.push({ ...person, pending, contacts: contacts.filter(row => row.phone && /^09\d{8}$/.test(row.phone)).map(row => ({ name: row.name, phone: row.phone! })) })
   }
   return output

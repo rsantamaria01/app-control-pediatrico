@@ -208,6 +208,28 @@ describe('doctor-only preventive record and draft review', () => {
     await expect(listVaccinationReview(guardian)).rejects.toMatchObject({ statusCode: 403 })
   })
 
+  it('keeps a pending patient without a verified guardian in review without inventing contact details', async () => {
+    const unlinked = randomUUID()
+    await db.insert(patient).values({ id: unlinked, name: 'Niña sin contacto', birthDate: '2024-01-01', sex: 'FEMALE', createdBy: doctor.id })
+    const review = await listVaccinationReview(doctor, new Date('2026-11-16T12:00:00Z'))
+    const row = review.find(item => item.id === unlinked)
+    expect(row?.pending.some(item => item.kind === 'MSP')).toBe(true)
+    expect(row?.contacts).toEqual([])
+  })
+
+  it('includes a staff-attested uninvited guardian phone without granting portal access', async () => {
+    const uninvited = randomUUID()
+    await db.insert(patient).values({ id: uninvited, name: 'Niña contacto presencial', birthDate: '2024-01-01', sex: 'FEMALE', createdBy: doctor.id })
+    await db.insert(guardianGrant).values({ patientId: uninvited, guardianId: guardian.id, contactEmail: 'guardian-preventive@example.test', contactPhone: '0991234567', proof: 'Identidad verificada presencialmente', verifiedBy: doctor.id, status: 'UNINVITED' })
+    const review = await listVaccinationReview(doctor, new Date('2026-11-16T12:00:00Z'))
+    expect(review.find(item => item.id === uninvited)?.contacts).toEqual([{ name: 'Representante verificada', phone: '0991234567' }])
+    await expect(listAppliedDoses(guardian, uninvited)).rejects.toMatchObject({ statusCode: 404 })
+    await db.update(guardianGrant).set({ status: 'REVOKED' }).where(eq(guardianGrant.patientId, uninvited))
+    expect((await listVaccinationReview(doctor, new Date('2026-11-16T12:00:00Z'))).find(item => item.id === uninvited)?.contacts).toEqual([])
+    await db.update(guardianGrant).set({ status: 'FAILED' }).where(eq(guardianGrant.patientId, uninvited))
+    expect((await listVaccinationReview(doctor, new Date('2026-11-16T12:00:00Z'))).find(item => item.id === uninvited)?.contacts).toEqual([])
+  })
+
   it('records clinician assessment without invented WHO walking dependency or CDC age claims', async () => {
     await assessMilestone(doctor, child, { label: 'Caminar (registro clínico de prueba)', domain: 'GROSS_MOTOR', outcome: 'ACHIEVED', acquiredAgeMonths: 17, privateNote: 'PRIVATE_ASSESSMENT' })
     const state = await listDevelopment(doctor, child)

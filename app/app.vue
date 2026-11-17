@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import { es } from '@nuxt/ui/locale'
+import type { DropdownMenuItem } from '@nuxt/ui'
 import { clinicBrand } from './utils/clinic-brand'
 
 const locale = extendLocale(es, { code: 'es-EC' })
 const colorMode = useColorMode()
-function toggleTheme() {
-  colorMode.preference = colorMode.value === 'dark' ? 'light' : 'dark'
-}
+const themeChoices = computed<DropdownMenuItem[]>(() => [
+  { label: 'Claro', type: 'checkbox', checked: colorMode.preference === 'light', onSelect: () => { colorMode.preference = 'light' } },
+  { label: 'Oscuro', type: 'checkbox', checked: colorMode.preference === 'dark', onSelect: () => { colorMode.preference = 'dark' } },
+  { label: 'Sistema', type: 'checkbox', checked: colorMode.preference === 'system', onSelect: () => { colorMode.preference = 'system' } }
+])
 const config = useRuntimeConfig()
 const { data: savedBrand } = await useFetch<{ name: string, primary: string, logo: string | null }>('/api/public/clinica-brand', { key: 'clinic-brand' })
 const brand = computed(() => clinicBrand(savedBrand.value?.primary ?? config.public.clinicPrimary, savedBrand.value ? savedBrand.value.logo ?? '' : config.public.clinicLogo))
@@ -41,7 +44,7 @@ const isParent = computed(() => navigation.value.some(item => item.to === '/cita
 const hasFamily = computed(() => navigation.value.some(item => item.to === '/citas'))
 const isAdmin = computed(() => navigation.value.some(item => item.to.startsWith('/admin/')))
 const staffItems = computed(() => {
-  const staff = navigation.value.filter(item => !item.to.startsWith('/admin/') && item.to !== '/citas')
+  const staff = navigation.value.filter(item => !item.to.startsWith('/admin/') && item.to !== '/citas' && item.to !== '/perfil')
   return isDoctor.value ? staff.filter(item => item.to !== '/agenda/horarios') : navigation.value.some(item => item.to === '/agenda') ? staff.filter(item => item.to !== '/') : []
 })
 const adminItems = computed(() => isAdmin.value
@@ -52,17 +55,12 @@ const adminItems = computed(() => isAdmin.value
       { label: 'Auditoría', to: '/admin/auditoria' }
     ]
   : [])
-const visibleItems = computed(() => isParent.value ? navigation.value.filter(item => ['/', '/citas', '/avisos', '/perfil'].includes(item.to)) : staffItems.value.length ? staffItems.value : adminItems.value)
+const visibleItems = computed(() => isParent.value ? navigation.value.filter(item => ['/', '/citas', '/avisos'].includes(item.to)) : staffItems.value.length ? staffItems.value : adminItems.value)
 const mobileItems = computed(() => isAdmin.value && !staffItems.value.length
   ? adminItems.value.filter(item => ['/admin/clinica', '/admin/catalogos'].includes(item.to))
-  : isAdmin.value && !isParent.value && !isDoctor.value
-    ? visibleItems.value.filter(item => item.to !== '/perfil')
-    : visibleItems.value)
+  : visibleItems.value)
 const mobileMoreItems = computed(() => isAdmin.value && !isParent.value && staffItems.value.length && mobileItems.value.length < 5
-  ? [
-      ...navigation.value.filter(item => item.to === '/perfil' && !mobileItems.value.some(mobile => mobile.to === item.to)),
-      ...adminItems.value.filter(item => !mobileItems.value.some(mobile => mobile.to === item.to))
-    ].map(item => ({ ...item, icon: icons[item.to] }))
+  ? adminItems.value.filter(item => !mobileItems.value.some(mobile => mobile.to === item.to)).map(item => ({ ...item, icon: icons[item.to] }))
   : [])
 const icons: Record<string, string> = { '/': 'i-lucide-house', '/pacientes': 'i-lucide-users-round', '/agenda': 'i-lucide-calendar-days', '/agenda/horarios': 'i-lucide-clock', '/avisos': 'i-lucide-bell', '/perfil': 'i-lucide-user-round', '/citas': 'i-lucide-calendar-days', '/admin/inicio': 'i-lucide-house', '/admin/usuarios': 'i-lucide-users-round', '/admin/clinica': 'i-lucide-settings', '/admin/catalogos': 'i-lucide-book-open', '/admin/auditoria': 'i-lucide-scroll-text' }
 const navItems = computed(() => visibleItems.value.map(item => ({ ...item, icon: icons[item.to], active: route.path === item.to || (item.to !== '/' && route.path.startsWith(`${item.to}/`)) })))
@@ -74,7 +72,14 @@ const sidebarHover = ref(false)
 const sidebarFocus = ref(false)
 const sidebarDismissed = ref(false)
 const sidebarExpanded = computed(() => pinnedSidebar.value || (!sidebarDismissed.value && (sidebarHover.value || sidebarFocus.value)))
-const sidebarMenu = computed(() => hasFamily.value && isStaff.value ? [{ label: 'Vista familiar', icon: 'i-lucide-house', to: '/?vista=familiar' }] : [])
+const userMenuItems = computed<DropdownMenuItem[][]>(() => [
+  [
+    { label: 'Ver perfil', icon: 'i-lucide-user-round', to: '/perfil' },
+    ...(hasFamily.value && isStaff.value ? [{ label: 'Vista familiar', icon: 'i-lucide-house', to: '/?vista=familiar' }] : []),
+    { label: 'Cambiar tema', icon: 'i-lucide-moon', children: themeChoices.value }
+  ],
+  [{ label: 'Cerrar sesión', icon: 'i-lucide-log-out', onSelect: logout }]
+])
 const pageAction = computed(() => isDoctor.value && (route.path === '/' && route.query.vista !== 'familiar' || route.path === '/pacientes') ? { label: 'Nuevo paciente', to: '/pacientes/nuevo' } : null)
 const clinicName = computed(() => savedBrand.value?.name ?? 'Pediatría')
 
@@ -211,14 +216,11 @@ useSeoMeta({
           <template #right>
             <ShellCommandSearch shortcuts />
             <UNavigationMenu :items="navItems" />
-            <UColorModeButton aria-label="Cambiar tema" />
-            <UButton
-              icon="i-lucide-log-out"
-              variant="ghost"
-              color="neutral"
-              aria-label="Cerrar sesión"
-              @click="logout"
-            />
+             <UDropdownMenu :items="userMenuItems">
+               <UButton variant="ghost" color="neutral" :aria-label="`Menú de usuario: ${user?.name || 'Representante'}`" aria-haspopup="menu">
+                 <UAvatar :text="user?.name?.slice(0, 2).toUpperCase() || 'CP'" size="sm" />
+               </UButton>
+             </UDropdownMenu>
           </template>
         </UHeader>
         <main class="min-h-dvh bg-muted pb-24 lg:pb-0">
@@ -232,8 +234,13 @@ useSeoMeta({
               class="size-7"
               aria-hidden="true"
             >
-            <span class="flex-1">{{ clinicName }}</span>
-            <ShellCommandSearch compact shortcuts />
+             <span class="flex-1">{{ clinicName }}</span>
+             <ShellCommandSearch compact shortcuts />
+             <UDropdownMenu :items="userMenuItems" :content="{ align: 'end' }">
+               <UButton variant="ghost" color="neutral" :aria-label="`Menú de usuario: ${user?.name || 'Representante'}`" aria-haspopup="menu">
+                 <UAvatar :text="user?.name?.slice(0, 2).toUpperCase() || 'CP'" size="sm" />
+               </UButton>
+             </UDropdownMenu>
            </header>
            <component :is="Component" />
         </main>
@@ -319,13 +326,14 @@ useSeoMeta({
                   @click="setSidebarPinned"
                 />
               </UTooltip>
-              <UDropdownMenu :items="[...sidebarMenu, { label: 'Cambiar tema', icon: 'i-lucide-moon', onSelect: toggleTheme }, { label: 'Cerrar sesión', icon: 'i-lucide-log-out', onSelect: logout }]">
+              <UDropdownMenu :items="userMenuItems" :content="{ side: 'right', align: 'end' }">
                <UButton
                  color="neutral"
                  variant="ghost"
                  class="w-full min-h-11 justify-start"
                  :class="sidebarExpanded ? 'px-2' : 'justify-center px-0'"
-                 :aria-label="sidebarExpanded ? undefined : 'Menú de usuario'"
+                  :aria-label="`Menú de usuario: ${user?.name || 'Personal de la clínica'}`"
+                  aria-haspopup="menu"
                >
                  <UAvatar :text="user?.name?.slice(0, 2).toUpperCase() || 'CP'" size="sm" />
                  <span v-if="sidebarExpanded" class="min-w-0 flex-1 text-left">
@@ -378,8 +386,15 @@ useSeoMeta({
                     aria-hidden="true"
                   >{{ clinicName }}
                 </span>
-                 <ShellCommandSearch compact shortcuts />
-              </header>
+                  <div class="flex items-center gap-2">
+                    <ShellCommandSearch compact shortcuts />
+                    <UDropdownMenu :items="userMenuItems" :content="{ align: 'end' }">
+                      <UButton variant="ghost" color="neutral" :aria-label="`Menú de usuario: ${user?.name || 'Personal de la clínica'}`" aria-haspopup="menu">
+                        <UAvatar :text="user?.name?.slice(0, 2).toUpperCase() || 'CP'" size="sm" />
+                      </UButton>
+                    </UDropdownMenu>
+                  </div>
+               </header>
               <component :is="Component" />
             </main>
           </template>

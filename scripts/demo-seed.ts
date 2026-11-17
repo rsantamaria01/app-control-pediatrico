@@ -70,11 +70,23 @@ async function checkIdentity() {
 
 async function resetDemo() {
   await db.transaction(async (tx) => {
-    const demoVisits = await tx.select({ id: visit.id }).from(visit).where(inArray(visit.patientId, childIds))
-    await tx.delete(inAppNotice).where(inArray(inAppNotice.subjectId, [...demoVisits.map(row => row.id), ...childIds.map((_, i) => id('checkup', i))]))
-    await tx.delete(inAppNotice).where(inArray(inAppNotice.outboxId, childIds.map((_, i) => id('outbox', i))))
-    if (demoVisits.length) await tx.delete(notificationOutbox).where(inArray(notificationOutbox.subjectId, demoVisits.map(row => row.id)))
+    const demoVisits = await tx.select({ id: visit.id, patientId: visit.patientId, requestId: visit.requestId }).from(visit).where(inArray(visit.patientId, childIds))
+    for (const row of demoVisits) {
+      const patientIndex = childIds.indexOf(row.patientId)
+      if (patientIndex < 0 || !Array.from({ length: 8 }, (_, index) => id(`visit-${patientIndex}`, index)).includes(row.requestId)) throw new Error('Demo patient has non-demo visits; refusing reset')
+    }
+    const grants = await tx.select({ guardianId: guardianGrant.guardianId, patientId: guardianGrant.patientId }).from(guardianGrant).where(inArray(guardianGrant.patientId, childIds))
+    if (grants.some(row => row.guardianId !== userIds[childIds.indexOf(row.patientId) < 4 ? 2 : 3])) throw new Error('Demo patient has non-demo guardian grants; refusing reset')
+    const storedNotices = await tx.select({ id: inAppNotice.id }).from(inAppNotice).where(inArray(inAppNotice.subjectId, [...demoVisits.map(row => row.id), ...childIds.map((_, i) => id('checkup', i))]))
+    if (storedNotices.some(row => !childIds.some((_, index) => row.id === id('notice', index)))) throw new Error('Demo records have non-demo notices; refusing reset')
+    await tx.delete(inAppNotice).where(inArray(inAppNotice.id, childIds.map((_, i) => id('notice', i))))
+    if (demoVisits.length) {
+      const outbox = await tx.select({ id: notificationOutbox.id }).from(notificationOutbox).where(inArray(notificationOutbox.subjectId, demoVisits.map(row => row.id)))
+      if (outbox.length) throw new Error('Demo visits have non-demo notification outbox entries; refusing reset')
+    }
     await tx.delete(notificationOutbox).where(inArray(notificationOutbox.id, childIds.map((_, i) => id('outbox', i))))
+    const otherAppointments = await tx.select({ id: appointment.id }).from(appointment).where(inArray(appointment.patientId, childIds))
+    if (otherAppointments.some(row => !Array.from({ length: 10 }, (_, index) => id('appointment', index)).includes(row.id))) throw new Error('Demo patient has non-demo appointments; refusing reset')
     await tx.delete(bookingRequest).where(inArray(bookingRequest.id, Array.from({ length: 3 }, (_, i) => id('booking', i))))
     await tx.delete(appointment).where(inArray(appointment.id, Array.from({ length: 12 }, (_, i) => id('appointment', i))))
     await tx.delete(completedCheckup).where(inArray(completedCheckup.id, childIds.map((_, i) => id('completed', i))))
@@ -98,7 +110,7 @@ async function resetDemo() {
     const [clinic] = await tx.select().from(clinicSettings).where(eq(clinicSettings.id, 'clinic'))
     if (clinic?.updatedBy === doctor.id && clinic.name === 'Clínica de Demostración Ficticia') await tx.delete(clinicSettings).where(eq(clinicSettings.id, 'clinic'))
     const [schedule] = await tx.select().from(clinicSchedule).where(eq(clinicSchedule.id, 'demo'))
-    if (schedule) await tx.delete(clinicSchedule).where(eq(clinicSchedule.id, 'demo'))
+    if (schedule?.durationMinutes === 30) await tx.delete(clinicSchedule).where(eq(clinicSchedule.id, 'demo'))
   })
 }
 

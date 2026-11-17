@@ -1,7 +1,5 @@
-import { defineEventHandler, getRequestURL } from 'h3'
-import { auditEvent } from '../db/schema'
+import { createError, defineEventHandler, getRequestURL } from 'h3'
 import { emulationState } from '../services/role-emulation'
-import { useDb } from '../utils/db'
 
 export default defineEventHandler(async (event) => {
   const method = event.method.toUpperCase()
@@ -10,5 +8,6 @@ export default defineEventHandler(async (event) => {
   if (!path.startsWith('/api/') || path === '/api/auth/emulacion' || path.startsWith('/api/auth/emulacion/')) return
   const state = await emulationState(event)
   if (!state) return
-  await useDb().insert(auditEvent).values({ id: crypto.randomUUID(), actorId: state.adminId, action: `EMULATED_${method}_${path}`.slice(0, 160), outcome: 'ALLOWED', subjectId: state.userId ?? state.adminId, emulatedRole: state.role, emulatedUserId: state.userId })
+  event.context.emulatedWrite = { adminId: state.adminId, role: state.role, userId: state.userId, method, path }
+  if (path.startsWith('/api/auth/') && path !== '/api/auth/sign-out') throw createError({ statusCode: 403, statusMessage: 'Salir de emulación para cambiar la cuenta' })
 })

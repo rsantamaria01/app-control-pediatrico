@@ -14,7 +14,9 @@ const target = process.env.DATABASE_URL
 if (!target) throw new Error('DATABASE_URL required')
 const url = new URL(target)
 const database = decodeURIComponent(url.pathname.slice(1))
-if (!['postgres:', 'postgresql:'].includes(url.protocol) || !/^pediatrico_design_[a-f0-9]{12}_test$/.test(database) || url.search || url.hash || (process.env.DB_NAME && process.env.DB_NAME !== database)) throw new Error('Only the isolated preview demo database is allowed')
+const disposable = /^pediatrico_design_[a-f0-9]{12}_test$/.test(database)
+const stablePreview = database === 'pediatrico_design_000000000000_test' && process.env.DEMO_SEED_DB === database
+if (!['postgres:', 'postgresql:'].includes(url.protocol) || !(disposable && database !== 'pediatrico_design_000000000000_test' || stablePreview) || url.search || url.hash || (process.env.DB_NAME && process.env.DB_NAME !== database) || (process.env.DEMO_SEED_DB && process.env.DEMO_SEED_DB !== database)) throw new Error('Only a disposable preview database or explicitly confirmed stable preview database is allowed')
 if (process.argv.slice(2).some(flag => flag !== '--reset') || process.argv.slice(2).length > 1) throw new Error('Usage: ops demo-seed [--reset]')
 const reset = process.argv.includes('--reset')
 const id = (kind: string, index: number) => {
@@ -36,10 +38,10 @@ const children = [
   { name: 'Planeta de Cartón Ocho', birthDate: '2022-06-18', sex: 'MALE', weight: 16, length: 105, head: 51 }
 ] as const
 const staff = [
-  { username: 'doctora.demo', name: 'Doctora de Demostración', role: 'DOCTOR' },
-  { username: 'asistente.demo', name: 'Asistente de Demostración', role: 'ASSISTANT' },
-  { username: 'familia.demo1', name: 'Familia Ficticia Uno', role: 'PATIENT' },
-  { username: 'familia.demo2', name: 'Familia Ficticia Dos', role: 'PATIENT' }
+  { username: 'doctor', name: 'Doctora de Demostración', role: 'DOCTOR' },
+  { username: 'asistente', name: 'Asistente de Demostración', role: 'ASSISTANT' },
+  { username: 'familiar', name: 'Familia Ficticia Uno', role: 'PATIENT' },
+  { username: 'familiar2', name: 'Familia Ficticia Dos', role: 'PATIENT' }
 ] as const
 const pool = new Pool({ connectionString: target })
 const db = drizzle(pool)

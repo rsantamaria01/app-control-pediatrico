@@ -83,7 +83,7 @@ test.describe('agenda by role and viewport', () => {
       expect(html).not.toContain(secret)
       expect(html).not.toContain(patientId)
       await page.getByRole('dialog', { name: 'Cita' }).getByRole('button', { name: 'Cerrar' }).click()
-      await page.getByRole('button', { name: 'Cita', exact: true }).click()
+      await page.getByRole('button', { name: 'Nueva cita' }).click()
       await expect(page.getByRole('dialog', { name: 'Nueva cita' }).getByRole('textbox', { name: 'Motivo' })).toHaveCount(0)
       await expect(page.getByRole('dialog', { name: 'Nueva cita' }).getByRole('textbox', { name: 'ID de paciente registrado (opcional)' })).toHaveCount(0)
       await context.close()
@@ -206,7 +206,7 @@ test.describe('agenda by role and viewport', () => {
         await expect(page).toHaveURL(role === 'ASSISTANT' ? '/agenda' : '/')
         await page.goto('/agenda?vista=dia')
         await page.waitForLoadState('networkidle')
-        await expect(page.getByRole('heading', { name: 'Agenda' })).toBeVisible()
+        await expect(page.locator('main').getByRole('heading', { name: 'Agenda' })).toBeVisible()
         if (role === 'ASSISTANT' && width === 375) {
           await page.getByRole('button', { name: 'Cita', exact: true }).click()
           const dialog = page.getByRole('dialog', { name: 'Nueva cita' })

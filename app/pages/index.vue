@@ -16,7 +16,8 @@ const { data: growthReview, error: growthError, refresh: refreshGrowth } = await
 const { data: vaccineReview, error: vaccineError, refresh: refreshVaccines } = await useFetch<{ id: string }[]>('/api/clinical/vacunacion-por-revisar', { immediate: isDoctor.value, default: () => [] })
 const { data: controlsReview, error: controlsError, refresh: refreshControls } = await useFetch<{ id: string }[]>('/api/clinical/controles-pendientes', { immediate: isDoctor.value, default: () => [] })
 const active = computed(() => appointments.value?.filter(item => item.status !== 'CANCELLED') ?? [])
-const todayLabel = new Intl.DateTimeFormat('es-EC', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'America/Guayaquil' }).format(new Date(`${today}T12:00:00-05:00`))
+const formattedToday = new Intl.DateTimeFormat('es-EC', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'America/Guayaquil' }).format(new Date(`${today}T12:00:00-05:00`))
+const todayLabel = formattedToday.charAt(0).toUpperCase() + formattedToday.slice(1)
 const upcoming = computed(() => active.value.filter(item => item.status !== 'ATTENDED' && new Date(`${item.date}T${item.time}:00-05:00`) >= new Date()))
 const appointmentStatus = (status: string) => status === 'ATTENDED' ? 'Atendida' : status === 'PENDING' ? 'Por confirmar' : status === 'CONFIRMED' ? 'Confirmada' : 'Programada'
 const greeting = new Intl.DateTimeFormat('es-EC', { hour: 'numeric', hourCycle: 'h23', timeZone: 'America/Guayaquil' }).format(new Date())
@@ -43,7 +44,7 @@ function age(birthDate: string) {
     <template v-if="isDoctor">
       <div class="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <p class="text-sm text-muted capitalize">
+          <p class="text-sm text-muted">
             {{ todayLabel }}
           </p>
           <h1 class="text-2xl font-semibold tracking-tight">
@@ -54,7 +55,7 @@ function age(birthDate: string) {
           to="/pacientes/nuevo"
           icon="i-lucide-plus"
           size="lg"
-          class="min-h-11"
+          class="min-h-11 lg:hidden"
         >
           Nuevo paciente
         </UButton>
@@ -123,14 +124,14 @@ function age(birthDate: string) {
             </p>
             <ul
               v-else
-              class="mt-2 divide-y divide-default"
+              class="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3"
             >
               <li
                 v-for="item in upcoming"
                 :key="item.id"
-                class="flex flex-wrap items-center gap-x-3 gap-y-1 py-3 text-sm first:pt-1 last:pb-0"
+                class="flex flex-col gap-1 rounded-lg border border-default bg-elevated p-3 text-sm"
               >
-                <strong class="w-12 shrink-0 self-start pt-1 tabular-nums">{{ item.time }}</strong>
+                <strong class="text-base tabular-nums">{{ item.time }}</strong>
                 <div class="min-w-0 flex-1">
                   <NuxtLink
                     v-if="item.patientId"
@@ -151,7 +152,7 @@ function age(birthDate: string) {
                   color="neutral"
                   variant="soft"
                   size="sm"
-                  class="shrink-0"
+                  class="self-start"
                 >
                   {{ appointmentStatus(item.status) }}
                 </UBadge>

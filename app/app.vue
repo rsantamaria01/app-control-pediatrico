@@ -46,7 +46,7 @@ const collapsed = ref(false)
 const narrowSidebar = ref(false)
 let releaseSidebarWidth: (() => void) | undefined
 const pageAction = computed(() => route.path === '/' || route.path === '/pacientes' ? { label: 'Nuevo paciente', to: '/pacientes/nuevo' } : null)
-const clinicName = 'Control Pediátrico'
+const clinicName = 'Pediatría'
 
 watch(loggedIn, async () => {
   await refreshNavigation()
@@ -209,7 +209,7 @@ useSeoMeta({
             <span
               v-if="!isCollapsed"
               class="min-w-0 text-sm"
-            >{{ clinicName }}<span class="block text-xs font-normal text-muted">Pediatría</span></span>
+            >{{ clinicName }}<span class="block text-xs font-normal text-muted">Control Pediátrico</span></span>
           </NuxtLink>
         </template>
         <template #default="{ collapsed: isCollapsed }">

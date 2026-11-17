@@ -14,6 +14,7 @@ const latest = computed(() => data.value?.visits[0])
 const { data: growth } = await useFetch<{ charts: Partial<Record<WhoIndicator, ChartView>> }>(`/api/pacientes/${encodeURIComponent(id)}/crecimiento`, { immediate: isDoctor.value })
 const chartIndicator = ref<WhoIndicator>(WhoIndicator.WEIGHT_FOR_AGE)
 const showGrowthTable = ref(false)
+const chartRange = ref<6 | 12 | 24 | 60>(24)
 const chartIndicators = [WhoIndicator.WEIGHT_FOR_AGE, WhoIndicator.HEIGHT_FOR_AGE, WhoIndicator.HEAD_CIRCUMFERENCE_FOR_AGE, WhoIndicator.BMI_FOR_AGE, WhoIndicator.WEIGHT_FOR_LENGTH, WhoIndicator.WEIGHT_FOR_HEIGHT]
 const sharing = reactive<Record<string, boolean>>({})
 const { data: sharingState } = await useFetch<Record<string, boolean>>(`/api/pacientes/${encodeURIComponent(id)}/visitas/compartir`, { immediate: isDoctor.value })
@@ -144,8 +145,27 @@ const age = computed(() => {
 const initials = computed(() => data.value?.patient.name.split(' ').map(part => part[0]).slice(0, 2).join('').toUpperCase() ?? '')
 const indicatorValues = computed(() => latestResults.value.map(result => ({
   result,
-  value: result.indicator === WhoIndicator.WEIGHT_FOR_AGE || result.indicator === WhoIndicator.WEIGHT_FOR_LENGTH || result.indicator === WhoIndicator.WEIGHT_FOR_HEIGHT ? `${weightFormat.format(latest.value!.weightKg)} kg` : result.indicator === WhoIndicator.HEIGHT_FOR_AGE ? `${lengthFormat.format(latest.value!.lengthHeightCm)} cm` : result.indicator === WhoIndicator.HEAD_CIRCUMFERENCE_FOR_AGE ? `${lengthFormat.format(latest.value!.headCircumferenceCm)} cm` : `${lengthFormat.format(latest.value!.bmi)} kg/m²`
+  value: result.indicator === WhoIndicator.WEIGHT_FOR_AGE || result.indicator === WhoIndicator.WEIGHT_FOR_LENGTH || result.indicator === WhoIndicator.WEIGHT_FOR_HEIGHT ? weightFormat.format(latest.value!.weightKg) : lengthFormat.format(result.indicator === WhoIndicator.HEIGHT_FOR_AGE ? latest.value!.lengthHeightCm : result.indicator === WhoIndicator.HEAD_CIRCUMFERENCE_FOR_AGE ? latest.value!.headCircumferenceCm : latest.value!.bmi),
+  unit: result.indicator === WhoIndicator.WEIGHT_FOR_AGE || result.indicator === WhoIndicator.WEIGHT_FOR_LENGTH || result.indicator === WhoIndicator.WEIGHT_FOR_HEIGHT ? 'kg' : result.indicator === WhoIndicator.BMI_FOR_AGE ? 'kg/m²' : 'cm'
 })))
+const selectedVisits = computed(() => data.value?.visits.map(visit => ({
+  visit,
+  result: visit.results.find(result => result.parentResultId === null && result.indicator === chartIndicator.value)
+})) ?? [])
+const chartRangeOptions = [{ label: '6 m', value: 6 }, { label: '1 a', value: 12 }, { label: '0–2 a', value: 24 }, { label: 'Todo', value: 60 }] as const
+const zFormat = new Intl.NumberFormat('es-EC', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+function zLabel(z: number) {
+  return `Z ${z < 0 ? '−' : '+'}${zFormat.format(Math.abs(z))}`
+}
+function ageAtVisit(measuredAt: string) {
+  const [year, month, day] = data.value!.patient.birthDate.split('-').map(Number)
+  const [visitYear, visitMonth, visitDay] = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Guayaquil', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(measuredAt)).split('-').map(Number)
+  const months = Math.max(0, (visitYear! - year!) * 12 + visitMonth! - month! - (visitDay! < day! ? 1 : 0))
+  return months < 12 ? `${months} m` : `${Math.floor(months / 12)} a ${months % 12} m`
+}
+function authorName(visit: VisitSnapshot) {
+  return (visit as VisitSnapshot & { authorName?: string }).authorName || '—'
+}
 </script>
 
 <template>
@@ -207,20 +227,13 @@ const indicatorValues = computed(() => latestResults.value.map(result => ({
               </UBadge>
               <UBadge
                 v-if="data.patient.gestationDays !== undefined"
-                :color="data.patient.gestationDays < 259 ? 'primary' : 'neutral'"
+                color="neutral"
                 variant="soft"
               >
                 {{ data.patient.gestationDays < 259 ? 'Prematuro' : 'A término' }} · {{ Math.floor(data.patient.gestationDays / 7) }}+{{ data.patient.gestationDays % 7 }} sem
               </UBadge>
-              <UBadge
-                class="sm:hidden"
-                color="neutral"
-                variant="soft"
-              >
-                {{ age }}
-              </UBadge>
             </div>
-            <dl class="hidden flex-wrap gap-x-8 gap-y-3 text-sm sm:flex">
+            <dl class="flex flex-wrap gap-x-8 gap-y-3 text-sm">
               <div>
                 <dt class="text-muted">
                   Edad
@@ -257,12 +270,23 @@ const indicatorValues = computed(() => latestResults.value.map(result => ({
                 </dd>
               </div>
             </dl>
-            <p
-              v-if="guardianStatus?.guardians.length"
-              class="hidden text-sm text-muted sm:block"
+            <div
+              v-if="guardianStatus?.guardians.length || pendingContacts?.length"
+              class="space-y-1 text-sm text-muted"
             >
-              Acceso familiar: {{ guardianStatus.guardians.map(guardian => `${guardian.email} · ${guardianLabel(guardian.status)}`).join(' · ') }}
-            </p>
+              <p
+                v-for="(guardian, index) in guardianStatus?.guardians"
+                :key="`${guardian.email}-${index}`"
+              >
+                Representante: {{ guardian.email }} · portal {{ guardianLabel(guardian.status).toLowerCase() }}
+              </p>
+              <p
+                v-for="contact in pendingContacts"
+                :key="contact.id"
+              >
+                Representante por vincular: {{ contact.name }} ({{ contact.relationship }}) · sin acceso al portal
+              </p>
+            </div>
           </div>
           <div class="flex w-full flex-wrap gap-2 xl:w-auto">
             <UButton
@@ -324,25 +348,42 @@ const indicatorValues = computed(() => latestResults.value.map(result => ({
           @click="chartIndicator = entry.result.indicator as WhoIndicator"
         >
           <span class="block text-xs font-medium text-muted">{{ labels[entry.result.indicator as WhoIndicator] }}</span>
-          <span class="block text-xl font-bold tabular-nums">{{ entry.value }}</span>
+          <span class="block text-xl font-bold tabular-nums">{{ entry.value }} <span class="text-xs font-medium text-muted">{{ entry.unit }}</span></span>
           <span
             v-if="entry.result.status === 'available'"
-            class="block text-sm tabular-nums"
-          >{{ formatGrowthValues(entry.result.z, entry.result.percentile) }}</span>
+            class="flex flex-wrap items-center gap-1.5"
+          >
+            <UBadge
+              v-if="entry.result.classification.name"
+              :color="entry.result.classification.tone === 'neutral' ? 'neutral' : 'warning'"
+              variant="soft"
+              class="max-w-full whitespace-normal"
+            >
+              <UIcon
+                :name="entry.result.classification.tone === 'flag' ? 'i-lucide-triangle-alert' : 'i-lucide-eye'"
+                aria-hidden="true"
+                class="mr-1 size-3.5"
+              />
+              {{ entry.result.classification.name }}
+            </UBadge>
+            <span class="text-sm font-semibold tabular-nums">{{ zLabel(entry.result.z) }}</span>
+          </span>
           <span
             v-else
             class="block text-sm text-muted"
           >No disponible</span>
-          <UBadge
-            v-if="entry.result.status === 'available' && entry.result.classification.name"
-            :color="entry.result.classification.tone === 'neutral' ? 'neutral' : 'warning'"
-            variant="soft"
-            class="max-w-full whitespace-normal"
-          >
-            {{ entry.result.classification.name }}
-          </UBadge>
+          <span
+            v-if="entry.result.status === 'available'"
+            class="block text-xs text-muted tabular-nums"
+          >{{ formatGrowthValues(entry.result.z, entry.result.percentile).split(' · ')[1] }}</span>
         </button>
       </section>
+      <p
+        v-if="latest?.clinicianTrend && patientSection === 'crecimiento'"
+        class="text-sm text-muted"
+      >
+        Tendencia indicada por el profesional: {{ latest.clinicianTrend }}
+      </p>
       <div class="min-w-0 overflow-hidden rounded-xl border border-default bg-default">
         <nav
           aria-label="Secciones del paciente"
@@ -764,62 +805,90 @@ const indicatorValues = computed(() => latestResults.value.map(result => ({
           <h2 class="text-lg font-semibold">
             Curvas de crecimiento OMS
           </h2>
-          <div
-            class="hidden gap-2 overflow-x-auto pb-1 sm:flex"
-            role="group"
-            aria-label="Indicador de crecimiento"
-          >
-            <UButton
-              v-for="indicator in chartIndicators"
-              :key="indicator"
-              variant="outline"
-              class="min-h-11 shrink-0"
-              :aria-pressed="chartIndicator === indicator"
-              @click="chartIndicator = indicator"
+          <div class="flex flex-wrap items-center gap-3 rounded-xl border border-default bg-default p-3 sm:p-4">
+            <div
+              class="hidden max-w-full gap-0.5 overflow-x-auto rounded-lg bg-elevated p-1 sm:flex"
+              role="group"
+              aria-label="Indicador de crecimiento"
             >
-              {{ labels[indicator] }}
-            </UButton>
-          </div>
-          <div class="flex items-center gap-2 sm:hidden">
+              <UButton
+                v-for="indicator in chartIndicators"
+                :key="indicator"
+                color="neutral"
+                :variant="chartIndicator === indicator ? 'solid' : 'ghost'"
+                class="min-h-11 shrink-0 text-xs"
+                :aria-pressed="chartIndicator === indicator"
+                @click="chartIndicator = indicator"
+              >
+                {{ labels[indicator] }}
+              </UButton>
+            </div>
             <USelect
               v-model="chartIndicator"
               :items="chartIndicators.map(indicator => ({ label: labels[indicator], value: indicator }))"
               aria-label="Indicador de crecimiento"
               size="lg"
-              class="min-w-0 flex-1"
+              class="min-w-0 flex-1 sm:hidden"
             />
-            <UButton
-              variant="outline"
-              class="min-h-11"
-              :aria-pressed="showGrowthTable"
-              @click="showGrowthTable = !showGrowthTable"
-            >
-              {{ showGrowthTable ? 'Gráfico' : 'Tabla' }}
-            </UButton>
+            <div class="ml-auto flex flex-wrap items-center gap-2">
+              <UFieldGroup
+                v-if="growth?.charts[chartIndicator]?.xUnit === 'DAY'"
+                size="sm"
+                role="group"
+                aria-label="Rango del gráfico"
+              >
+                <UButton
+                  v-for="range in chartRangeOptions.filter(range => range.value !== 60 || (growth?.charts[chartIndicator]?.curves[0]?.data.at(-1)?.[0] ?? 0) > 2 * 365.25)"
+                  :key="range.value"
+                  color="neutral"
+                  :variant="chartRange === range.value ? 'solid' : 'outline'"
+                  class="min-h-11"
+                  :aria-pressed="chartRange === range.value"
+                  @click="chartRange = range.value"
+                >
+                  {{ range.label }}
+                </UButton>
+              </UFieldGroup>
+              <UFieldGroup
+                size="sm"
+                role="group"
+                aria-label="Vista de crecimiento"
+              >
+                <UButton
+                  color="neutral"
+                  :variant="showGrowthTable ? 'outline' : 'solid'"
+                  class="min-h-11"
+                  :aria-pressed="!showGrowthTable"
+                  @click="showGrowthTable = false"
+                >
+                  Gráfico
+                </UButton>
+                <UButton
+                  color="neutral"
+                  :variant="showGrowthTable ? 'solid' : 'outline'"
+                  class="min-h-11"
+                  :aria-pressed="showGrowthTable"
+                  @click="showGrowthTable = true"
+                >
+                  Tabla
+                </UButton>
+              </UFieldGroup>
+            </div>
           </div>
-          <UButton
-            variant="outline"
-            class="hidden min-h-11 sm:inline-flex"
-            :aria-pressed="showGrowthTable"
-            @click="showGrowthTable = !showGrowthTable"
+          <div
+            v-if="!showGrowthTable"
+            class="grid overflow-hidden rounded-xl border border-default bg-default xl:grid-cols-[minmax(0,1fr)_320px]"
           >
-            {{ showGrowthTable ? 'Ver gráfico' : 'Ver tabla' }}
-          </UButton>
-          <div class="grid overflow-hidden rounded-xl border border-default bg-default xl:grid-cols-[minmax(0,1fr)_320px]">
             <div class="min-w-0 p-3 sm:p-5">
-              <h3 class="mb-3 hidden text-base font-semibold sm:block">
+              <h3 class="mb-3 text-base font-semibold">
                 {{ labels[chartIndicator] }} · {{ data.patient.sex === 'FEMALE' ? 'Niña' : 'Niño' }}
               </h3>
-              <template v-if="growth?.charts[chartIndicator]">
-                <GrowthTable
-                  v-if="showGrowthTable"
-                  :view="growth.charts[chartIndicator]!"
-                />
-                <GrowthChart
-                  v-else
-                  :view="growth.charts[chartIndicator]!"
-                />
-              </template>
+              <GrowthChart
+                v-if="growth?.charts[chartIndicator]"
+                :key="chartIndicator"
+                :view="growth.charts[chartIndicator]!"
+                :range-months="chartRange"
+              />
               <p
                 v-else
                 class="text-muted"
@@ -870,6 +939,16 @@ const indicatorValues = computed(() => latestResults.value.map(result => ({
               </UButton>
             </aside>
           </div>
+          <GrowthTable
+            v-if="showGrowthTable && growth?.charts[chartIndicator]"
+            :view="growth.charts[chartIndicator]!"
+          />
+          <p
+            v-else-if="showGrowthTable"
+            class="text-sm text-muted"
+          >
+            Referencia OMS no disponible.
+          </p>
         </section>
         <section
           v-if="patientSection === 'crecimiento' || patientSection === 'visitas'"
@@ -880,9 +959,11 @@ const indicatorValues = computed(() => latestResults.value.map(result => ({
           </h2><UCard>
             <div class="overflow-x-auto">
               <table
-                aria-label="Mediciones"
                 class="w-full min-w-[680px] text-left text-sm"
               >
+                <caption class="p-3 text-left font-semibold">
+                  Mediciones · {{ labels[chartIndicator] }}
+                </caption>
                 <thead>
                   <tr class="border-b border-default text-muted">
                     <th
@@ -890,27 +971,32 @@ const indicatorValues = computed(() => latestResults.value.map(result => ({
                       class="p-3"
                     >
                       Fecha
-                    </th><th
+                    </th>
+                    <th
                       scope="col"
                       class="p-3"
                     >
-                      Peso
-                    </th><th
+                      Edad
+                    </th>
+                    <th
                       scope="col"
                       class="p-3"
                     >
-                      Longitud/talla
-                    </th><th
+                      Medición
+                    </th>
+                    <th
                       scope="col"
                       class="p-3"
                     >
-                      P. cefálico
-                    </th><th
+                      Resultado
+                    </th>
+                    <th
                       scope="col"
                       class="p-3"
                     >
-                      Z peso/edad · percentil
-                    </th><th
+                      Clasificación OMS
+                    </th>
+                    <th
                       scope="col"
                       class="p-3"
                     >
@@ -920,27 +1006,43 @@ const indicatorValues = computed(() => latestResults.value.map(result => ({
                 </thead>
                 <tbody>
                   <tr
-                    v-for="item in data.visits"
-                    :key="item.id"
+                    v-for="{ visit, result } in selectedVisits"
+                    :key="visit.id"
                     class="border-b border-default last:border-0"
                   >
                     <td class="p-3">
-                      {{ dateFormat.format(new Date(item.measuredAt)) }}
-                    </td><td class="p-3 tabular-nums">
-                      {{ weightFormat.format(item.weightKg) }} kg
-                    </td><td class="p-3 tabular-nums">
-                      {{ lengthFormat.format(item.lengthHeightCm) }} cm
-                    </td><td class="p-3 tabular-nums">
-                      {{ lengthFormat.format(item.headCircumferenceCm) }} cm
-                    </td><td class="p-3 tabular-nums">
-                      <template
-                        v-for="result in item.results.filter(result => result.parentResultId === null)"
-                        :key="result.id"
+                      {{ dateFormat.format(new Date(visit.measuredAt)) }}
+                    </td>
+                    <td class="p-3 tabular-nums">
+                      {{ ageAtVisit(visit.measuredAt) }}
+                    </td>
+                    <td class="p-3 tabular-nums">
+                      {{ chartIndicator === WhoIndicator.WEIGHT_FOR_AGE || chartIndicator === WhoIndicator.WEIGHT_FOR_LENGTH || chartIndicator === WhoIndicator.WEIGHT_FOR_HEIGHT ? `${weightFormat.format(visit.weightKg)} kg` : chartIndicator === WhoIndicator.HEIGHT_FOR_AGE ? `${lengthFormat.format(visit.lengthHeightCm)} cm` : chartIndicator === WhoIndicator.HEAD_CIRCUMFERENCE_FOR_AGE ? `${lengthFormat.format(visit.headCircumferenceCm)} cm` : `${lengthFormat.format(visit.bmi)} kg/m²` }}
+                    </td>
+                    <td class="p-3 tabular-nums">
+                      {{ result?.status === 'available' ? formatGrowthValues(result.z, result.percentile) : 'No disponible' }}
+                    </td>
+                    <td class="p-3">
+                      <UBadge
+                        v-if="result?.status === 'available' && result.classification.name"
+                        :color="result.classification.tone === 'neutral' ? 'neutral' : 'warning'"
+                        variant="soft"
+                        class="whitespace-normal"
                       >
-                        <span v-if="result.indicator === WhoIndicator.WEIGHT_FOR_AGE">{{ result.status === 'available' ? formatGrowthValues(result.z, result.percentile) : 'No disponible' }}</span>
-                      </template>
-                    </td><td class="p-3">
-                      {{ item.authorId }}
+                        <UIcon
+                          :name="result.classification.tone === 'flag' ? 'i-lucide-triangle-alert' : 'i-lucide-eye'"
+                          aria-hidden="true"
+                          class="mr-1 size-3.5"
+                        />
+                        {{ result.classification.name }}
+                      </UBadge>
+                      <span
+                        v-else
+                        class="text-muted"
+                      >—</span>
+                    </td>
+                    <td class="p-3 text-muted">
+                      {{ authorName(visit) }}
                     </td>
                   </tr>
                 </tbody>

@@ -65,7 +65,7 @@ test('production image journeys from bootstrapped admin through two children and
     await page.getByRole('textbox', { name: 'Usuario' }).fill(username)
     await page.getByLabel('Contraseña').fill(secret)
     await page.getByRole('button', { name: 'Ingresar' }).click()
-    await expect(page).toHaveURL('/')
+    await expect(page).toHaveURL(username === 'firstadmin' ? '/admin/clinica' : username === 'journey-assistant' ? '/agenda' : '/')
   }
   const setup = async (address: string, username: string, secret: string) => {
     const token = await tokenFor(address)

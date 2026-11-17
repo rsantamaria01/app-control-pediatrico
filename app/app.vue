@@ -37,6 +37,12 @@ function dismissInstall() {
 const route = useRoute()
 const { user, loggedIn, fetchSession, signOut } = useUserSession()
 const { data: navigation, refresh: refreshNavigation } = await useFetch<{ label: string, to: string }[]>('/api/auth/navigation', { default: () => [] })
+const { data: emulation, refresh: refreshEmulation } = await useFetch<{ available: boolean, active: { role: string } | null }>('/api/auth/emulacion', { key: 'role-emulation-state', default: () => ({ available: false, active: null }) })
+const emulationOpen = ref(false)
+async function stopEmulation() {
+  await $fetch('/api/auth/emulacion', { method: 'DELETE' })
+  await navigateTo('/admin/inicio', { external: true })
+}
 const staffAccess = computed(() => navigation.value.some(item => ['/pacientes', '/agenda'].includes(item.to) || item.to.startsWith('/admin/')))
 const { data: staffNotices, refresh: refreshStaffNotices } = await useFetch<{ id: string }[]>('/api/avisos/personal', { enabled: staffAccess, default: () => [] })
 const readStaffIds = useState<string[]>('read-staff-notices', () => [])
@@ -106,6 +112,7 @@ function onSidebarLeave() {
 const userMenuItems = computed<DropdownMenuItem[][]>(() => [
   [
     { label: 'Ver perfil', icon: 'i-lucide-user-round', to: '/perfil' },
+    ...(emulation.value?.available ? [{ label: emulation.value.active ? 'Salir de emulación' : 'Ver como…', icon: 'i-lucide-eye', onSelect: emulation.value.active ? stopEmulation : () => { emulationOpen.value = true } }] : []),
     ...(hasFamily.value && isStaff.value ? [{ label: 'Vista familiar', icon: 'i-lucide-house', to: '/?vista=familiar' }] : []),
     { label: 'Cambiar tema', icon: 'i-lucide-moon', children: themeChoices.value }
   ],
@@ -116,6 +123,7 @@ const clinicName = computed(() => savedBrand.value?.name ?? 'Pediatría')
 
 watch(loggedIn, async () => {
   await refreshNavigation()
+  await refreshEmulation()
 })
 watch(() => route.path, async () => {
   if (import.meta.client) {
@@ -126,6 +134,7 @@ watch(() => route.path, async () => {
 async function logout() {
   await signOut({ onSuccess: async () => {
     await refreshNavigation()
+    await refreshEmulation()
     await navigateTo('/acceso')
   } })
 }
@@ -203,6 +212,8 @@ useSeoMeta({
 <template>
   <UApp :locale="locale">
     <NuxtPwaManifest />
+    <RoleEmulationBanner v-if="loggedIn && !publicPage && online" />
+    <RoleEmulationMenu v-if="loggedIn && emulation?.available && !emulation?.active" v-model:open="emulationOpen" />
 
     <NuxtPage v-slot="{ Component, route: pageRoute }">
       <template v-if="!online">
@@ -272,8 +283,8 @@ useSeoMeta({
               aria-hidden="true"
             >
              <span class="flex-1">{{ clinicName }}</span>
-             <ShellCommandSearch compact shortcuts />
-             <UDropdownMenu :items="userMenuItems" :content="{ align: 'end' }">
+                     <ShellCommandSearch compact shortcuts />
+                              <UDropdownMenu :items="userMenuItems" :content="{ align: 'end' }">
                <UButton variant="ghost" color="neutral" :aria-label="`Menú de usuario: ${user?.name || 'Representante'}`" aria-haspopup="menu">
                  <UAvatar :text="user?.name?.slice(0, 2).toUpperCase() || 'CP'" size="sm" />
                </UButton>
@@ -354,8 +365,7 @@ useSeoMeta({
              </div>
           </template>
            <template #footer>
-
-              <UDropdownMenu :items="userMenuItems" :content="{ side: 'right', align: 'end' }">
+                <UDropdownMenu :items="userMenuItems" :content="{ side: 'right', align: 'end' }">
                <UButton
                  color="neutral"
                  variant="ghost"
@@ -416,7 +426,7 @@ useSeoMeta({
                 </span>
                   <div class="flex items-center gap-2">
                     <ShellCommandSearch compact shortcuts />
-                    <UDropdownMenu :items="userMenuItems" :content="{ align: 'end' }">
+                              <UDropdownMenu :items="userMenuItems" :content="{ align: 'end' }">
                       <UButton variant="ghost" color="neutral" :aria-label="`Menú de usuario: ${user?.name || 'Personal de la clínica'}`" aria-haspopup="menu">
                         <UAvatar :text="user?.name?.slice(0, 2).toUpperCase() || 'CP'" size="sm" />
                       </UButton>

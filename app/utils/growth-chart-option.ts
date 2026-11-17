@@ -29,13 +29,15 @@ export function growthChartOption(view: ChartView | FamilyChartView, dark: boole
     if (family || !('z' in point)) return `${date} · ${value}${view.xUnit === 'DAY' ? ` · edad ${point.ageBasis === 'CORRECTED' ? 'corregida' : 'cronológica'} ${new Intl.NumberFormat('es-EC', { maximumFractionDigits: 1 }).format(point.x / 30.4375)} meses` : ''}`
     return `${date} · ${value} · ${point.ageBasis === 'CORRECTED' ? 'Edad corregida · ' : ''}${formatGrowthValues(point.z, point.percentile)}`
   } }
+  const current = view.points.at(-1)?.x
+  const initialRange = compact && view.xUnit === 'DAY' && current !== undefined ? { startValue: Math.max(view.curves[0]?.data[0]?.[0] ?? 0, current - 6 * 30.4375), endValue: Math.min(view.curves[0]?.data.at(-1)?.[0] ?? current, current + 6 * 30.4375) } : {}
   return {
     aria: { enabled: true, description: family ? 'Mediciones y curvas de referencia de crecimiento' : 'Mediciones y siete curvas de desviación estándar OMS. Tabla disponible.' },
     textStyle: { fontFamily: 'Inter, sans-serif', color: color.text, fontSize: 11 },
     grid: { left: 14, right: family ? 14 : 44, top: 24, bottom: 65, containLabel: true },
     xAxis: { type: 'value', name: view.xUnit === 'CM' ? 'Longitud/talla (cm)' : 'Edad (meses)', min: view.curves[0]?.data[0]?.[0], max: view.curves[0]?.data.at(-1)?.[0], axisLabel: { color: color.axis, formatter: view.xUnit === 'CM' ? '{value}' : (value: number) => String(Math.round(value / 30.4375)) }, splitLine: { lineStyle: { color: color.grid, type: 'dashed' } } },
     yAxis: { type: 'value', name: view.indicator === 'BMI_FOR_AGE' ? 'kg/m²' : view.indicator === 'WEIGHT_FOR_AGE' || view.indicator === 'WEIGHT_FOR_LENGTH' || view.indicator === 'WEIGHT_FOR_HEIGHT' ? 'kg' : 'cm', axisLabel: { color: color.axis }, splitLine: { lineStyle: { color: color.grid } } },
-    dataZoom: [{ type: 'inside', zoomOnMouseWheel: true, moveOnMouseMove: true }, { type: 'slider', height: 24, bottom: 4, show: !compact }],
+    dataZoom: [{ type: 'inside', zoomOnMouseWheel: true, moveOnMouseMove: true, ...initialRange }, { type: 'slider', height: 24, bottom: 4, show: !compact, ...initialRange }],
     tooltip,
     series: [...band, ...curveSeries, patient]
   }

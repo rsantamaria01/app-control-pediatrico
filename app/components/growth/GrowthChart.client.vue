@@ -31,7 +31,6 @@ function setRange(months: number) {
 onMounted(() => {
   const width = window.matchMedia('(max-width: 639px)')
   compact.value = width.matches
-  if (compact.value && props.view.xUnit === 'DAY' && props.view.points.length) nextTick(() => setRange(12))
   const update = () => { compact.value = width.matches }
   width.addEventListener('change', update)
   releaseWidth = () => width.removeEventListener('change', update)

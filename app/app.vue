@@ -43,6 +43,8 @@ const isStaff = computed(() => navigation.value.some(item => ['/pacientes', '/ag
 const isParent = computed(() => navigation.value.some(item => item.to === '/citas') && !isStaff.value)
 const hasFamily = computed(() => navigation.value.some(item => item.to === '/citas'))
 const isAdmin = computed(() => navigation.value.some(item => item.to.startsWith('/admin/')))
+const isAdminPanel = computed(() => isAdmin.value && route.path.startsWith('/admin/'))
+const clinicalLanding = computed(() => isDoctor.value ? '/' : navigation.value.some(item => item.to === '/agenda') ? '/agenda' : null)
 const staffItems = computed(() => {
   const staff = navigation.value.filter(item => !item.to.startsWith('/admin/') && item.to !== '/citas' && item.to !== '/perfil')
   return isDoctor.value ? staff.filter(item => item.to !== '/agenda/horarios') : navigation.value.some(item => item.to === '/agenda') ? staff.filter(item => item.to !== '/') : []
@@ -55,16 +57,16 @@ const adminItems = computed(() => isAdmin.value
       { label: 'Auditoría', to: '/admin/auditoria' }
     ]
   : [])
-const visibleItems = computed(() => isParent.value ? navigation.value.filter(item => ['/', '/citas', '/avisos'].includes(item.to)) : staffItems.value.length ? staffItems.value : adminItems.value)
-const mobileItems = computed(() => isAdmin.value && !staffItems.value.length
+const visibleItems = computed(() => isParent.value ? navigation.value.filter(item => ['/', '/citas', '/avisos'].includes(item.to)) : isAdminPanel.value || !staffItems.value.length ? adminItems.value : staffItems.value)
+const mobileItems = computed(() => isAdminPanel.value || isAdmin.value && !staffItems.value.length
   ? adminItems.value.filter(item => ['/admin/clinica', '/admin/catalogos'].includes(item.to))
   : visibleItems.value)
-const mobileMoreItems = computed(() => isAdmin.value && !isParent.value && staffItems.value.length && mobileItems.value.length < 5
-  ? adminItems.value.filter(item => !mobileItems.value.some(mobile => mobile.to === item.to)).map(item => ({ ...item, icon: icons[item.to] }))
+const mobileMoreItems = computed(() => isAdmin.value && !isParent.value && mobileItems.value.length < 5
+  ? (isAdminPanel.value || !staffItems.value.length ? adminItems.value : [{ label: 'Administración', to: '/admin/inicio' }]).filter(item => !mobileItems.value.some(mobile => mobile.to === item.to)).map(item => ({ ...item, icon: icons[item.to] }))
   : [])
 const icons: Record<string, string> = { '/': 'i-lucide-house', '/pacientes': 'i-lucide-users-round', '/agenda': 'i-lucide-calendar-days', '/agenda/horarios': 'i-lucide-clock', '/avisos': 'i-lucide-bell', '/perfil': 'i-lucide-user-round', '/citas': 'i-lucide-calendar-days', '/admin/inicio': 'i-lucide-house', '/admin/usuarios': 'i-lucide-users-round', '/admin/clinica': 'i-lucide-settings', '/admin/catalogos': 'i-lucide-book-open', '/admin/auditoria': 'i-lucide-scroll-text' }
 const navItems = computed(() => visibleItems.value.map(item => ({ ...item, icon: icons[item.to], active: route.path === item.to || (item.to !== '/' && route.path.startsWith(`${item.to}/`)) })))
-const adminNavItems = computed(() => adminItems.value.map(item => ({ ...item, icon: icons[item.to], active: route.path === item.to })))
+const staffAdminItem = [{ label: 'Administración', to: '/admin/inicio', icon: 'i-lucide-settings' }]
 const pageTitle = computed(() => route.query.vista === 'familiar' && route.path === '/' && hasFamily.value ? 'Vista familiar' : ({ '/': 'Inicio', '/pacientes': 'Pacientes', '/pacientes/nuevo': 'Nuevo paciente', '/agenda': 'Agenda', '/agenda/horarios': 'Horarios', '/agenda/solicitudes': 'Solicitudes', '/avisos': 'Avisos', '/perfil': 'Perfil', '/admin/inicio': 'Configuración inicial', '/admin/usuarios': 'Usuarios', '/admin/clinica': 'Ajustes de la clínica', '/admin/catalogos': 'Catálogos', '/admin/auditoria': 'Auditoría' })[route.path] ?? (route.path.startsWith('/pacientes/') ? 'Ficha del paciente' : 'Control Pediátrico'))
 const pinnedSidebar = ref(false)
 const sidebarCollapsed = computed({ get: () => !pinnedSidebar.value, set: value => { pinnedSidebar.value = !value } })
@@ -80,7 +82,7 @@ const userMenuItems = computed<DropdownMenuItem[][]>(() => [
   ],
   [{ label: 'Cerrar sesión', icon: 'i-lucide-log-out', onSelect: logout }]
 ])
-const pageAction = computed(() => isDoctor.value && (route.path === '/' && route.query.vista !== 'familiar' || route.path === '/pacientes') ? { label: 'Nuevo paciente', to: '/pacientes/nuevo' } : null)
+const pageAction = computed(() => isDoctor.value && !isAdminPanel.value && (route.path === '/' && route.query.vista !== 'familiar' || route.path === '/pacientes') ? { label: 'Nuevo paciente', to: '/pacientes/nuevo' } : null)
 const clinicName = computed(() => savedBrand.value?.name ?? 'Pediatría')
 
 watch(loggedIn, async () => {
@@ -268,7 +270,7 @@ useSeoMeta({
         >
            <template #header>
              <NuxtLink
-               :to="isDoctor ? '/' : isAdmin ? '/admin/clinica' : '/agenda'"
+                :to="isAdminPanel || !staffItems.length ? '/admin/inicio' : isDoctor ? '/' : '/agenda'"
                 class="flex w-full min-w-0 items-center gap-2 py-1 font-semibold text-default"
                 :class="sidebarExpanded ? 'px-2' : 'justify-center px-0'"
                 :aria-label="sidebarExpanded ? undefined : clinicName"
@@ -278,39 +280,38 @@ useSeoMeta({
                 alt="Logo de la clínica"
                 class="size-8 shrink-0"
               >
-              <span
-                 v-if="sidebarExpanded"
-                 class="min-w-0 text-sm"
-              >{{ clinicName }}<span class="block text-xs font-normal text-muted">Control Pediátrico</span></span>
+               <span
+                  v-if="sidebarExpanded"
+                  class="min-w-0 text-sm"
+               >{{ clinicName }}<span class="block text-xs font-normal text-muted">{{ isAdminPanel || !staffItems.length ? 'Administración' : 'Control Pediátrico' }}</span></span>
             </NuxtLink>
           </template>
            <template #default>
-            <UNavigationMenu
-              v-if="staffItems.length"
-              :items="navItems"
-               :collapsed="!sidebarExpanded"
-               :tooltip="!sidebarExpanded"
-               orientation="vertical"
-               aria-label="Navegación principal"
-            />
-            <div
-              v-if="adminItems.length"
-              class="mt-auto border-t border-default pt-3"
-            >
-              <p
-                 v-if="sidebarExpanded"
-                 class="px-3 pb-2 text-xs font-semibold uppercase tracking-wide text-muted"
-              >
-                Administración
-              </p>
-              <UNavigationMenu
-                :items="adminNavItems"
+             <UNavigationMenu
+               :items="navItems"
+                :collapsed="!sidebarExpanded"
+                :tooltip="!sidebarExpanded"
+                orientation="vertical"
+                :aria-label="isAdminPanel || !staffItems.length ? 'Administración' : 'Navegación principal'"
+             />
+             <div v-if="isAdminPanel && clinicalLanding" class="mt-auto border-t border-default pt-3">
+               <UNavigationMenu
+                 :items="[{ label: 'Volver a la consulta', to: clinicalLanding, icon: 'i-lucide-arrow-left' }]"
+                 :collapsed="!sidebarExpanded"
+                 :tooltip="!sidebarExpanded"
+                 orientation="vertical"
+                 aria-label="Volver a la consulta"
+               />
+             </div>
+             <div v-else-if="isAdmin && staffItems.length && !isAdminPanel" class="mt-auto border-t border-default pt-3">
+               <UNavigationMenu
+                 :items="staffAdminItem"
                  :collapsed="!sidebarExpanded"
                  :tooltip="!sidebarExpanded"
                  orientation="vertical"
                  aria-label="Administración"
-              />
-            </div>
+               />
+             </div>
           </template>
            <template #footer>
               <UTooltip :text="sidebarExpanded ? 'Contraer menú' : sidebarHover || sidebarFocus ? 'Fijar menú abierto' : 'Expandir menú'" :disabled="sidebarExpanded">

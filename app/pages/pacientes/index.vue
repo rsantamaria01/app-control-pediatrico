@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import type { PatientView } from '#shared/types/measurement'
 
-const query = ref('')
+const route = useRoute()
+const query = ref(typeof route.query.q === 'string' ? route.query.q : '')
 const age = (birthDate: string) => {
   const today = new Date()
   const [year, month, day] = birthDate.split('-').map(Number)

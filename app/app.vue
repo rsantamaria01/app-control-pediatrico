@@ -46,21 +46,22 @@ const isAdmin = computed(() => navigation.value.some(item => item.to.startsWith(
 const isAdminPanel = computed(() => isAdmin.value && route.path.startsWith('/admin/'))
 const clinicalLanding = computed(() => isDoctor.value ? '/' : navigation.value.some(item => item.to === '/agenda') ? '/agenda' : null)
 const staffItems = computed(() => {
-  const staff = navigation.value.filter(item => !item.to.startsWith('/admin/') && item.to !== '/citas' && item.to !== '/perfil')
+  const staff = navigation.value.filter(item => !item.to.startsWith('/admin/') && item.to !== '/citas' && item.to !== '/perfil' && !(item.to === '/' && !isDoctor.value))
   return isDoctor.value ? staff.filter(item => item.to !== '/agenda/horarios') : navigation.value.some(item => item.to === '/agenda') ? staff.filter(item => item.to !== '/') : []
 })
 const adminItems = computed(() => isAdmin.value
   ? [
-      { label: 'Configuración inicial', to: '/admin/inicio' },
-      { label: 'Usuarios', to: '/admin/usuarios' },
-      ...navigation.value.filter(item => item.to.startsWith('/admin/')),
-      { label: 'Auditoría', to: '/admin/auditoria' }
-    ]
+       { label: 'Configuración inicial', to: '/admin/inicio' },
+       { label: 'Usuarios', to: '/admin/usuarios' },
+       { label: 'Clínica', to: '/admin/clinica' },
+       { label: 'Catálogos', to: '/admin/catalogos' },
+       { label: 'Auditoría', to: '/admin/auditoria' }
+     ]
   : [])
 const visibleItems = computed(() => isParent.value ? navigation.value.filter(item => ['/', '/citas', '/avisos'].includes(item.to)) : isAdminPanel.value || !staffItems.value.length ? adminItems.value : staffItems.value)
 const mobileItems = computed(() => isAdminPanel.value || isAdmin.value && !staffItems.value.length
   ? adminItems.value.filter(item => ['/admin/clinica', '/admin/catalogos'].includes(item.to))
-  : visibleItems.value)
+  : visibleItems.value.filter(item => item.to !== '/perfil'))
 const mobileMoreItems = computed(() => {
   if (isParent.value || !isAdmin.value) return []
   const adminLinks = isAdminPanel.value || !staffItems.value.length ? adminItems.value : [{ label: 'Administración', to: '/admin/inicio' }]

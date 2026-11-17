@@ -37,9 +37,12 @@ function dismissInstall() {
 const route = useRoute()
 const { user, loggedIn, fetchSession, signOut } = useUserSession()
 const { data: navigation, refresh: refreshNavigation } = await useFetch<{ label: string, to: string }[]>('/api/auth/navigation', { default: () => [] })
+const staffAccess = computed(() => navigation.value.some(item => ['/pacientes', '/agenda'].includes(item.to) || item.to.startsWith('/admin/')))
+const { data: staffNotices, refresh: refreshStaffNotices } = await useFetch<{ readAt?: string }[]>('/api/avisos/personal', { enabled: staffAccess, default: () => [] })
+const staffUnread = computed(() => staffNotices.value.filter(notice => !notice.readAt).length)
 const publicPage = computed(() => /^\/(acceso|recuperar|restablecer|invitacion|reservar|privacidad|sin-conexion|sesion-expirada|403)(\/|$)/.test(route.path))
 const isDoctor = computed(() => navigation.value.some(item => item.to === '/pacientes'))
-const isStaff = computed(() => navigation.value.some(item => ['/pacientes', '/agenda'].includes(item.to) || item.to.startsWith('/admin/')))
+const isStaff = staffAccess
 const isParent = computed(() => navigation.value.some(item => item.to === '/citas') && !isStaff.value)
 const hasFamily = computed(() => navigation.value.some(item => item.to === '/citas'))
 const isAdmin = computed(() => navigation.value.some(item => item.to.startsWith('/admin/')))
@@ -71,7 +74,7 @@ const mobileMoreItems = computed(() => {
   ].map(item => ({ ...item, icon: item.label === 'Volver a la consulta' ? 'i-lucide-arrow-left' : item.label === 'Administración' ? 'i-lucide-settings' : icons[item.to] }))
 })
 const icons: Record<string, string> = { '/': 'i-lucide-house', '/pacientes': 'i-lucide-users-round', '/agenda': 'i-lucide-calendar-days', '/agenda/horarios': 'i-lucide-clock', '/avisos': 'i-lucide-bell', '/perfil': 'i-lucide-user-round', '/citas': 'i-lucide-calendar-days', '/admin/inicio': 'i-lucide-house', '/admin/usuarios': 'i-lucide-users-round', '/admin/clinica': 'i-lucide-settings', '/admin/catalogos': 'i-lucide-book-open', '/admin/auditoria': 'i-lucide-scroll-text' }
-const navItems = computed(() => visibleItems.value.map(item => ({ ...item, icon: icons[item.to], active: route.path === item.to || (item.to !== '/' && route.path.startsWith(`${item.to}/`)) })))
+const navItems = computed(() => visibleItems.value.map(item => ({ ...item, icon: icons[item.to], badge: item.to === '/avisos' && isStaff.value && staffUnread.value ? String(staffUnread.value) : undefined, active: route.path === item.to || (item.to !== '/' && route.path.startsWith(`${item.to}/`)) })))
 const staffAdminItem = [{ label: 'Administración', to: '/admin/inicio', icon: 'i-lucide-settings' }]
 const pageTitle = computed(() => route.query.vista === 'familiar' && route.path === '/' && hasFamily.value ? 'Vista familiar' : ({ '/': 'Inicio', '/pacientes': 'Pacientes', '/pacientes/nuevo': 'Nuevo paciente', '/agenda': 'Agenda', '/agenda/horarios': 'Horarios', '/agenda/solicitudes': 'Solicitudes', '/avisos': 'Avisos', '/perfil': 'Perfil', '/admin/inicio': 'Configuración inicial', '/admin/usuarios': 'Usuarios', '/admin/clinica': 'Ajustes de la clínica', '/admin/catalogos': 'Catálogos', '/admin/auditoria': 'Auditoría' })[route.path] ?? (route.path.startsWith('/pacientes/') ? 'Ficha del paciente' : 'Control Pediátrico'))
 const pinnedSidebar = ref(false)
@@ -108,7 +111,10 @@ watch(loggedIn, async () => {
   await refreshNavigation()
 })
 watch(() => route.path, async () => {
-  if (import.meta.client) await refreshNavigation()
+  if (import.meta.client) {
+    await refreshNavigation()
+    if (isStaff.value) await refreshStaffNotices()
+  }
 })
 async function logout() {
   await signOut({ onSuccess: async () => {

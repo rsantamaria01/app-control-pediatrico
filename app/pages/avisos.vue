@@ -3,6 +3,18 @@ const { data: navigation, error: navigationError, refresh: refreshNavigation } =
 const isStaff = computed(() => navigation.value.some(item => item.to === '/pacientes' || item.to === '/agenda' || item.to.startsWith('/admin/')))
 const isParent = computed(() => !navigationError.value && !isStaff.value && navigation.value.some(item => item.to === '/citas'))
 const { data, error, refresh } = await useFetch<{ id: string, eventKind: string, subjectId: string, dueDate: string | null, readAt: string | null, createdAt: string }[]>('/api/avisos', { default: () => [], enabled: isParent })
+type StaffNotice = { id: string, title: string, context: string, icon: string, to: string, createdAt: string, readAt?: string }
+const { data: staffNotices, error: staffError, refresh: refreshStaff } = await useFetch<StaffNotice[]>('/api/avisos/personal', { default: () => [], enabled: isStaff })
+const staffUnread = computed(() => staffNotices.value.filter(notice => !notice.readAt).length)
+const relativeTime = new Intl.RelativeTimeFormat('es-EC', { numeric: 'auto' })
+function when(date: string) {
+  const hours = Math.round((Date.parse(date) - Date.now()) / 3600000)
+  return Math.abs(hours) < 24 ? relativeTime.format(hours, 'hour') : relativeTime.format(Math.round(hours / 24), 'day')
+}
+async function readStaff(id: string) {
+  await $fetch(`/api/avisos/personal/${encodeURIComponent(id)}`, { method: 'POST' })
+  await refreshStaff()
+}
 const accessError = navigationError.value?.statusCode ?? error.value?.statusCode
 if (import.meta.server && (accessError === 401 || accessError === 403)) throw createError({ statusCode: accessError, statusMessage: 'Acceso denegado' })
 watch(isParent, async (allowed) => {
@@ -11,7 +23,8 @@ watch(isParent, async (allowed) => {
 const dates = new Intl.DateTimeFormat('es-EC', { dateStyle: 'medium', timeZone: 'America/Guayaquil' })
 const calendarDay = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Guayaquil', year: 'numeric', month: '2-digit', day: '2-digit' })
 const filter = ref<'all' | 'unread'>('all')
-const unreadCount = computed(() => data.value?.filter(notice => !notice.readAt).length ?? 0)
+const staffVisible = computed(() => staffNotices.value.filter(notice => filter.value === 'all' || !notice.readAt))
+const unreadCount = computed(() => isStaff.value ? staffUnread.value : data.value?.filter(notice => !notice.readAt).length ?? 0)
 const visible = computed(() => data.value?.filter(notice => filter.value === 'all' || !notice.readAt) ?? [])
 const today = calendarDay.format(new Date())
 const todayNotices = computed(() => visible.value.filter(notice => calendarDay.format(new Date(notice.createdAt)) === today))
@@ -20,10 +33,14 @@ const titles: Record<string, string> = { CHECKUP_DUE: 'Recordatorio de control',
 const icons: Record<string, string> = { CHECKUP_DUE: 'i-lucide-clock', VISIT_RECORDED: 'i-lucide-message-square', BOOKING_APPROVED: 'i-lucide-check', BOOKING_PENDING: 'i-lucide-calendar-days', BOOKING_DECLINED: 'i-lucide-calendar-x', BOOKING_RESCHEDULED: 'i-lucide-calendar-days', BOOKING_CANCELLED: 'i-lucide-calendar-x' }
 const reading = ref(false)
 async function markAllRead() {
-  if (!isParent.value) return
+  if (!isParent.value && !isStaff.value) return
   reading.value = true
   try {
-    for (const notice of visible.value.filter(item => !item.readAt)) await markRead(notice.id)
+    if (isStaff.value) {
+      for (const notice of staffVisible.value.filter(item => !item.readAt)) await readStaff(notice.id)
+    } else {
+      for (const notice of visible.value.filter(item => !item.readAt)) await markRead(notice.id)
+    }
   } finally {
     reading.value = false
   }
@@ -45,7 +62,7 @@ async function markRead(id: string) {
         Avisos
       </h1>
       <UButton
-        v-if="isParent && unreadCount"
+        v-if="(isParent || isStaff) && unreadCount"
         variant="ghost"
         color="neutral"
         :loading="reading"
@@ -56,8 +73,8 @@ async function markRead(id: string) {
       </UButton>
     </header>
     <nav
-      v-if="isParent && !navigationError"
-      aria-label="Filtrar avisos"
+v-if="(isParent || isStaff) && !navigationError"
+       aria-label="Filtrar avisos"
        class="flex rounded-lg bg-elevated p-1 text-sm"
     >
       <button
@@ -80,21 +97,23 @@ async function markRead(id: string) {
       </button>
     </nav>
     <div class="rounded-xl border border-default bg-default p-4">
-      <UEmpty
-        v-if="isStaff && !navigationError"
-        icon="i-lucide-bell-off"
-        title="Avisos no disponibles para el personal"
-        description="Los avisos del portal son solo para representantes. Esta sección no muestra información de familias."
-      />
-      <UAlert
-        v-else-if="navigationError"
+       <UAlert
+         v-if="navigationError"
         color="error"
         variant="soft"
         title="No se pudo verificar el acceso"
         :actions="[{ label: 'Reintentar', onClick: () => refreshNavigation() }]"
       />
-      <UAlert
-        v-else-if="isParent && error"
+       <UAlert
+         v-else-if="isStaff && staffError"
+         color="error"
+         variant="soft"
+         title="No se pudieron cargar los avisos"
+         :actions="[{ label: 'Reintentar', onClick: () => refreshStaff() }]"
+       />
+       <UEmpty v-else-if="isStaff && !staffVisible.length" title="Sin avisos nuevos" />
+       <UAlert
+         v-else-if="isParent && error"
         color="error"
         variant="soft"
         title="No se pudieron cargar los avisos"
@@ -110,6 +129,18 @@ async function markRead(id: string) {
         description="Inicie sesión para consultar sus avisos."
       />
     </div>
+    <section v-if="isStaff && !staffError && !navigationError && staffVisible.length" aria-label="Avisos del personal" class="overflow-hidden rounded-xl border border-default bg-default">
+      <ul class="divide-y divide-default">
+        <li v-for="notice in staffVisible" :key="notice.id" class="flex items-center gap-3 px-4 py-3" :class="!notice.readAt ? 'bg-primary/5' : ''">
+          <span class="flex size-9 shrink-0 items-center justify-center rounded-full bg-elevated"><UIcon :name="notice.icon" class="size-5" aria-hidden="true" /></span>
+          <NuxtLink :to="notice.to" class="min-w-0 flex-1 py-2 hover:text-primary">
+            <span class="block font-semibold">{{ notice.title }}</span>
+            <span class="block truncate text-sm text-muted">{{ notice.context }} · {{ when(notice.createdAt) }}</span>
+          </NuxtLink>
+          <UButton v-if="!notice.readAt" variant="ghost" color="neutral" icon="i-lucide-check" :aria-label="`Marcar como leído: ${notice.title}, ${notice.context}`" class="min-h-11 min-w-11" @click="readStaff(notice.id)" />
+        </li>
+      </ul>
+    </section>
     <template v-if="isParent && !error && !navigationError && visible.length">
       <section
         v-for="group in [{ label: 'HOY', items: todayNotices }, { label: 'ANTERIORES', items: olderNotices }]"

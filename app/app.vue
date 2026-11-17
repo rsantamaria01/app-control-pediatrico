@@ -231,7 +231,7 @@ useSeoMeta({
               :items="navItems"
               :collapsed="isCollapsed"
               orientation="vertical"
-              aria-label="Principal"
+              aria-label="Navegación principal"
             />
             <div
               v-if="adminItems.length"

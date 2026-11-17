@@ -106,7 +106,7 @@ test.describe('board fidelity: public access and role-aware shell', () => {
           expect(await tabs.getByRole('link').count()).toBeLessThanOrEqual(5)
           await expectLinks(page, 'nav[aria-label="Navegación principal"]', roles[role].mobile)
           if (role === 'ADMIN') await expect(tabs.getByRole('link', { name: /Pacientes|Citas/ })).toHaveCount(0)
-          await expect(page.locator('nav[aria-label="Principal"], nav[aria-label="Administración"]')).toBeHidden()
+          await expect(page.locator('[data-slot="body"] nav[aria-label="Navegación principal"], [data-slot="body"] nav[aria-label="Administración"]')).toBeHidden()
         } else if (role === 'PATIENT') {
           const header = page.locator('header[data-slot="root"]')
           await expect(header).toBeVisible()
@@ -116,7 +116,7 @@ test.describe('board fidelity: public access and role-aware shell', () => {
           await expect(header.getByRole('button', { name: 'Cerrar sesión' })).toBeVisible()
           await expect(page.getByRole('navigation', { name: 'Navegación principal' })).toBeHidden()
         } else {
-          const label = role === 'ADMIN' ? 'Administración' : 'Principal'
+          const label = role === 'ADMIN' ? 'Administración' : 'Navegación principal'
           const sidebar = page.getByRole('navigation', { name: label })
           await expect(sidebar).toBeVisible()
           const shell = sidebar.locator('xpath=ancestor::*[@data-slot="body"][1]/..')
@@ -128,7 +128,7 @@ test.describe('board fidelity: public access and role-aware shell', () => {
           }
           await expectLinks(page, `nav[aria-label="${label}"]`, roles[role].desktop, width === 1024)
           if (role !== 'ADMIN') await expect(page.getByRole('navigation', { name: 'Administración' })).toHaveCount(0)
-          else await expect(page.getByRole('navigation', { name: 'Principal' })).toHaveCount(0)
+          else await expect(page.getByRole('navigation', { name: 'Navegación principal' })).toHaveCount(0)
           const title = role === 'DOCTOR' ? 'Inicio' : role === 'ASSISTANT' ? 'Agenda' : 'Clínica'
           const topbar = page.locator('h1[data-slot="title"]').filter({ hasText: title }).locator('xpath=../..')
           await expect(topbar).toBeVisible()

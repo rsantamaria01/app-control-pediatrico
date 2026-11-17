@@ -7,9 +7,10 @@ const { user } = useUserSession()
 const { data: navigation } = await useFetch<{ label: string, to: string }[]>('/api/auth/navigation')
 const isAdmin = computed(() => Boolean(navigation.value?.some(item => item.to === '/admin/clinica')))
 const hasDoctorRole = computed(() => Boolean(navigation.value?.some(item => item.to === '/pacientes')))
-const isDoctor = computed(() => hasDoctorRole.value && route.query.vista !== 'familiar')
 const hasStaffRole = computed(() => hasDoctorRole.value || Boolean(navigation.value?.some(item => item.to === '/agenda' || item.to.startsWith('/admin/'))))
-const isParent = computed(() => Boolean(navigation.value?.some(item => item.to === '/citas')) && (!hasStaffRole.value || route.query.vista === 'familiar'))
+const isFamilyView = computed(() => route.query.vista === 'familiar' && Boolean(navigation.value?.some(item => item.to === '/citas')))
+const isDoctor = computed(() => hasDoctorRole.value && !isFamilyView.value)
+const isParent = computed(() => Boolean(navigation.value?.some(item => item.to === '/citas')) && (!hasStaffRole.value || isFamilyView.value))
 if (!user.value) {
   await navigateTo('/acceso')
 } else if (!isDoctor.value && !isParent.value) {

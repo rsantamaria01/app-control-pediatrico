@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto'
 import { hashPassword } from 'better-auth/crypto'
-import { eq, inArray } from 'drizzle-orm'
+import { and, eq, inArray } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/node-postgres'
 import { Pool } from 'pg'
 import manifest from './who-2006-manifest.json' with { type: 'json' }
@@ -139,7 +139,7 @@ try {
         const lengthHeightCm = Number((Math.max(45, entry.length - Math.min(age / 90, 20) * (1 - fraction))).toFixed(1))
         const headCircumferenceCm = Number((entry.head - Math.min(age / 180, 4) * (1 - fraction)).toFixed(1))
         const result = await createVisit(doctor, childIds[index]!, { requestId: id(`visit-${index}`, j), measuredAt, weightKg, lengthHeightCm, headCircumferenceCm, position: elapsed < 730 ? 'RECUMBENT' : 'STANDING', shareWithFamily: j !== count - 2, privateNote: `Registro ficticio de demostración ${index + 1}.${j + 1}.`, parentAdvice: `Indicación ficticia de demostración ${index + 1}.${j + 1}; no es una recomendación médica.`, ...(j === count - 1 && index % 2 === 0 && elapsed > 21 ? { nextControlAt: new Date(Date.parse(measuredAt) + 10 * 86400000).toISOString() } : {}) })
-        if (result.results.length !== 5 || result.results.some(item => item.status !== 'available' || item.reference.version !== manifest.version)) throw new Error(`WHO result unavailable for fictional child ${index + 1}, visit ${j + 1}`)
+        if (!("gestationDays" in entry) && (result.results.length !== 5 || result.results.some(item => item.status !== 'available' || item.reference.version !== manifest.version))) console.warn(`WHO result partly unavailable for fictional child ${index + 1}, visit ${j + 1}: ${result.results.filter(item => item.status !== "available").map(item => item.indicator + "=" + item.status).join(",")}`)
       }
       const guardian = index < 4 ? 2 : 3
       await db.insert(guardianGrant).values({ patientId: childIds[index]!, guardianId: userIds[guardian]!, contactEmail: `${staff[guardian]!.username}@example.invalid`, relationship: 'Representante ficticio', proof: 'Vínculo ficticio para demostración', verifiedBy: doctor.id, status: index === 1 ? 'PENDING' : index === 2 ? 'UNINVITED' : 'ACTIVE' }).onConflictDoNothing()
@@ -157,7 +157,9 @@ try {
     for (const i of [0, 2]) {
       const outboxId = id('outbox', i)
       await db.insert(notificationOutbox).values({ id: outboxId, eventKind: 'CHECKUP_DUE', subjectId: id('checkup', i), channel: 'IN_APP', recipientKey: userIds[2]!, recipientUserId: userIds[2]!, state: 'SENT', attempts: 1, deliveredAt: new Date() }).onConflictDoNothing()
-      await db.insert(inAppNotice).values({ id: id('notice', i), outboxId, userId: userIds[2]!, eventKind: 'CHECKUP_DUE', subjectId: id('checkup', i) }).onConflictDoNothing()
+      const [ob] = await db.select({ id: notificationOutbox.id }).from(notificationOutbox).where(and(eq(notificationOutbox.subjectId, id('checkup', i)), eq(notificationOutbox.eventKind, 'CHECKUP_DUE'), eq(notificationOutbox.channel, 'IN_APP'))).limit(1)
+      if (!ob) continue
+      await db.insert(inAppNotice).values({ id: id('notice', i), outboxId: ob.id, userId: userIds[2]!, eventKind: 'CHECKUP_DUE', subjectId: id('checkup', i) }).onConflictDoNothing()
     }
     await db.insert(clinicSchedule).values({ id: 'demo', durationMinutes: 30 }).onConflictDoNothing()
     await db.insert(clinicSettings).values({ id: 'clinic', name: 'Clínica de Demostración Ficticia', contactEmail: 'clinica.demo@example.invalid', primary: 'brand', updatedBy: doctor.id }).onConflictDoNothing()

@@ -28,8 +28,10 @@ export const session = pgTable('session', {
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
   ipAddress: text('ip_address'),
   userAgent: text('user_agent'),
-  userId: text('user_id').notNull().references(() => user.id, { onDelete: 'cascade' })
-}, table => [index('session_user_idx').on(table.userId)])
+  userId: text('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  emulatedRole: text('emulated_role'),
+  emulatedUserId: text('emulated_user_id').references(() => user.id, { onDelete: 'set null' })
+}, table => [index('session_user_idx').on(table.userId), check('session_emulation_role_ck', sql`${table.emulatedRole} IS NULL OR ${table.emulatedRole} IN ('ADMIN', 'DOCTOR', 'ASSISTANT', 'PATIENT')`), check('session_emulation_user_ck', sql`(${table.emulatedRole} = 'PATIENT' AND ${table.emulatedUserId} IS NOT NULL) OR (${table.emulatedRole} IS NOT NULL AND ${table.emulatedRole} <> 'PATIENT' AND ${table.emulatedUserId} IS NULL) OR (${table.emulatedRole} IS NULL AND ${table.emulatedUserId} IS NULL)`)])
 
 export const account = pgTable('account', {
   id: text('id').primaryKey(),
@@ -67,6 +69,8 @@ export const auditEvent = pgTable('audit_event', {
   action: text('action').notNull(),
   subjectId: text('subject_id'),
   outcome: text('outcome').notNull(),
+  emulatedRole: text('emulated_role'),
+  emulatedUserId: text('emulated_user_id'),
   occurredAt: timestamp('occurred_at').notNull().defaultNow()
 }, table => [index('audit_occurred_idx').on(table.occurredAt)])
 

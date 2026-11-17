@@ -75,13 +75,26 @@ it('persists one clinic record, validates accessible primary palette and never r
   expect(await db.select().from(auditEvent).where(eq(auditEvent.action, 'CLINIC_SETTINGS_UPDATE'))).toHaveLength(2)
 })
 
+it('uses persisted null logo instead of deployment fallback in reports', async () => {
+  const logo = process.env.NUXT_PUBLIC_CLINIC_LOGO
+  try {
+    process.env.NUXT_PUBLIC_CLINIC_LOGO = '/branding/deployment.png'
+    expect(await getClinicReportBrand()).toMatchObject({ logo: '/branding/deployment.png' })
+    await updateClinicSettings(admin, { name: 'Clínica', contactEmail: 'hola@example.test', primary: 'teal', logo: null })
+    expect(await getClinicReportBrand()).toEqual({ primary: 'teal', logo: '' })
+  } finally {
+    if (logo === undefined) delete process.env.NUXT_PUBLIC_CLINIC_LOGO
+    else process.env.NUXT_PUBLIC_CLINIC_LOGO = logo
+  }
+})
+
 it('exposes only validated persisted public brand fields and rejects unsafe branding paths', async () => {
-  expect(await getPublicClinicBrand()).toEqual({ primary: 'brand', logo: null })
+  expect(await getPublicClinicBrand()).toEqual({ name: null, primary: 'brand', logo: null })
   await updateClinicSettings(admin, { name: 'Clínica', contactEmail: 'hola@example.test', primary: 'teal', logo: '/branding/clinic.png' })
-  expect(await getPublicClinicBrand()).toEqual({ primary: 'teal', logo: '/branding/clinic.png' })
+  expect(await getPublicClinicBrand()).toEqual({ name: 'Clínica', primary: 'teal', logo: '/branding/clinic.png' })
   await expect(updateClinicSettings(admin, { name: 'Clínica', contactEmail: 'hola@example.test', primary: 'teal', logo: '/branding/clinic.svg?url=https://evil.test' })).rejects.toMatchObject({ statusCode: 400 })
   await db.update(clinicSettings).set({ logo: 'https://evil.test/track.png' })
-  expect(await getPublicClinicBrand()).toEqual({ primary: 'teal', logo: null })
+  expect(await getPublicClinicBrand()).toEqual({ name: 'Clínica', primary: 'teal', logo: null })
 })
 
 it('validates deployment fallback before exposing public brand values', async () => {
@@ -90,10 +103,10 @@ it('validates deployment fallback before exposing public brand values', async ()
   try {
     process.env.NUXT_PUBLIC_CLINIC_PRIMARY = 'javascript:unsafe'
     process.env.NUXT_PUBLIC_CLINIC_LOGO = 'https://evil.test/logo.png'
-    expect(await getPublicClinicBrand()).toEqual({ primary: 'brand', logo: null })
+    expect(await getPublicClinicBrand()).toEqual({ name: null, primary: 'brand', logo: null })
     process.env.NUXT_PUBLIC_CLINIC_PRIMARY = 'violet'
     process.env.NUXT_PUBLIC_CLINIC_LOGO = '/branding/preprovisioned.webp'
-    expect(await getPublicClinicBrand()).toEqual({ primary: 'violet', logo: '/branding/preprovisioned.webp' })
+    expect(await getPublicClinicBrand()).toEqual({ name: null, primary: 'violet', logo: '/branding/preprovisioned.webp' })
   } finally {
     if (primary === undefined) delete process.env.NUXT_PUBLIC_CLINIC_PRIMARY
     else process.env.NUXT_PUBLIC_CLINIC_PRIMARY = primary
@@ -114,10 +127,47 @@ it('explicitly grants dual ADMIN and DOCTOR, revokes sessions on deactivation an
   await expect(assignStaffRoles(doctor, admin.id, ['DOCTOR'])).rejects.toMatchObject({ statusCode: 403 })
 })
 
+it('lists deactivated credentialed former staff without exposing unassigned patients or uncredentialed users', async () => {
+  const former = randomUUID()
+  const patient = randomUUID()
+  const uncredentialed = randomUUID()
+  await db.insert(user).values([
+    { id: former, name: 'Former', email: `${former}@example.test` },
+    { id: patient, name: 'Patient', email: `${patient}@example.test` },
+    { id: uncredentialed, name: 'Other', email: `${uncredentialed}@example.test` }
+  ])
+  await db.insert(account).values([
+    { id: randomUUID(), userId: former, accountId: former, providerId: 'credential', password: 'hashed' },
+    { id: randomUUID(), userId: patient, accountId: patient, providerId: 'credential', password: 'hashed' }
+  ])
+  await db.insert(userRole).values([{ userId: former, role: 'ASSISTANT' }, { userId: patient, role: 'PATIENT' }])
+  await deactivateStaff(admin, former)
+  await db.delete(userRole).where(eq(userRole.userId, patient))
+  await db.insert(auditEvent).values({ id: randomUUID(), actorId: admin.id, subjectId: uncredentialed, action: 'STAFF_DEACTIVATE', outcome: 'ALLOWED' })
+  const staff = await listStaff(admin)
+  expect(staff.find(row => row.id === former)).toEqual({ id: former, name: 'Former', email: `${former}@example.test`, roles: [], active: false })
+  expect(staff.map(row => row.id)).not.toContain(patient)
+  expect(staff.map(row => row.id)).not.toContain(uncredentialed)
+  expect(staff.find(row => row.id === admin.id)).toMatchObject({ roles: ['ADMIN'], active: true })
+  await expect(listStaff(doctor)).rejects.toMatchObject({ statusCode: 403 })
+})
+
 it('does not count an invited administrator without credentials as a functioning administrator', async () => {
   const invited = randomUUID()
   await db.insert(user).values({ id: invited, name: 'Invited', email: `${invited}@example.test` })
   await db.insert(userRole).values({ userId: invited, role: 'ADMIN' })
+  await expect(deactivateStaff(admin, admin.id)).rejects.toMatchObject({ statusCode: 409 })
+  await expect(assignStaffRoles(admin, admin.id, ['DOCTOR'])).rejects.toMatchObject({ statusCode: 409 })
+  expect(await db.select().from(userRole).where(eq(userRole.userId, admin.id))).toMatchObject([{ role: 'ADMIN' }])
+})
+
+it('does not count a deactivated credentialed former ADMIN as the last active administrator', async () => {
+  const former = randomUUID()
+  await db.insert(user).values({ id: former, name: 'Former admin', email: `${former}@example.test` })
+  await db.insert(account).values({ id: randomUUID(), userId: former, accountId: former, providerId: 'credential', password: 'hashed' })
+  await db.insert(userRole).values({ userId: former, role: 'ADMIN' })
+  await deactivateStaff(admin, former)
+  expect((await listStaff(admin)).find(row => row.id === former)).toMatchObject({ active: false, roles: [] })
   await expect(deactivateStaff(admin, admin.id)).rejects.toMatchObject({ statusCode: 409 })
   await expect(assignStaffRoles(admin, admin.id, ['DOCTOR'])).rejects.toMatchObject({ statusCode: 409 })
   expect(await db.select().from(userRole).where(eq(userRole.userId, admin.id))).toMatchObject([{ role: 'ADMIN' }])

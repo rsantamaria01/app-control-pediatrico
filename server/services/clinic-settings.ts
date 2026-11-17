@@ -23,16 +23,16 @@ export async function getClinicSettings(): Promise<ClinicSettings | null> {
   return row ? projection(row) : null
 }
 
-export async function getPublicClinicBrand(): Promise<{ primary: ClinicSettings['primary'], logo: string | null }> {
+export async function getPublicClinicBrand(): Promise<{ name: string | null, primary: ClinicSettings['primary'], logo: string | null }> {
   const saved = await getClinicSettings()
   const primary = clinicSettingsSchema.shape.primary.safeParse(saved?.primary ?? process.env.NUXT_PUBLIC_CLINIC_PRIMARY)
   const logo = clinicSettingsSchema.shape.logo.safeParse(saved ? saved.logo : process.env.NUXT_PUBLIC_CLINIC_LOGO)
-  return { primary: primary.success ? primary.data : 'brand', logo: logo.success ? logo.data : null }
+  return { name: saved?.name ?? null, primary: primary.success ? primary.data : 'brand', logo: logo.success ? logo.data : null }
 }
 
 export async function getClinicReportBrand(): Promise<{ primary: string, logo: string }> {
   const saved = await getClinicSettings()
-  return { primary: saved?.primary ?? process.env.NUXT_PUBLIC_CLINIC_PRIMARY ?? 'brand', logo: saved?.logo ?? process.env.NUXT_PUBLIC_CLINIC_LOGO ?? '' }
+  return { primary: saved?.primary ?? process.env.NUXT_PUBLIC_CLINIC_PRIMARY ?? 'brand', logo: saved ? saved.logo ?? '' : process.env.NUXT_PUBLIC_CLINIC_LOGO ?? '' }
 }
 
 export async function updateClinicSettings(actor: Actor, input: ClinicSettingsInput): Promise<ClinicSettings> {

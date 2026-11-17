@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { staffInviteSchema } from '#shared/types/admin'
+import { clinicBrand } from '../../utils/clinic-brand'
 
 const { data: clinic, error, refresh } = await useFetch('/api/admin/clinica')
 if (import.meta.server && (error.value?.statusCode === 401 || error.value?.statusCode === 403)) throw createError({ status: error.value.statusCode, statusText: 'Acceso denegado' })
@@ -9,6 +10,11 @@ const step = computed(() => {
   return Number.isInteger(value) && value >= 1 && value <= 5 ? value : 1
 })
 const labels = ['Clínica', 'Marca', 'Contacto', 'Primer médico', 'Recordatorios']
+const descriptions = ['Nombre', 'Logo y color', 'Correo de contacto', 'Invitación', 'Canales']
+const section = computed(() => route.query.paso == null ? 'all' : (['clinic', 'brand', 'contact'] as const)[step.value - 1] ?? 'all')
+const config = useRuntimeConfig()
+const savedBrand = useNuxtData<{ primary: string, logo: string | null }>('clinic-brand')
+const preview = computed(() => clinicBrand(savedBrand.data.value?.primary ?? config.public.clinicPrimary, savedBrand.data.value ? savedBrand.data.value.logo ?? '' : config.public.clinicLogo))
 const invite = reactive({ name: '', email: '', roles: ['DOCTOR'] as ('ADMIN' | 'DOCTOR' | 'ASSISTANT')[] })
 const sending = ref(false)
 const inviteFeedback = ref<'sent' | 'error' | null>(null)
@@ -29,7 +35,7 @@ async function sendInvite() {
 </script>
 
 <template>
-  <UContainer class="max-w-6xl space-y-6 py-8 pb-24">
+  <UContainer class="max-w-7xl space-y-6 py-8 pb-24">
     <header>
       <p class="text-xs font-semibold tracking-wide text-muted">
         CONFIGURACIÓN INICIAL
@@ -38,7 +44,7 @@ async function sendInvite() {
         Prepare su clínica
       </h1>
       <p class="text-sm text-muted">
-        Paso {{ step }} de 5. Guarde la clínica antes de invitar al equipo.
+        Paso {{ step }} de 5 · Guarde los cambios antes de pasar al siguiente paso. El nombre y el correo son necesarios para guardar.
       </p>
     </header>
     <UAlert
@@ -49,7 +55,7 @@ async function sendInvite() {
     />
     <div
       v-else
-      class="grid items-start gap-5 lg:grid-cols-[16rem_minmax(0,1fr)]"
+      class="grid min-w-0 items-start gap-5 xl:grid-cols-[13rem_minmax(0,1fr)_minmax(0,1fr)]"
     >
       <nav aria-label="Pasos de configuración">
         <UCard>
@@ -64,7 +70,14 @@ async function sendInvite() {
                 class="flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm focus-visible:outline-2 focus-visible:outline-primary"
                 :class="step === index + 1 ? 'bg-primary/10 font-semibold text-primary' : 'text-muted'"
               >
-                <span>{{ index + 1 }}</span>{{ label }}
+                <span
+                  class="flex size-7 shrink-0 items-center justify-center rounded-full bg-elevated text-xs font-semibold text-default"
+                  :class="step === index + 1 ? 'bg-primary text-inverted' : ''"
+                >{{ index + 1 }}</span>
+                <span class="min-w-0">
+                  <span class="block">{{ label }}</span>
+                  <span class="block text-xs font-normal text-muted">{{ descriptions[index] }}</span>
+                </span>
               </NuxtLink>
             </li>
           </ol>
@@ -75,11 +88,29 @@ async function sendInvite() {
           v-if="step <= 3"
           class="space-y-5"
         >
-          <p class="text-sm text-muted">
-            Complete el nombre, la marca y el contacto en este formulario. No se guardan cambios automáticamente.
+          <p
+            v-if="section !== 'all'"
+            class="text-sm text-muted"
+          >
+            Los cambios no se guardan automáticamente. El nombre y el correo son obligatorios para guardar cada paso.
           </p>
+          <p
+            v-else
+            class="text-sm text-muted"
+          >
+            Complete el nombre, la marca y el correo de contacto. Guarde el formulario para continuar.
+          </p>
+          <UAlert
+            v-if="!clinic && section !== 'all'"
+            color="info"
+            variant="soft"
+            title="Complete primero el formulario inicial"
+            description="El nombre y el correo de la clínica son necesarios para guardar por separado."
+            :actions="[{ label: 'Abrir formulario inicial', to: '/admin/inicio' }]"
+          />
           <AdminClinicIdentityForm
-            section="all"
+            :key="section"
+            :section="section"
             @saved="refresh()"
           />
         </div>
@@ -197,6 +228,66 @@ async function sendInvite() {
             Ir a usuarios
           </UButton>
         </nav>
+      </UCard>
+      <UCard
+        v-if="step <= 3"
+        class="min-w-0"
+      >
+        <section
+          aria-label="Vista previa de la marca aplicada"
+          class="space-y-3"
+        >
+          <p class="text-xs font-semibold tracking-wide text-muted">
+            VISTA PREVIA DE LA MARCA APLICADA
+          </p>
+          <div class="overflow-hidden rounded-xl border border-default bg-muted">
+            <div class="grid min-h-72 grid-cols-[minmax(0,6rem)_minmax(0,1fr)] sm:grid-cols-[minmax(0,8rem)_minmax(0,1fr)]">
+              <div class="space-y-3 border-r border-default bg-default p-3">
+                <div class="flex flex-wrap items-center gap-2">
+                  <img
+                    :src="preview.logo"
+                    alt="Logo aplicado de la clínica"
+                    class="size-8 rounded-md object-contain"
+                  >
+                  <span class="min-w-0 break-words text-xs font-semibold">{{ clinic?.name || 'Clínica sin configurar' }}</span>
+                </div>
+                <div class="rounded-md bg-primary/10 px-2 py-2 text-xs font-semibold text-primary">
+                  Inicio
+                </div>
+                <div class="px-2 text-xs text-muted">
+                  Pacientes
+                </div>
+                <div class="px-2 text-xs text-muted">
+                  Agenda
+                </div>
+              </div>
+              <div class="min-w-0 space-y-3 p-3">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                  <strong class="text-sm">Inicio</strong>
+                  <span class="rounded-md bg-primary px-2 py-2 text-xs font-semibold text-inverted">Nuevo paciente</span>
+                </div>
+                <div class="rounded-lg border border-default bg-default p-3">
+                  <p class="text-xs font-semibold">
+                    Colores clínicos
+                  </p>
+                  <p class="mt-1 text-xs text-muted">
+                    Los resultados Z y las curvas mantienen sus colores fijos; no siguen la marca.
+                  </p>
+                </div>
+                <div class="border-b-2 border-primary px-2 py-2 text-xs font-semibold text-primary">
+                  Crecimiento
+                </div>
+                <div
+                  class="min-h-16 rounded-lg border border-default bg-default"
+                  aria-hidden="true"
+                />
+              </div>
+            </div>
+          </div>
+          <p class="text-xs text-muted">
+            Vista previa de la marca aplicada en la aplicación. Guarde el formulario para actualizarla; los cambios sin guardar no aparecen aquí.
+          </p>
+        </section>
       </UCard>
     </div>
   </UContainer>

@@ -6,11 +6,14 @@ if (import.meta.server && (error.value?.statusCode === 401 || error.value?.statu
 const invite = reactive({ name: '', email: '', roles: [] as ('ADMIN' | 'DOCTOR' | 'ASSISTANT')[] })
 const selected = ref<StaffMember | null>(null)
 const roles = ref<('ADMIN' | 'DOCTOR' | 'ASSISTANT')[]>([])
+const reactivationRoles = ref<('ADMIN' | 'DOCTOR' | 'ASSISTANT')[]>([])
+const reactivationError = ref('')
 const busy = ref(false)
 const feedback = ref('')
 const inviteOpen = ref(false)
 const editorOpen = ref(false)
 const confirmOpen = ref(false)
+const reactivateOpen = ref(false)
 const labels = { ADMIN: 'Administración', DOCTOR: 'Médico', ASSISTANT: 'Asistente' }
 const options = ['ADMIN', 'DOCTOR', 'ASSISTANT'] as const
 function toggleRole(list: ('ADMIN' | 'DOCTOR' | 'ASSISTANT')[], role: 'ADMIN' | 'DOCTOR' | 'ASSISTANT', checked: boolean) {
@@ -21,6 +24,32 @@ function edit(user: StaffMember) {
   selected.value = user
   roles.value = user.roles.filter((role): role is 'ADMIN' | 'DOCTOR' | 'ASSISTANT' => role !== 'PATIENT')
   editorOpen.value = true
+}
+function openReactivation(user: StaffMember) {
+  selected.value = user
+  reactivationRoles.value = []
+  reactivationError.value = ''
+  reactivateOpen.value = true
+}
+async function reactivate() {
+  if (!selected.value || busy.value) return
+  if (!reactivationRoles.value.length) {
+    reactivationError.value = 'Elija al menos un rol para reactivar la cuenta'
+    return
+  }
+  busy.value = true
+  reactivationError.value = ''
+  feedback.value = ''
+  try {
+    await $fetch(`/api/admin/usuarios/${encodeURIComponent(selected.value.id)}/reactivar`, { method: 'POST', body: { roles: reactivationRoles.value } })
+    reactivateOpen.value = false
+    feedback.value = 'Cuenta reactivada. Los roles seleccionados ya están asignados.'
+    await refresh()
+  } catch {
+    reactivationError.value = 'No se pudo reactivar la cuenta. Verifique su estado e intente de nuevo.'
+  } finally {
+    busy.value = false
+  }
 }
 async function submitInvite() {
   const parsed = staffInviteSchema.safeParse(invite)
@@ -122,6 +151,9 @@ async function deactivate() {
         class="max-w-full overflow-x-auto"
       >
         <table class="w-full min-w-[640px] text-left text-sm">
+          <caption class="sr-only">
+            Cuentas del equipo y estado de acceso
+          </caption>
           <thead>
             <tr class="border-b border-default text-muted">
               <th
@@ -139,6 +171,11 @@ async function deactivate() {
                 class="p-3"
               >
                 Roles
+              </th><th
+                scope="col"
+                class="p-3"
+              >
+                Estado
               </th><th
                 scope="col"
                 class="p-3"
@@ -161,23 +198,44 @@ async function deactivate() {
               </th><td class="p-3">
                 {{ user.email }}
               </td><td class="p-3">
-                {{ user.roles.map(role => labels[role as keyof typeof labels]).join(' · ') }}
+                {{ user.active ? user.roles.map(role => labels[role as keyof typeof labels]).join(' · ') : 'Sin roles asignados' }}
+              </td><td class="p-3">
+                <UBadge
+                  color="neutral"
+                  variant="soft"
+                >
+                  {{ user.active ? 'Activo' : 'Desactivado' }}
+                </UBadge>
               </td><td class="p-3">
                 <div class="flex flex-wrap gap-2">
+                  <template v-if="user.active">
+                    <UButton
+                      variant="outline"
+                      color="neutral"
+                      class="min-h-11"
+                      :aria-label="`Editar roles de ${user.name}`"
+                      @click="edit(user)"
+                    >
+                      Editar roles
+                    </UButton><UButton
+                      color="error"
+                      variant="ghost"
+                      class="min-h-11"
+                      :aria-label="`Desactivar cuenta de ${user.name}`"
+                      @click="selected = user; confirmOpen = true"
+                    >
+                      Desactivar
+                    </UButton>
+                  </template>
                   <UButton
+                    v-else
                     variant="outline"
-                    color="neutral"
+                    color="primary"
                     class="min-h-11"
-                    @click="edit(user)"
+                    :aria-label="`Reactivar cuenta de ${user.name}`"
+                    @click="openReactivation(user)"
                   >
-                    Editar roles
-                  </UButton><UButton
-                    color="error"
-                    variant="ghost"
-                    class="min-h-11"
-                    @click="selected = user; confirmOpen = true"
-                  >
-                    Desactivar
+                    Reactivar
                   </UButton>
                 </div>
               </td>
@@ -288,6 +346,62 @@ async function deactivate() {
           >
             Guardar roles
           </UButton>
+        </form>
+      </template>
+    </UModal>
+    <UModal
+      v-model:open="reactivateOpen"
+      :title="`Reactivar cuenta de ${selected?.name ?? ''}`"
+      description="Seleccione los roles que tendrá la cuenta al reactivarla. No se recuperan automáticamente los roles anteriores."
+    >
+      <template #body>
+        <form
+          action="/api/admin/usuarios"
+          method="post"
+          class="space-y-4"
+          @submit.prevent="reactivate"
+        >
+          <fieldset>
+            <legend class="font-medium">
+              Roles del equipo
+            </legend><label
+              v-for="option in options"
+              :key="option"
+              class="flex min-h-11 items-center gap-3"
+            ><input
+              type="checkbox"
+              name="roles"
+              :value="option"
+              :checked="reactivationRoles.includes(option)"
+              @change="toggleRole(reactivationRoles, option, ($event.target as HTMLInputElement).checked)"
+            >{{ labels[option] }}</label>
+          </fieldset>
+          <UAlert
+            v-if="reactivationError"
+            color="error"
+            :title="reactivationError"
+            role="alert"
+          />
+          <div class="flex flex-wrap gap-3">
+            <UButton
+              type="button"
+              color="neutral"
+              variant="outline"
+              class="min-h-11"
+              :disabled="busy"
+              @click="reactivateOpen = false"
+            >
+              Cancelar
+            </UButton>
+            <UButton
+              type="submit"
+              :loading="busy"
+              :disabled="!reactivationRoles.length || busy"
+              class="min-h-11"
+            >
+              Reactivar cuenta
+            </UButton>
+          </div>
         </form>
       </template>
     </UModal>

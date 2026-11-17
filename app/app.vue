@@ -4,7 +4,7 @@ import { clinicBrand } from './utils/clinic-brand'
 
 const locale = extendLocale(es, { code: 'es-EC' })
 const config = useRuntimeConfig()
-const { data: savedBrand } = await useFetch<{ primary: string, logo: string | null }>('/api/public/clinica-brand', { key: 'clinic-brand' })
+const { data: savedBrand } = await useFetch<{ name: string, primary: string, logo: string | null }>('/api/public/clinica-brand', { key: 'clinic-brand' })
 const brand = computed(() => clinicBrand(savedBrand.value?.primary ?? config.public.clinicPrimary, savedBrand.value ? savedBrand.value.logo ?? '' : config.public.clinicLogo))
 watch(() => brand.value.primary, primary => updateAppConfig({ ui: { colors: { primary } } }), { immediate: true })
 const online = ref(true)
@@ -65,7 +65,7 @@ const collapsed = ref(false)
 const narrowSidebar = ref(false)
 let releaseSidebarWidth: (() => void) | undefined
 const pageAction = computed(() => route.path === '/' || route.path === '/pacientes' ? { label: 'Nuevo paciente', to: '/pacientes/nuevo' } : null)
-const clinicName = 'Pediatría'
+const clinicName = computed(() => savedBrand.value?.name ?? 'Pediatría')
 
 watch(loggedIn, async () => {
   await refreshNavigation()

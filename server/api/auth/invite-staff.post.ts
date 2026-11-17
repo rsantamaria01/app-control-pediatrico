@@ -13,7 +13,12 @@ import { recordAudit } from '../../services/audit'
 export default defineEventHandler(async (event) => {
   const actor = await requireCapability(event, 'ADMINISTER')
   const input = await readBody(event)
-  const body = input && typeof input === 'object' && 'roles' in input ? staffInviteSchema.parse(input) : staffInviteSchema.parse({ ...z.object({ email: z.string(), name: z.string(), role: z.enum(['DOCTOR', 'ASSISTANT']) }).parse(input), roles: [input.role] })
+  let body
+  if (input && typeof input === 'object' && 'roles' in input) body = staffInviteSchema.parse(input)
+  else {
+    const { role, ...legacy } = z.object({ email: z.string(), name: z.string(), role: z.enum(['DOCTOR', 'ASSISTANT']) }).parse(input)
+    body = staffInviteSchema.parse({ ...legacy, roles: [role] })
+  }
   const email = body.email.trim().toLowerCase()
   const token = randomBytes(32).toString('base64url')
   const digest = createHash('sha256').update(token).digest('hex')

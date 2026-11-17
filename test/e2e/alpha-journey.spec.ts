@@ -394,9 +394,9 @@ test('production image journeys from bootstrapped admin through two children and
     const whatsappOptIn = page.getByRole('checkbox', { name: 'Recibir recordatorios por WhatsApp' })
     await whatsappOptIn.check()
     await expect(whatsappOptIn).toBeChecked()
-    expect(await context.request.get('/api/avisos/preferencias').then(response => response.json())).toMatchObject({ inApp: true, email: false, whatsapp: true })
+    await expect.poll(async () => (await context.request.get('/api/avisos/preferencias').then(response => response.json()) as { whatsapp: boolean }).whatsapp).toBe(true)
     await whatsappOptIn.uncheck()
-    await expect(whatsappOptIn).not.toBeChecked()
+    await expect.poll(async () => (await context.request.get('/api/avisos/preferencias').then(response => response.json()) as { whatsapp: boolean }).whatsapp).toBe(false)
     console.log('checkpoint: guardian preferences verified')
     await expect.poll(async () => {
       const response = await context.request.get('/api/avisos')

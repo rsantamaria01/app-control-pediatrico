@@ -77,7 +77,9 @@ const updateConnection = () => {
 onMounted(() => {
   updateConnection()
   const tablet = window.matchMedia('(min-width: 1024px) and (max-width: 1199px)')
-  const resizeSidebar = () => { narrowSidebar.value = tablet.matches }
+  const resizeSidebar = () => {
+    narrowSidebar.value = tablet.matches
+  }
   resizeSidebar()
   tablet.addEventListener('change', resizeSidebar)
   releaseSidebarWidth = () => tablet.removeEventListener('change', resizeSidebar)
@@ -127,9 +129,20 @@ useSeoMeta({
           <span class="mx-auto flex size-18 items-center justify-center rounded-full bg-elevated text-muted">
             <UIcon name="i-lucide-wifi-off" class="size-8" aria-hidden="true" />
           </span>
-          <h1 class="text-2xl font-bold">Sin conexión</h1>
-          <p class="text-muted">Para proteger la información de sus hijos, la app no guarda datos de salud en el teléfono. Conéctese a internet para continuar.</p>
-          <UButton block size="xl" class="min-h-12" @click="updateConnection">Reintentar</UButton>
+          <h1 class="text-2xl font-bold">
+            Sin conexión
+          </h1>
+          <p class="text-muted">
+            Para proteger la información de sus hijos, la app no guarda datos de salud en el teléfono. Conéctese a internet para continuar.
+          </p>
+          <UButton
+            block
+            size="xl"
+            class="min-h-12"
+            @click="updateConnection"
+          >
+            Reintentar
+          </UButton>
         </div>
       </main>
     </template>
@@ -162,8 +175,12 @@ useSeoMeta({
         </template>
       </UHeader>
       <main class="min-h-dvh bg-muted pb-24 lg:pb-0">
-        <header v-if="route.path === '/'" class="flex h-14 items-center gap-2 border-b border-default bg-default px-4 font-semibold lg:hidden">
-          <img :src="brand.logo" alt="" class="size-7" aria-hidden="true">{{ clinicName }}
+        <header
+          v-if="route.path === '/'"
+          class="flex h-14 items-center gap-2 border-b border-default bg-default px-4 font-semibold lg:hidden"
+        >
+          <img :src="brand.logo" alt="" class="size-7" aria-hidden="true">
+          {{ clinicName }}
         </header>
         <NuxtPage />
       </main>
@@ -222,7 +239,10 @@ useSeoMeta({
           </div>
         </template>
         <template #footer="{ collapsed: isCollapsed }">
-          <div v-if="!isCollapsed" class="flex items-center gap-2 px-2 py-2">
+          <div
+            v-if="!isCollapsed"
+            class="flex items-center gap-2 px-2 py-2"
+          >
             <UAvatar
               :text="user?.name?.slice(0, 2).toUpperCase() || 'CP'"
               size="sm"
@@ -297,9 +317,21 @@ useSeoMeta({
         </template>
         <template #body>
           <main class="min-h-full bg-muted pb-24 lg:pb-0">
-            <header v-if="route.path === '/'" class="flex h-14 items-center justify-between border-b border-default bg-default px-4 lg:hidden">
-              <span class="flex items-center gap-2 font-semibold"><img :src="brand.logo" alt="" class="size-7" aria-hidden="true">{{ clinicName }}</span>
-              <UButton to="/pacientes" icon="i-lucide-search" variant="ghost" color="neutral" aria-label="Buscar pacientes" class="min-h-11 min-w-11" />
+            <header
+              v-if="route.path === '/'"
+              class="flex h-14 items-center justify-between border-b border-default bg-default px-4 lg:hidden"
+            >
+              <span class="flex items-center gap-2 font-semibold">
+                <img :src="brand.logo" alt="" class="size-7" aria-hidden="true">{{ clinicName }}
+              </span>
+              <UButton
+                to="/pacientes"
+                icon="i-lucide-search"
+                variant="ghost"
+                color="neutral"
+                aria-label="Buscar pacientes"
+                class="min-h-11 min-w-11"
+              />
             </header>
             <NuxtPage />
           </main>
@@ -312,20 +344,44 @@ useSeoMeta({
     >
       <NuxtPage />
     </main>
-    <div v-if="online && !publicPage && showInstall && !installDismissed" class="fixed inset-x-0 top-0 z-50 flex items-center gap-2 bg-primary px-4 py-2 text-sm font-semibold text-white lg:hidden">
+    <div
+      v-if="online && !publicPage && showInstall && !installDismissed"
+      class="fixed inset-x-0 top-0 z-50 flex items-center gap-2 bg-primary px-4 py-2 text-sm font-semibold text-white lg:hidden"
+    >
       <UIcon name="i-lucide-download" class="size-5" aria-hidden="true" />
       <span class="min-w-0 flex-1">Instale la app en su teléfono</span>
-      <UButton color="neutral" variant="solid" size="sm" class="min-h-9" @click="installApp">Instalar</UButton>
-      <UButton icon="i-lucide-x" variant="ghost" color="neutral" aria-label="Cerrar aviso" class="min-h-9 min-w-9" @click="dismissInstall" />
+      <UButton color="neutral" variant="solid" size="sm" class="min-h-9" @click="installApp">
+        Instalar
+      </UButton>
+      <UButton
+        icon="i-lucide-x"
+        variant="ghost"
+        color="neutral"
+        aria-label="Cerrar aviso"
+        class="min-h-9 min-w-9"
+        @click="dismissInstall"
+      />
     </div>
-    <UModal v-model:open="iosInstall" title="Agregar a la pantalla de inicio" :ui="{ content: 'sm:max-w-sm' }">
+    <UModal
+      v-model:open="iosInstall"
+      title="Agregar a la pantalla de inicio"
+      :ui="{ content: 'sm:max-w-sm' }"
+    >
       <template #body>
         <ol class="space-y-4 text-sm">
-          <li class="flex gap-3"><span class="font-bold text-primary">1</span>Toque Compartir en la barra de Safari.</li>
-          <li class="flex gap-3"><span class="font-bold text-primary">2</span>Elija Agregar a inicio.</li>
-          <li class="flex gap-3"><span class="font-bold text-primary">3</span>Toque Agregar. La app aparecerá con el ícono de la clínica.</li>
+          <li class="flex gap-3">
+            <span class="font-bold text-primary">1</span>Toque Compartir en la barra de Safari.
+          </li>
+          <li class="flex gap-3">
+            <span class="font-bold text-primary">2</span>Elija Agregar a inicio.
+          </li>
+          <li class="flex gap-3">
+            <span class="font-bold text-primary">3</span>Toque Agregar. La app aparecerá con el ícono de la clínica.
+          </li>
         </ol>
-        <UButton block variant="outline" color="neutral" class="mt-5 min-h-11" @click="dismissInstall">Entendido</UButton>
+        <UButton block variant="outline" color="neutral" class="mt-5 min-h-11" @click="dismissInstall">
+          Entendido
+        </UButton>
       </template>
     </UModal>
     <nav
@@ -333,14 +389,14 @@ useSeoMeta({
       aria-label="Navegación principal"
       class="fixed inset-x-0 bottom-0 z-40 grid grid-flow-col border-t border-default bg-default pb-[env(safe-area-inset-bottom)] lg:hidden"
     >
-        <NuxtLink
-          v-for="item in visibleItems"
-          :key="item.to"
-          :to="item.to"
-          :aria-current="route.path === item.to ? 'page' : undefined"
-          class="flex min-h-16 min-w-0 flex-col items-center justify-center gap-0.5 px-1 text-center text-[11px] font-medium text-muted focus-visible:outline-2 focus-visible:outline-primary"
-          active-class="text-primary font-semibold"
-        >
+      <NuxtLink
+        v-for="item in visibleItems"
+        :key="item.to"
+        :to="item.to"
+        :aria-current="route.path === item.to ? 'page' : undefined"
+        class="flex min-h-16 min-w-0 flex-col items-center justify-center gap-0.5 px-1 text-center text-[11px] font-medium text-muted focus-visible:outline-2 focus-visible:outline-primary"
+        active-class="text-primary font-semibold"
+      >
         <UIcon
           :name="icons[item.to] || 'i-lucide-circle'"
           class="size-5"

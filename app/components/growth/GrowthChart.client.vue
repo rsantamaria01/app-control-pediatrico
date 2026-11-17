@@ -31,7 +31,9 @@ function setRange(months: number) {
 onMounted(() => {
   const width = window.matchMedia('(max-width: 639px)')
   compact.value = width.matches
-  const update = () => { compact.value = width.matches }
+  const update = () => {
+    compact.value = width.matches
+  }
   width.addEventListener('change', update)
   releaseWidth = () => width.removeEventListener('change', update)
 })
@@ -40,10 +42,21 @@ onUnmounted(() => releaseWidth?.())
 
 <template>
   <div>
-    <div v-if="compact && view.xUnit === 'DAY'" class="mb-2 flex gap-2" role="group" aria-label="Rango del gráfico">
-      <UButton variant="outline" class="min-h-11" @click="setRange(6)">6 m</UButton>
-      <UButton variant="outline" class="min-h-11" @click="setRange(12)">1 a</UButton>
-      <UButton variant="outline" class="min-h-11" @click="setZoom(100)">Todo</UButton>
+    <div
+      v-if="compact && view.xUnit === 'DAY'"
+      class="mb-2 flex gap-2"
+      role="group"
+      aria-label="Rango del gráfico"
+    >
+      <UButton variant="outline" class="min-h-11" @click="setRange(6)">
+        6 m
+      </UButton>
+      <UButton variant="outline" class="min-h-11" @click="setRange(12)">
+        1 a
+      </UButton>
+      <UButton variant="outline" class="min-h-11" @click="setZoom(100)">
+        Todo
+      </UButton>
     </div>
     <div
       v-if="!compact"

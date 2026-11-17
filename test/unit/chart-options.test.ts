@@ -30,6 +30,14 @@ describe('growth chart options', () => {
     expect((option.tooltip as { formatter: (params: unknown) => string }).formatter({ seriesName: 'Mediciones', dataIndex: 1 })).toContain('edad cronológica')
     expect(option.series?.length).toBe(8)
     expect(option.series?.[7]?.lineStyle?.color).toBe('#60a5fa')
-    expect(option.series?.[0]?.endLabel).toBeUndefined()
+    expect(option.series?.slice(0, 7).every(series => series.lineStyle?.color === '#94a3b8' && series.lineStyle?.type === 'dotted' && !series.areaStyle && !series.endLabel)).toBe(true)
+  })
+
+  it('keeps family reference curves neutral and unshaded in the light compact chart', () => {
+    const option = growthChartOption(family, false, true, true)
+    expect(option.series?.length).toBe(8)
+    expect(option.series?.slice(0, 7).every(series => series.lineStyle?.color === '#475569' && !series.areaStyle && !series.endLabel)).toBe(true)
+    expect(option.xAxis?.name).toContain('corregida o cronológica')
+    expect(option.yAxis?.name).toBe('kg')
   })
 })

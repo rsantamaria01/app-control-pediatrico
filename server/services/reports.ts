@@ -281,7 +281,7 @@ async function branding(): Promise<{ primary: string, logo?: Buffer }> {
   return { primary: colors[brand.primary]!, logo }
 }
 
-function chart(doc: PDFKit.PDFDocument, view: FamilyChartView, title: string, yTop: number, height = 255): number {
+function chart(doc: PDFKit.PDFDocument, view: FamilyChartView, title: string, yTop: number, height = 255, doctor = false): number {
   const width = 499
   doc.roundedRect(48, yTop, width, height, 6).strokeColor('#e2e8f0').lineWidth(0.8).stroke()
   doc.font('bold').fontSize(10).fillColor('#0f172a').text(title, 60, yTop + 12, { width: 450, lineBreak: false })
@@ -314,23 +314,25 @@ function chart(doc: PDFKit.PDFDocument, view: FamilyChartView, title: string, yT
     const yValue = minY + (maxY - minY) * step / 4
     doc.moveTo(x(xValue), top).lineTo(x(xValue), top + plotHeight).strokeColor('#f1f5f9').lineWidth(0.5).stroke()
     doc.moveTo(left, y(yValue)).lineTo(left + plotWidth, y(yValue)).stroke()
-    doc.font('regular').fontSize(7).fillColor('#64748b').text(decimal(view.xUnit === 'DAY' ? xValue / 30.4375 : xValue, view.xUnit === 'DAY' ? 0 : 1), x(xValue) - 16, top + plotHeight + 3, { width: 32, align: 'center', lineBreak: false })
+    doc.font('regular').fontSize(7).fillColor('#64748b').text(decimal(view.xUnit === 'DAY' && doctor ? xValue / 30.4375 : xValue, view.xUnit === 'DAY' ? 0 : 1), x(xValue) - 16, top + plotHeight + 3, { width: 32, align: 'center', lineBreak: false })
     doc.text(decimal(yValue, 1), 53, y(yValue) - 5, { width: 32, align: 'right', lineBreak: false })
   }
   doc.moveTo(left, top).lineTo(left, top + plotHeight).lineTo(left + plotWidth, top + plotHeight).strokeColor('#cbd5e1').lineWidth(0.8).stroke()
-  const lower = curves[1]!.data
-  const upper = curves[5]!.data
   doc.save()
   doc.rect(left, top, plotWidth, plotHeight).clip()
-  doc.moveTo(x(lower[0]![0]), y(lower[0]![1]))
-  for (const point of lower.slice(1)) doc.lineTo(x(point[0]), y(point[1]))
-  for (const point of [...upper].reverse()) doc.lineTo(x(point[0]), y(point[1]))
-  doc.closePath().fill('#f0fdfa')
-  const colors = ['#dc2626', '#ea580c', '#ca8a04', '#334155', '#ca8a04', '#ea580c', '#dc2626']
+  if (doctor) {
+    const lower = curves[1]!.data
+    const upper = curves[5]!.data
+    doc.moveTo(x(lower[0]![0]), y(lower[0]![1]))
+    for (const point of lower.slice(1)) doc.lineTo(x(point[0]), y(point[1]))
+    for (const point of [...upper].reverse()) doc.lineTo(x(point[0]), y(point[1]))
+    doc.closePath().fill('#f0fdfa')
+  }
+  const colors = doctor ? ['#dc2626', '#ea580c', '#ca8a04', '#334155', '#ca8a04', '#ea580c', '#dc2626'] : Array(7).fill('#94a3b8') as string[]
   for (const [index, curve] of curves.entries()) {
     doc.moveTo(x(curve.data[0]![0]), y(curve.data[0]![1]))
     for (const point of curve.data.slice(1)) doc.lineTo(x(point[0]), y(point[1]))
-    doc.strokeColor(colors[index]!).lineWidth(index === 3 ? 1.4 : 0.9).stroke()
+    doc.strokeColor(colors[index]!).lineWidth(doctor && index === 3 ? 1.4 : 0.9).stroke()
   }
   const points = [...view.points].sort((a, b) => a.x - b.x)
   if (points.length) {
@@ -340,11 +342,13 @@ function chart(doc: PDFKit.PDFDocument, view: FamilyChartView, title: string, yT
     for (const point of points) doc.circle(x(point.x), y(point.y), 2.8).fillAndStroke('#ffffff', '#1d4ed8')
   }
   doc.restore()
-  for (const [index, curve] of curves.entries()) {
-    const last = curve.data.at(-1)!
-    doc.font('bold').fontSize(7).fillColor(colors[index]!).text(['−3', '−2', '−1', '0', '+1', '+2', '+3'][index]!, 511, y(last[1]) - 4, { width: 24, lineBreak: false })
+  if (doctor) {
+    for (const [index, curve] of curves.entries()) {
+      const last = curve.data.at(-1)!
+      doc.font('bold').fontSize(7).fillColor(colors[index]!).text(['−3', '−2', '−1', '0', '+1', '+2', '+3'][index]!, 511, y(last[1]) - 4, { width: 24, lineBreak: false })
+    }
   }
-  doc.font('regular').fontSize(8).fillColor('#64748b').text(view.xUnit === 'DAY' ? 'Edad de referencia (meses)' : 'Longitud o talla (cm)', 155, yTop + height - 18, { width: 290, align: 'center', lineBreak: false })
+  doc.font('regular').fontSize(8).fillColor('#64748b').text(view.xUnit === 'DAY' ? doctor ? 'Edad de referencia (meses)' : 'Edad de referencia (días)' : 'Longitud o talla (cm)', 155, yTop + height - 18, { width: 290, align: 'center', lineBreak: false })
   doc.y = yTop + height
   return doc.y
 }
@@ -369,14 +373,15 @@ async function makeFamilyPdf(content: ReportContent, issuedAt: string, brand: { 
     const weight = content.charts[WhoIndicator.WEIGHT_FOR_AGE]
     if (weight?.length) chart(doc, weight[0]!, 'Peso para la edad · Curvas OMS', 368, 310)
     else textBlock(doc, 'Referencia OMS no disponible para este indicador.', 395)
-    textBlock(doc, 'Línea azul: mediciones compartidas. Curvas: −3 a +3 desviaciones estándar (OMS). Edad corregida cuando corresponda.', 714, { fill: '#64748b', size: 8 })
+    textBlock(doc, 'Línea azul: mediciones compartidas. Curvas OMS verificadas; edad corregida cuando corresponda.', 714, { fill: '#64748b', size: 8 })
     for (const panel of weight?.slice(1) ?? []) {
       newPage()
       chart(doc, panel, 'Peso para la edad · Otra referencia OMS', 114, 310)
-      textBlock(doc, 'Línea azul: mediciones compartidas. Curvas: −3 a +3 desviaciones estándar (OMS). Edad corregida cuando corresponda.', 439, { fill: '#64748b', size: 8 })
+      textBlock(doc, 'Línea azul: mediciones compartidas. Curvas OMS verificadas; edad corregida cuando corresponda.', 439, { fill: '#64748b', size: 8 })
     }
     newPage()
-    let y = 114
+    heading(doc, 'Curvas de crecimiento OMS', 112)
+    let y = 140
     doc.y = y
     for (const indicator of [WhoIndicator.HEIGHT_FOR_AGE, WhoIndicator.HEAD_CIRCUMFERENCE_FOR_AGE]) {
       const panels = content.charts[indicator]
@@ -392,7 +397,7 @@ async function makeFamilyPdf(content: ReportContent, issuedAt: string, brand: { 
             newPage()
             y = 114
           }
-            y = chart(doc, panel, indicator === WhoIndicator.HEIGHT_FOR_AGE ? `${panel.curves[0]!.data[0]![0] <= 730 ? 'Longitud acostada' : 'Talla de pie'} para la edad · Curvas OMS` : `${INDICATOR_LABEL[indicator]} · Otra referencia`, y, 275) + 14
+          y = chart(doc, panel, indicator === WhoIndicator.HEIGHT_FOR_AGE ? `${panel.curves[0]!.data[0]![0] <= 730 ? 'Longitud acostada' : 'Talla de pie'} para la edad · Curvas OMS` : `${INDICATOR_LABEL[indicator]} · Otra referencia`, y, 275) + 14
           doc.y = y
         }
       } else {
@@ -474,7 +479,7 @@ export async function renderDoctorReport(actor: Actor, patientId: string, includ
         flowBlock(doc, INDICATOR_LABEL[indicator], 'Referencia OMS no disponible para este indicador.', primary, newPage)
         return doc.y
       }
-      return chart(doc, { ...view, curves: view.curves.map(curve => ({ data: curve.data })), points: view.points.map(point => ({ ...point, chronologicalAgeDays: point.x })) }, `${INDICATOR_LABEL[indicator]} · Curvas OMS`, top, height)
+      return chart(doc, { ...view, curves: view.curves.map(curve => ({ data: curve.data })), points: view.points.map(point => ({ ...point, chronologicalAgeDays: point.x })) }, `${INDICATOR_LABEL[indicator]} · Curvas OMS`, top, height, true)
     }
     newPage()
     doc.roundedRect(48, 112, 499, 85, 6).fill('#f8fafc')

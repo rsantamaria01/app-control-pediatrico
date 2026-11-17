@@ -15,24 +15,41 @@ const date = new Intl.DateTimeFormat('es-EC', { day: 'numeric', month: 'short', 
       :actions="[{ label: 'Reintentar', onClick: () => refresh() }]"
     />
     <template v-else-if="reports">
-      <nav aria-label="Ruta" class="flex items-center gap-2 text-sm text-muted">
+      <nav
+        aria-label="Ruta"
+        class="flex items-center gap-2 text-sm text-muted"
+      >
         <NuxtLink
           :to="`/hijos/${id}`"
           class="hover:text-primary hover:underline"
         >Mi hijo/a</NuxtLink>
-        <UIcon name="i-lucide-chevron-right" aria-hidden="true" class="size-4" />
-        <span aria-current="page" class="font-semibold text-default">Informes</span>
+        <UIcon
+          name="i-lucide-chevron-right"
+          aria-hidden="true"
+          class="size-4"
+        />
+        <span aria-current="page" class="font-semibold text-default">
+          Informes
+        </span>
       </nav>
       <div class="space-y-1">
-        <h1 class="text-2xl font-bold tracking-tight">Informe de crecimiento</h1>
-        <p class="text-sm text-muted">Consulte los documentos que su pediatra ha revisado y aprobado para su familia.</p>
+        <h1 class="text-2xl font-bold tracking-tight">
+          Informe de crecimiento
+        </h1>
+        <p class="text-sm text-muted">
+          Consulte los documentos que su pediatra ha revisado y aprobado para su familia.
+        </p>
       </div>
       <UEmpty
         v-if="!reports.length"
         title="No hay informes disponibles"
         description="Su pediatra puede preparar y aprobar un informe para usted."
       />
-      <section v-else aria-label="Informes aprobados" class="space-y-3">
+      <section
+        v-else
+        aria-label="Informes aprobados"
+        class="space-y-3"
+      >
         <UCard
           v-for="report in reports"
           :key="report.id"
@@ -43,8 +60,12 @@ const date = new Intl.DateTimeFormat('es-EC', { day: 'numeric', month: 'short', 
               <UIcon name="i-lucide-file-text" aria-hidden="true" class="size-5" />
             </span>
             <div>
-              <h2 class="font-semibold">Informe de crecimiento</h2>
-              <p class="text-sm text-muted">Aprobado el {{ date.format(new Date(report.approvedAt)) }}</p>
+              <h2 class="font-semibold">
+                Informe de crecimiento
+              </h2>
+              <p class="text-sm text-muted">
+                Aprobado el {{ date.format(new Date(report.approvedAt)) }}
+              </p>
             </div>
           </div>
           <UButton

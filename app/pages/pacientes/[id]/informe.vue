@@ -50,22 +50,39 @@ async function approve() {
       title="No se pudo abrir la ficha"
     />
     <template v-else-if="access">
-      <nav aria-label="Ruta" class="flex items-center gap-2 text-sm text-muted">
+      <nav
+        aria-label="Ruta"
+        class="flex items-center gap-2 text-sm text-muted"
+      >
         <NuxtLink
           :to="`/pacientes/${id}`"
           class="hover:text-primary hover:underline"
         >Ficha del paciente</NuxtLink>
-        <UIcon name="i-lucide-chevron-right" aria-hidden="true" class="size-4" />
-        <span aria-current="page" class="font-semibold text-default">Informe</span>
+        <UIcon
+          name="i-lucide-chevron-right"
+          aria-hidden="true"
+          class="size-4"
+        />
+        <span aria-current="page" class="font-semibold text-default">
+          Informe
+        </span>
       </nav>
       <div class="space-y-1">
-        <h1 class="text-2xl font-bold tracking-tight">Informe de crecimiento</h1>
-        <p class="text-sm text-muted">Prepare una vista previa y apruebe el documento que recibirá la familia.</p>
+        <h1 class="text-2xl font-bold tracking-tight">
+          Informe de crecimiento
+        </h1>
+        <p class="text-sm text-muted">
+          Prepare una vista previa y apruebe el documento que recibirá la familia.
+        </p>
       </div>
       <UCard :ui="{ body: 'space-y-5 p-4 sm:p-6' }">
         <div class="space-y-1">
-          <h2 class="text-lg font-semibold">Informe familiar</h2>
-          <p class="text-sm text-muted">Solo controles compartidos, mediciones, curvas OMS verificadas e indicaciones compartidas. Sin puntuaciones Z, interpretación ni notas clínicas privadas.</p>
+          <h2 class="text-lg font-semibold">
+            Informe familiar
+          </h2>
+          <p class="text-sm text-muted">
+            Solo controles compartidos, mediciones, curvas OMS verificadas e indicaciones compartidas. Sin puntuaciones Z, interpretación ni notas clínicas privadas.
+          </p>
         </div>
         <div
           v-if="legacyReports?.length"
@@ -98,13 +115,24 @@ async function approve() {
           variant="soft"
           :description="error"
         />
-        <div v-if="draft" class="space-y-5 border-t border-default pt-5">
+        <div
+          v-if="draft"
+          class="space-y-5 border-t border-default pt-5"
+        >
           <div class="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <h3 class="font-semibold">Vista previa del PDF familiar</h3>
-              <p class="text-sm text-muted">{{ draft.content.name }} · emitido el {{ date.format(new Date(draft.createdAt)) }}</p>
+              <h3 class="font-semibold">
+                Vista previa del PDF familiar
+              </h3>
+              <p class="text-sm text-muted">
+                {{ draft.content.name }} · emitido el {{ date.format(new Date(draft.createdAt)) }}
+              </p>
             </div>
-            <UBadge :color="approved ? 'primary' : 'neutral'" variant="subtle" role="status">
+            <UBadge
+              :color="approved ? 'primary' : 'neutral'"
+              variant="subtle"
+              role="status"
+            >
               {{ approved ? 'Aprobado para la familia' : 'Pendiente de aprobación' }}
             </UBadge>
           </div>
@@ -116,12 +144,26 @@ async function approve() {
             />
           </div>
           <div class="space-y-3 rounded-lg border border-default p-4">
-            <h3 class="font-semibold">Controles incluidos</h3>
-            <div v-for="visit in draft.content.visits" :key="visit.id" class="border-b border-default pb-3 text-sm last:border-0 last:pb-0">
-              <p class="font-medium">{{ date.format(new Date(visit.measuredAt)) }}</p>
-              <p class="mt-1 tabular-nums">Peso {{ number.format(visit.weightKg) }} kg · {{ visit.position === 'RECUMBENT' ? 'Longitud' : 'Talla' }} {{ number.format(visit.lengthHeightCm) }} cm · Perímetro cefálico {{ number.format(visit.headCircumferenceCm) }} cm</p>
-              <p v-if="visit.parentAdvice" class="mt-1">Indicaciones: {{ visit.parentAdvice }}</p>
-              <p v-if="visit.nextControlAt" class="mt-1">Próximo control: {{ date.format(new Date(visit.nextControlAt)) }}</p>
+            <h3 class="font-semibold">
+              Controles incluidos
+            </h3>
+            <div
+              v-for="visit in draft.content.visits"
+              :key="visit.id"
+              class="border-b border-default pb-3 text-sm last:border-0 last:pb-0"
+            >
+              <p class="font-medium">
+                {{ date.format(new Date(visit.measuredAt)) }}
+              </p>
+              <p class="mt-1 tabular-nums">
+                Peso {{ number.format(visit.weightKg) }} kg · {{ visit.position === 'RECUMBENT' ? 'Longitud' : 'Talla' }} {{ number.format(visit.lengthHeightCm) }} cm · Perímetro cefálico {{ number.format(visit.headCircumferenceCm) }} cm
+              </p>
+              <p v-if="visit.parentAdvice" class="mt-1">
+                Indicaciones: {{ visit.parentAdvice }}
+              </p>
+              <p v-if="visit.nextControlAt" class="mt-1">
+                Próximo control: {{ date.format(new Date(visit.nextControlAt)) }}
+              </p>
             </div>
             <p class="text-sm text-muted">
               {{ Object.keys(draft.content.charts).length ? 'El PDF incluye curvas OMS verificadas y las mediciones compartidas.' : 'Referencia OMS no disponible para este informe.' }}
@@ -148,8 +190,12 @@ async function approve() {
       </UCard>
       <UCard :ui="{ body: 'space-y-4 p-4 sm:p-6' }">
         <div class="space-y-1">
-          <h2 class="text-lg font-semibold">Informe médico</h2>
-          <p class="text-sm text-muted">Contiene resultados clínicos y referencias para uso médico. Es independiente del informe aprobado para la familia.</p>
+          <h2 class="text-lg font-semibold">
+            Informe médico
+          </h2>
+          <p class="text-sm text-muted">
+            Contiene resultados clínicos y referencias para uso médico. Es independiente del informe aprobado para la familia.
+          </p>
         </div>
         <UCheckbox
           v-model="includePrivateNotes"

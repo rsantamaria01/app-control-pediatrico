@@ -6,11 +6,11 @@ for (const width of [375, 1440]) {
   test(`unauthenticated shell at ${width}px contains no unfinished navigation or clinical data`, async ({ page }) => {
     await page.setViewportSize({ width, height: 812 })
     await page.goto('/')
-    await expect(page.getByRole('heading', { name: 'Control Pediátrico' })).toBeVisible()
+    await expect(page).toHaveURL('/acceso')
+    await expect(page.getByRole('heading', { name: 'Ingresar' })).toBeVisible()
     await expect(page.locator('html')).toHaveAttribute('lang', 'es-EC')
-    await expect(page.getByRole('button', { name: 'Cambiar tema' })).toHaveAttribute('aria-label', 'Cambiar tema')
-    await expect(page.locator('header img[alt="Logo de la clínica"]')).toBeVisible()
-    await expect(page.getByRole('link', { name: /control pediátrico/i })).toHaveAttribute('href', '/')
+    await expect(page.getByRole('navigation')).toHaveCount(0)
+    await expect(page.getByRole('img', { name: 'Logo de la clínica' }).last()).toBeVisible()
     await expect(page.getByRole('link', { name: /pacientes|agenda|hijos|administración/i })).toHaveCount(0)
     await expect(page.getByText(/peso:|puntuación z|abrir ficha/i)).toHaveCount(0)
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width)
@@ -20,8 +20,8 @@ for (const width of [375, 1440]) {
 }
 
 test('deployment brand changes header logo and primary in both color modes without recoloring clinical tokens', async ({ page }) => {
-  await page.goto('/')
-  await expect(page.locator('header img[alt="Logo de la clínica"]')).toHaveAttribute('src', '/favicon.svg')
+  await page.goto('/acceso')
+  await expect(page.getByRole('img', { name: 'Logo de la clínica' }).last()).toHaveAttribute('src', '/favicon.svg')
   await page.waitForLoadState('networkidle')
   const defaultPrimary = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--ui-primary').trim())
   for (const theme of ['light', 'dark'] as const) {

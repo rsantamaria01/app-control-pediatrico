@@ -74,13 +74,13 @@ try {
   const [existingDoctor] = await db.select().from(user).where(eq(user.id, doctorId))
   const [emailOwner] = await db.select({ id: user.id }).from(user).where(eq(user.email, email))
   const [usernameOwner] = await db.select({ id: user.id }).from(user).where(eq(user.username, username))
-  if (emailOwner?.id !== undefined && emailOwner.id !== doctorId || usernameOwner?.id !== undefined && usernameOwner.id !== doctorId
-    || existingDoctor && (existingDoctor.email !== email || existingDoctor.username !== username || existingDoctor.name !== 'Doctor Demo')) throw new Error('Demo doctor identity conflicts with existing data')
+  if ((emailOwner?.id !== undefined && emailOwner.id !== doctorId) || (usernameOwner?.id !== undefined && usernameOwner.id !== doctorId)
+    || (existingDoctor && (existingDoctor.email !== email || existingDoctor.username !== username || existingDoctor.name !== 'Doctor Demo'))) throw new Error('Demo doctor identity conflicts with existing data')
   await db.transaction(async (tx) => {
     if (!existingDoctor) await tx.insert(user).values({ id: doctorId, name: 'Doctor Demo', email, username, displayUsername: username, emailVerified: true })
     await tx.insert(userRole).values({ userId: doctorId, role: 'DOCTOR' }).onConflictDoNothing()
     const credentials = await tx.select().from(account).where(and(eq(account.userId, doctorId), eq(account.providerId, 'credential')))
-    if (credentials.length > 1 || credentials[0] && (credentials[0].accountId !== doctorId || !credentials[0].password)) throw new Error('Demo doctor credential conflicts with existing data')
+    if (credentials.length > 1 || (credentials[0] && (credentials[0].accountId !== doctorId || !credentials[0].password))) throw new Error('Demo doctor credential conflicts with existing data')
     if (!credentials.length) await tx.insert(account).values({ id: randomUUID(), accountId: doctorId, providerId: 'credential', userId: doctorId, password: await hashPassword(password) })
     for (const fixture of fixtures) {
       const [existing] = await tx.select().from(patient).where(eq(patient.id, fixture.id))

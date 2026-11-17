@@ -36,10 +36,10 @@ const children = [
   { name: 'Planeta de Cartón Ocho', birthDate: '2022-06-18', sex: 'MALE', weight: 16, length: 105, head: 51 }
 ] as const
 const staff = [
-  { username: 'doctor', name: 'Doctora de Demostración', role: 'DOCTOR' },
-  { username: 'asistente', name: 'Asistente de Demostración', role: 'ASSISTANT' },
-  { username: 'familiar', name: 'Familia Ficticia Uno', role: 'PATIENT' },
-  { username: 'familiar2', name: 'Familia Ficticia Dos', role: 'PATIENT' }
+  { username: 'doctora.demo', name: 'Doctora de Demostración', role: 'DOCTOR' },
+  { username: 'asistente.demo', name: 'Asistente de Demostración', role: 'ASSISTANT' },
+  { username: 'familia.demo1', name: 'Familia Ficticia Uno', role: 'PATIENT' },
+  { username: 'familia.demo2', name: 'Familia Ficticia Dos', role: 'PATIENT' }
 ] as const
 const pool = new Pool({ connectionString: target })
 const db = drizzle(pool)
@@ -136,6 +136,8 @@ try {
         const [existing] = await db.select({ id: visit.id, patientId: visit.patientId }).from(visit).where(eq(visit.requestId, requestId))
         if (existing) {
           if (existing.patientId !== childIds[index]) throw new Error('Demo visit identifier belongs to a different patient')
+          const stored = await db.select({ snapshot: visitResult.snapshot }).from(visitResult).where(eq(visitResult.visitId, existing.id))
+          if (stored.length !== 5 || stored.some(result => (result.snapshot as { status?: string }).status !== 'available')) throw new Error('Existing demo visit has incomplete verified results')
           continue
         }
         const elapsed = Math.max('gestationDays' in entry ? 100 : 1, j === count - 1 ? age - (age > 60 && index % 2 === 0 ? 20 : 1) : Math.floor(age * (j + 1) / count))
@@ -156,7 +158,7 @@ try {
       await db.insert(complementaryVaccine).values({ id: id('pending-vaccine', index), patientId: childIds[index]!, authorId: doctor.id, label: 'Vacuna ficticia por revisar', doseLabel: 'Dato de demostración', source: 'Ficción; sin recomendación clínica' }).onConflictDoNothing()
     }
     for (let i = 0; i < 10; i++) {
-      const startsAt = new Date(date(i < 4 ? 0 : i - 3, 12 + i % 4))
+      const startsAt = new Date(`${localDate(i < 4 ? 0 : i - 3)}T${String(14 + i % 4).padStart(2, '0')}:00:00.000Z`)
       await db.insert(appointment).values({ id: id('appointment', i), patientId: childIds[i % 8]!, name: children[i % 8]!.name, contact: 'Contacto ficticio', reason: 'Consulta de demostración', startsAt, endsAt: new Date(startsAt.getTime() + 30 * 60000), status: (['CONFIRMED', 'PENDING', 'ATTENDED', 'CANCELLED'] as const)[i % 4]!, createdBy: doctor.id }).onConflictDoNothing()
     }
     for (let i = 0; i < 3; i++) await db.insert(bookingRequest).values({ id: id('booking', i), source: 'PUBLIC', childName: `Solicitud Ficticia ${i + 1}`, guardianName: 'Contacto Ficticio', email: `solicitud${i + 1}@example.invalid`, startsAt: new Date(date(i + 3, 16)), status: 'PENDING', consentVersion: 'demo-only' }).onConflictDoNothing()

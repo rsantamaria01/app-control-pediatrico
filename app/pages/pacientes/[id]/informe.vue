@@ -4,7 +4,6 @@ import type { ReportDraft } from '../../../../server/services/reports'
 const id = useRoute().params.id as string
 const draft = ref<ReportDraft | null>(null)
 const approved = ref(false)
-const includePrivateNotes = ref(false)
 const busy = ref(false)
 const error = ref('')
 const date = new Intl.DateTimeFormat('es-EC', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'America/Guayaquil' })
@@ -197,12 +196,8 @@ async function approve() {
             Contiene resultados clínicos y referencias para uso médico. Es independiente del informe aprobado para la familia.
           </p>
         </div>
-        <UCheckbox
-          v-model="includePrivateNotes"
-          label="Incluir notas clínicas privadas en el PDF médico"
-        />
         <UButton
-          :href="`${url}/medico${includePrivateNotes ? '?includePrivateNotes=true' : ''}`"
+          :href="`${url}/medico`"
           target="_blank"
           rel="noopener"
           icon="i-lucide-download"

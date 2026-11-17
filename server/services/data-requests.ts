@@ -44,8 +44,9 @@ export async function handleDataRequest(actor: Actor, id: string, status: 'UNDER
     throw createError({ statusCode: 403, statusMessage: 'Access denied' })
   }
   if (!['UNDER_REVIEW', 'CLOSED'].includes(status)) throw createError({ statusCode: 400, statusMessage: 'Invalid status' })
+  if (status === 'CLOSED') throw createError({ statusCode: 409, statusMessage: 'Resolution requires reviewed legal workflow' })
   return useDb().transaction(async (tx) => {
-    const [row] = await tx.update(dataRequest).set({ status, handledBy: actor.id, updatedAt: new Date() }).where(and(eq(dataRequest.id, id), eq(dataRequest.status, status === 'CLOSED' ? 'UNDER_REVIEW' : 'QUEUED'))).returning()
+    const [row] = await tx.update(dataRequest).set({ status, handledBy: actor.id, updatedAt: new Date() }).where(and(eq(dataRequest.id, id), eq(dataRequest.status, 'QUEUED'))).returning()
     if (!row) throw createError({ statusCode: 409, statusMessage: 'Request not in expected state' })
     await tx.insert(auditEvent).values({ id: crypto.randomUUID(), action: 'DATA_REQUEST_HANDLE', outcome: 'ALLOWED', actorId: actor.id, subjectId: id })
     return row as DataRequest

@@ -656,7 +656,7 @@ test('production image journeys from bootstrapped admin through two children and
     const adminRequests = await adminContext!.request.get('/api/admin/solicitudes')
     expect(adminRequests.status()).toBe(200)
     expect((await adminRequests.json() as { items: { id: string, type: string, status: string }[] }).items).toEqual(expect.arrayContaining([expect.objectContaining({ id: dataRequest!.id, type: 'DELETE', status: 'QUEUED' })]))
-    const requestCard = adminPage.locator('li').filter({ hasText: dataRequest!.id })
+    const requestCard = adminPage.locator('li').filter({ hasText: dataRequest!.requesterId }).filter({ hasText: 'Eliminación' })
     await requestCard.getByRole('button', { name: 'Iniciar revisión' }).click()
     await expect(requestCard.getByText('Eliminación · En revisión')).toBeVisible()
     expect((await otherGuardianContext!.request.get('/api/mis-datos/solicitudes').then(response => response.json()) as { id: string }[]).some(item => item.id === dataRequest!.id)).toBe(false)

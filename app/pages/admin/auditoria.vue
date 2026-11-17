@@ -51,7 +51,7 @@ async function advance(item: DataRequest) {
   busy.value = true
   feedback.value = ''
   try {
-    await $fetch(`/api/admin/solicitudes/${encodeURIComponent(item.id)}`, { method: 'PATCH', body: { status: item.status === 'QUEUED' ? 'UNDER_REVIEW' : 'CLOSED' } })
+    await $fetch(`/api/admin/solicitudes/${encodeURIComponent(item.id)}`, { method: 'PATCH', body: { status: 'UNDER_REVIEW' } })
     feedback.value = 'Estado actualizado'
     await refreshRequests()
   } catch {
@@ -316,14 +316,14 @@ async function advance(item: DataRequest) {
                   Solicitante: {{ item.requesterId }} · {{ formatDate(item.createdAt) }}
                 </p>
               </div><UButton
-                v-if="item.status !== 'CLOSED'"
+                v-if="item.status === 'QUEUED'"
                 variant="outline"
                 :disabled="busy"
                 :loading="busy"
                 class="min-h-11"
                 @click="advance(item)"
               >
-                {{ item.status === 'QUEUED' ? 'Iniciar revisión' : 'Cerrar solicitud' }}
+                Iniciar revisión
               </UButton>
             </div>
           </UCard>

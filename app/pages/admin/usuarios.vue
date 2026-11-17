@@ -198,17 +198,17 @@ async function deactivate() {
               </th><td class="p-3">
                 {{ user.email }}
               </td><td class="p-3">
-                {{ user.active ? user.roles.map(role => labels[role as keyof typeof labels]).join(' · ') : 'Sin roles asignados' }}
+                {{ user.roles.length ? user.roles.map(role => labels[role as keyof typeof labels]).join(' · ') : 'Sin roles asignados' }}
               </td><td class="p-3">
                 <UBadge
                   color="neutral"
                   variant="soft"
                 >
-                  {{ user.active ? 'Activo' : 'Desactivado' }}
+                  {{ user.active ? 'Activo' : user.roles.length ? 'Pendiente de activación' : 'Desactivado' }}
                 </UBadge>
               </td><td class="p-3">
                 <div class="flex flex-wrap gap-2">
-                  <template v-if="user.active">
+                  <template v-if="user.roles.length">
                     <UButton
                       variant="outline"
                       color="neutral"

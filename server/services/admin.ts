@@ -51,7 +51,7 @@ export async function exportAuditCsv(actor: Actor, filter: AuditFilter): Promise
 export async function listStaff(actor: Actor): Promise<StaffMember[]> {
   await requireAdmin(actor, 'STAFF_READ')
   const db = useDb()
-  const rows = await db.select({ id: user.id, name: user.name, email: user.email, role: userRole.role }).from(user).innerJoin(userRole, eq(user.id, userRole.userId)).where(inArray(userRole.role, ['ADMIN', 'DOCTOR', 'ASSISTANT'])).orderBy(asc(user.name), asc(user.id))
+  const rows = await db.select({ id: user.id, name: user.name, email: user.email, role: userRole.role, credentialed: exists(db.select({ id: account.id }).from(account).where(and(eq(account.userId, user.id), eq(account.providerId, 'credential'), sql`${account.password} IS NOT NULL`))) }).from(user).innerJoin(userRole, eq(user.id, userRole.userId)).where(inArray(userRole.role, ['ADMIN', 'DOCTOR', 'ASSISTANT'])).orderBy(asc(user.name), asc(user.id))
   const former = await db.select({ id: user.id, name: user.name, email: user.email }).from(user).where(and(
     exists(db.select({ id: account.id }).from(account).where(and(eq(account.userId, user.id), eq(account.providerId, 'credential'), sql`${account.password} IS NOT NULL`))),
     exists(db.select({ id: auditEvent.id }).from(auditEvent).where(and(eq(auditEvent.subjectId, user.id), eq(auditEvent.action, 'STAFF_DEACTIVATE'), eq(auditEvent.outcome, 'ALLOWED')))),
@@ -59,7 +59,7 @@ export async function listStaff(actor: Actor): Promise<StaffMember[]> {
   )).orderBy(asc(user.name), asc(user.id))
   const members = new Map<string, StaffMember>()
   for (const row of rows) {
-    if (!members.has(row.id)) members.set(row.id, { id: row.id, name: row.name, email: row.email, roles: [], active: true })
+    if (!members.has(row.id)) members.set(row.id, { id: row.id, name: row.name, email: row.email, roles: [], active: row.credentialed === true })
     members.get(row.id)!.roles.push(row.role as Role)
   }
   for (const row of former) members.set(row.id, { ...row, roles: [], active: false })

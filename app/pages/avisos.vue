@@ -39,9 +39,9 @@ async function markRead(id: string) {
 </script>
 
 <template>
-  <UContainer class="max-w-3xl px-0 pb-24 sm:px-4 sm:py-6">
-    <header class="flex min-h-14 items-center justify-between gap-2 border-b border-default bg-default px-4 sm:rounded-t-xl sm:border-x sm:border-t">
-      <h1 class="text-base font-semibold">
+  <UContainer class="max-w-3xl space-y-4 px-4 py-5 pb-24 sm:px-6">
+    <header class="flex min-h-11 items-center justify-between gap-2">
+      <h1 class="text-xl font-semibold">
         Avisos
       </h1>
       <UButton
@@ -58,7 +58,7 @@ async function markRead(id: string) {
     <nav
       v-if="isParent && !navigationError"
       aria-label="Filtrar avisos"
-      class="m-4 flex rounded-lg bg-elevated p-1 text-sm"
+       class="flex rounded-lg bg-elevated p-1 text-sm"
     >
       <button
         type="button"
@@ -79,7 +79,7 @@ async function markRead(id: string) {
         Sin leer · {{ unreadCount }}
       </button>
     </nav>
-    <div class="px-4">
+    <div class="rounded-xl border border-default bg-default p-4">
       <UEmpty
         v-if="isStaff && !navigationError"
         icon="i-lucide-bell-off"

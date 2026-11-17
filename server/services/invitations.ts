@@ -324,7 +324,7 @@ export async function getShareableChild(actor: Actor, patientId: string): Promis
     await recordAudit('PORTAL_READ', 'DENIED', actor.id, patientId)
     throw createError({ statusCode: 404, statusMessage: 'Not found' })
   }
-  const rows = await db.select({ measuredAt: visit.measuredAt, weightKg: visit.weightKg, lengthHeightCm: visit.lengthHeightCm, position: visit.position, headCircumferenceCm: visit.headCircumferenceCm, parentAdvice: visitText.parentAdvice, nextControlAt: visit.nextControlAt }).from(visit).leftJoin(visitText, eq(visit.id, visitText.visitId)).leftJoin(visitSharing, eq(visitSharing.visitId, visit.id)).where(and(eq(visit.patientId, patientId), sql`coalesce(${visitSharing.shared}, ${visit.shareWithFamily}) = true`)).orderBy(desc(visit.measuredAt), desc(visit.createdAt)).limit(100)
+  const rows = await db.select({ measuredAt: visit.measuredAt, weightKg: visit.weightKg, lengthHeightCm: visit.lengthHeightCm, position: visit.position, headCircumferenceCm: visit.headCircumferenceCm, parentAdvice: visitText.parentAdvice, nextControlAt: visit.nextControlAt }).from(visit).leftJoin(visitText, eq(visit.id, visitText.visitId)).leftJoin(visitSharing, eq(visitSharing.visitId, visit.id)).where(and(eq(visit.patientId, patientId), sql`coalesce(${visitSharing.shared}, ${visit.shareWithFamily}) = true`)).orderBy(desc(visit.measuredAt), desc(visit.createdAt)).limit(1)
   const visits = rows.map(familyVisit)
   await recordAudit('PORTAL_READ', 'ALLOWED', actor.id, patientId)
   return { ...child, visits }

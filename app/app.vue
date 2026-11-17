@@ -173,6 +173,7 @@ useSeoMeta({
 <template>
   <UApp :locale="locale">
     <NuxtPwaManifest />
+    <RoleEmulationBanner />
 
     <NuxtPage v-slot="{ Component, route: pageRoute }">
       <template v-if="!online">
@@ -224,6 +225,7 @@ useSeoMeta({
           <template #right>
             <ShellCommandSearch shortcuts />
             <UNavigationMenu :items="navItems" />
+            <RoleEmulationMenu />
              <UDropdownMenu :items="userMenuItems">
                <UButton variant="ghost" color="neutral" :aria-label="`Menú de usuario: ${user?.name || 'Representante'}`" aria-haspopup="menu">
                  <UAvatar :text="user?.name?.slice(0, 2).toUpperCase() || 'CP'" size="sm" />
@@ -242,8 +244,9 @@ useSeoMeta({
               aria-hidden="true"
             >
              <span class="flex-1">{{ clinicName }}</span>
-             <ShellCommandSearch compact shortcuts />
-             <UDropdownMenu :items="userMenuItems" :content="{ align: 'end' }">
+                     <ShellCommandSearch compact shortcuts />
+                     <RoleEmulationMenu />
+                     <UDropdownMenu :items="userMenuItems" :content="{ align: 'end' }">
                <UButton variant="ghost" color="neutral" :aria-label="`Menú de usuario: ${user?.name || 'Representante'}`" aria-haspopup="menu">
                  <UAvatar :text="user?.name?.slice(0, 2).toUpperCase() || 'CP'" size="sm" />
                </UButton>
@@ -332,6 +335,7 @@ useSeoMeta({
                   @click="setSidebarPinned"
                 />
               </UTooltip>
+              <RoleEmulationMenu />
               <UDropdownMenu :items="userMenuItems" :content="{ side: 'right', align: 'end' }">
                <UButton
                  color="neutral"
@@ -393,7 +397,8 @@ useSeoMeta({
                 </span>
                   <div class="flex items-center gap-2">
                     <ShellCommandSearch compact shortcuts />
-                    <UDropdownMenu :items="userMenuItems" :content="{ align: 'end' }">
+                     <RoleEmulationMenu />
+                     <UDropdownMenu :items="userMenuItems" :content="{ align: 'end' }">
                       <UButton variant="ghost" color="neutral" :aria-label="`Menú de usuario: ${user?.name || 'Personal de la clínica'}`" aria-haspopup="menu">
                         <UAvatar :text="user?.name?.slice(0, 2).toUpperCase() || 'CP'" size="sm" />
                       </UButton>

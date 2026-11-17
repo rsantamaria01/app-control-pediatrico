@@ -75,7 +75,8 @@ const groups = computed(() => [
     :aria-label="compact ? 'Buscar pacientes, pantallas y acciones' : undefined"
     color="neutral"
     variant="outline"
-    class="min-h-11 min-w-11"
+    class="min-h-11 min-w-11 shrink-0"
+    :class="compact ? '' : 'w-48 justify-between'"
     @click="open = true"
   >
     <template

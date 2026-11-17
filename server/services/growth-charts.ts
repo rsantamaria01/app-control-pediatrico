@@ -53,7 +53,7 @@ function measurement(visit: Pick<VisitSnapshot, 'weightKg' | 'lengthHeightCm' | 
 }
 
 export async function getFamilyGrowth(actor: Actor, patientId: string): Promise<{ name: string, charts: Partial<Record<WhoIndicator, FamilyChartView>> }> {
-  const child = await getShareableChild(actor, patientId)
+  const child = await getShareableChild(actor, patientId, true)
   const charts: Partial<Record<WhoIndicator, FamilyChartView>> = {}
   const sexRow = await (await import('../utils/db')).useDb().query.patient.findFirst({ columns: { sex: true, gestationDays: true, correctionUntilMonths: true }, where: (table, { eq }) => eq(table.id, patientId) })
   if (!sexRow || !Object.values(Gender).includes(sexRow.sex as Gender)) return { name: child.name, charts }

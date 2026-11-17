@@ -146,7 +146,7 @@ export async function listVaccines(actor: Actor, patientId: string, today = new 
 
 export async function listAppliedDoses(actor: Actor, patientId: string) {
   const db = useDb()
-  if (actor.roles.length !== 1 || actor.roles[0] !== 'PATIENT') throw createError({ statusCode: 404, statusMessage: 'Not found' })
+  if (!actor.roles.includes('PATIENT')) throw createError({ statusCode: 404, statusMessage: 'Not found' })
   const [grant] = await db.select({ patientId: guardianGrant.patientId }).from(guardianGrant).where(and(eq(guardianGrant.patientId, patientId), eq(guardianGrant.guardianId, actor.id), eq(guardianGrant.status, 'ACTIVE')))
   await recordAudit('VACCINE_FAMILY_READ', grant ? 'ALLOWED' : 'DENIED', actor.id, patientId)
   if (!grant) throw createError({ statusCode: 404, statusMessage: 'Not found' })

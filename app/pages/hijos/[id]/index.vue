@@ -148,24 +148,7 @@ const advice = computed(() => child.value?.visits.filter(visit => visit.parentAd
               Consulte las mediciones compartidas por la clínica y sus gráficos de crecimiento con su pediatra.
             </p>
           </UCard>
-          <UCard
-            v-if="child.visits.length > 1"
-            :ui="{ body: 'p-4 sm:p-5' }"
-          >
-            <h2 class="text-lg font-semibold">
-              Controles anteriores
-            </h2>
-            <ul class="mt-3 divide-y divide-default">
-              <li
-                v-for="(visit, index) in child.visits.slice(1)"
-                :key="visit.measuredAt + index"
-                class="flex flex-wrap justify-between gap-x-4 gap-y-1 py-3 text-sm tabular-nums"
-              >
-                <span class="font-medium">{{ dates.format(new Date(visit.measuredAt)) }}</span>
-                <span class="text-muted">{{ weight.format(visit.weightKg) }} kg · {{ size.format(visit.lengthHeightCm) }} cm · {{ size.format(visit.headCircumferenceCm) }} cm</span>
-              </li>
-            </ul>
-          </UCard>
+
         </div>
         <div class="space-y-5">
           <UCard

@@ -19,13 +19,17 @@ if (!user.value) {
 const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Guayaquil', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
 const { data: appointments, error, refresh } = await useFetch<Appointment[]>('/api/agenda', { query: { from: today, to: today }, immediate: isDoctor.value, default: () => [] })
 const { data: requestsCount, error: requestsError, refresh: refreshRequests } = await useFetch<{ count: number }>('/api/agenda/solicitudes/count', { immediate: isDoctor.value })
-const { data: growthReview, error: growthError, refresh: refreshGrowth } = await useFetch<{ id: string }[]>('/api/clinical/crecimiento-por-revisar', { immediate: isDoctor.value, default: () => [] })
-const { data: vaccineReview, error: vaccineError, refresh: refreshVaccines } = await useFetch<{ id: string }[]>('/api/clinical/vacunacion-por-revisar', { immediate: isDoctor.value, default: () => [] })
-const { data: controlsReview, error: controlsError, refresh: refreshControls } = await useFetch<{ id: string }[]>('/api/clinical/controles-pendientes', { immediate: isDoctor.value, default: () => [] })
+const { data: growthReview, error: growthError, refresh: refreshGrowth } = await useFetch<{ id: string, name: string, indicators: string[] }[]>('/api/clinical/crecimiento-por-revisar', { immediate: isDoctor.value, default: () => [] })
+const { data: vaccineReview, error: vaccineError, refresh: refreshVaccines } = await useFetch<{ id: string, name: string, pending: { label: string }[] }[]>('/api/clinical/vacunacion-por-revisar', { immediate: isDoctor.value, default: () => [] })
+const { data: controlsReview, error: controlsError, refresh: refreshControls } = await useFetch<{ id: string, name: string, reason: string, date: string }[]>('/api/clinical/controles-pendientes', { immediate: isDoctor.value, default: () => [] })
 const active = computed(() => appointments.value?.filter(item => item.status !== 'CANCELLED') ?? [])
 const formattedToday = new Intl.DateTimeFormat('es-EC', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'America/Guayaquil' }).format(new Date(`${today}T12:00:00-05:00`))
-const todayLabel = formattedToday.charAt(0).toUpperCase() + formattedToday.slice(1)
-const upcoming = computed(() => active.value.filter(item => item.status !== 'ATTENDED' && new Date(`${item.date}T${item.time}:00-05:00`) >= new Date()))
+const todayLabel = formattedToday.charAt(0).toLocaleUpperCase('es-EC') + formattedToday.slice(1)
+const reviewQueues = computed(() => [
+  { title: 'Vacunación por revisar', to: '/pacientes/vacunacion-por-revisar', icon: 'i-lucide-syringe', error: vaccineError.value, retry: refreshVaccines, rows: (vaccineReview.value ?? []).map(person => ({ id: person.id, name: person.name, detail: person.pending[0]?.label ?? 'Vacunas por revisar', status: 'Por revisar' })) },
+  { title: 'Crecimiento por revisar', to: '/pacientes/crecimiento-por-revisar', icon: 'i-lucide-chart-no-axes-combined', error: growthError.value, retry: refreshGrowth, rows: (growthReview.value ?? []).map(person => ({ id: person.id, name: person.name, detail: `${person.indicators.length} indicadores por revisar`, status: 'Por revisar' })) },
+  { title: 'Controles pendientes', to: '/pacientes/controles-pendientes', icon: 'i-lucide-calendar-clock', error: controlsError.value, retry: refreshControls, rows: (controlsReview.value ?? []).map(person => ({ id: person.id, name: person.name, detail: person.reason, status: 'Pendiente' })) }
+])
 const appointmentStatus = (status: string) => status === 'ATTENDED' ? 'Atendida' : status === 'PENDING' ? 'Por confirmar' : status === 'CONFIRMED' ? 'Confirmada' : 'Programada'
 const greeting = new Intl.DateTimeFormat('es-EC', { hour: 'numeric', hourCycle: 'h23', timeZone: 'America/Guayaquil' }).format(new Date())
 const greetingLabel = Number(greeting) < 12 ? 'Buenos días' : Number(greeting) < 19 ? 'Buenas tardes' : 'Buenas noches'
@@ -67,11 +71,11 @@ function age(birthDate: string) {
           Nuevo paciente
         </UButton>
       </div>
-      <div class="space-y-4">
+      <div class="grid gap-4 lg:grid-cols-[minmax(0,1.7fr)_minmax(260px,1fr)]">
         <UCard>
           <div class="flex flex-wrap items-center justify-between gap-2">
             <h2 class="text-lg font-semibold">
-              Hoy
+              Citas de hoy · {{ active.length }}
             </h2>
             <UButton
               to="/agenda?vista=dia"
@@ -117,24 +121,22 @@ function age(birthDate: string) {
                 </dd>
               </div>
             </dl>
-            <div class="mt-4 flex items-center justify-between gap-2">
-              <h3 class="text-sm font-semibold">
-                Próximas citas
-              </h3>
-              <span class="text-xs text-muted tabular-nums">{{ upcoming.length }}</span>
-            </div>
+             <div class="mt-4 flex items-center justify-between gap-2">
+               <h3 class="text-sm font-semibold">Citas programadas</h3>
+               <span class="text-xs text-muted tabular-nums">{{ active.length }}</span>
+             </div>
             <p
-              v-if="!upcoming.length"
-              class="mt-2 text-sm text-muted"
-            >
-              Sin próximas citas hoy.
+               v-if="!active.length"
+               class="mt-2 rounded-lg border border-dashed border-default p-4 text-sm text-muted"
+             >
+               No hay citas programadas para hoy.
             </p>
             <ul
               v-else
-              class="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3"
+              class="mt-2 grid gap-2 sm:grid-cols-2"
             >
               <li
-                v-for="item in upcoming"
+                v-for="item in active"
                 :key="item.id"
                 class="flex flex-col gap-1 rounded-lg border border-default bg-elevated p-3 text-sm"
               >
@@ -167,152 +169,44 @@ function age(birthDate: string) {
             </ul>
           </template>
         </UCard>
-        <UCard :ui="{ body: 'p-0 sm:p-0' }">
-          <div class="flex flex-wrap items-center gap-3 p-4">
-            <UIcon
-              name="i-lucide-inbox"
-              class="size-5 shrink-0 text-primary"
-              aria-hidden="true"
-            />
-            <NuxtLink
-              to="/agenda/solicitudes"
-              class="flex min-h-11 min-w-0 flex-1 items-center gap-2 font-medium hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-            >
-              <span class="min-w-0 flex-1">Solicitudes de reserva pendientes</span>
-              <UBadge
-                v-if="!requestsError"
-                color="primary"
-                variant="soft"
-                class="tabular-nums"
-              >
-                {{ requestsCount?.count ?? 0 }}
-              </UBadge>
-              <UIcon
-                name="i-lucide-chevron-right"
-                class="size-4 shrink-0"
-                aria-hidden="true"
-              />
-            </NuxtLink>
-            <UButton
-              v-if="requestsError"
-              variant="link"
-              class="min-h-11"
-              @click="refreshRequests()"
-            >
-              Reintentar
-            </UButton>
+        <UCard>
+          <div class="flex items-center gap-2">
+            <UIcon name="i-lucide-inbox" class="size-5 text-primary" aria-hidden="true" />
+            <h2 class="text-lg font-semibold">Solicitudes de reserva</h2>
           </div>
+          <UAlert v-if="requestsError" color="error" variant="soft" title="No se pudieron cargar las solicitudes" :actions="[{ label: 'Reintentar', onClick: () => refreshRequests() }]" class="mt-4" />
+          <template v-else>
+            <p class="mt-5 text-4xl font-semibold tabular-nums">{{ requestsCount?.count ?? 0 }}</p>
+            <p class="mt-2 text-sm text-muted">Solicitudes pendientes de revisión; una reserva aún no es una cita confirmada.</p>
+          </template>
+          <UButton to="/agenda/solicitudes" variant="outline" color="neutral" class="mt-5 min-h-11">Revisar solicitudes</UButton>
         </UCard>
       </div>
-      <UCard :ui="{ body: 'p-0 sm:p-0' }">
-        <h2 class="p-4 text-lg font-semibold">
-          Mis pacientes
-        </h2>
-        <ul class="divide-y divide-default border-t border-default">
-          <li class="flex min-h-14 items-center gap-2 px-4">
-            <NuxtLink
-              to="/pacientes/vacunacion-por-revisar"
-              class="flex min-h-14 min-w-0 flex-1 items-center gap-3 font-medium hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-            >
-              <UIcon
-                name="i-lucide-syringe"
-                class="size-5 shrink-0 text-primary"
-                aria-hidden="true"
-              />
-              <span class="min-w-0 flex-1">Vacunación por revisar</span>
-              <UBadge
-                v-if="!vaccineError"
-                color="neutral"
-                variant="soft"
-                class="tabular-nums"
-              >
-                {{ vaccineReview?.length ?? 0 }}
-              </UBadge>
-              <UIcon
-                name="i-lucide-chevron-right"
-                class="size-4 shrink-0 text-muted"
-                aria-hidden="true"
-              />
-            </NuxtLink>
-            <UButton
-              v-if="vaccineError"
-              variant="link"
-              class="min-h-11"
-              @click="refreshVaccines()"
-            >
-              Reintentar
-            </UButton>
-          </li>
-          <li class="flex min-h-14 items-center gap-2 px-4">
-            <NuxtLink
-              to="/pacientes/crecimiento-por-revisar"
-              class="flex min-h-14 min-w-0 flex-1 items-center gap-3 font-medium hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-            >
-              <UIcon
-                name="i-lucide-chart-no-axes-combined"
-                class="size-5 shrink-0 text-primary"
-                aria-hidden="true"
-              />
-              <span class="min-w-0 flex-1">Crecimiento por revisar</span>
-              <UBadge
-                v-if="!growthError"
-                color="neutral"
-                variant="soft"
-                class="tabular-nums"
-              >
-                {{ growthReview?.length ?? 0 }}
-              </UBadge>
-              <UIcon
-                name="i-lucide-chevron-right"
-                class="size-4 shrink-0 text-muted"
-                aria-hidden="true"
-              />
-            </NuxtLink>
-            <UButton
-              v-if="growthError"
-              variant="link"
-              class="min-h-11"
-              @click="refreshGrowth()"
-            >
-              Reintentar
-            </UButton>
-          </li>
-          <li class="flex min-h-14 items-center gap-2 px-4">
-            <NuxtLink
-              to="/pacientes/controles-pendientes"
-              class="flex min-h-14 min-w-0 flex-1 items-center gap-3 font-medium hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-            >
-              <UIcon
-                name="i-lucide-calendar-clock"
-                class="size-5 shrink-0 text-primary"
-                aria-hidden="true"
-              />
-              <span class="min-w-0 flex-1">Controles pendientes</span>
-              <UBadge
-                v-if="!controlsError"
-                color="neutral"
-                variant="soft"
-                class="tabular-nums"
-              >
-                {{ controlsReview?.length ?? 0 }}
-              </UBadge>
-              <UIcon
-                name="i-lucide-chevron-right"
-                class="size-4 shrink-0 text-muted"
-                aria-hidden="true"
-              />
-            </NuxtLink>
-            <UButton
-              v-if="controlsError"
-              variant="link"
-              class="min-h-11"
-              @click="refreshControls()"
-            >
-              Reintentar
-            </UButton>
-          </li>
-        </ul>
-      </UCard>
+      <section aria-labelledby="mis-pacientes" class="space-y-3">
+        <h2 id="mis-pacientes" class="text-lg font-semibold">Mis pacientes</h2>
+        <div class="grid gap-4 xl:grid-cols-3">
+          <UCard v-for="queue in reviewQueues" :key="queue.to" :ui="{ body: 'p-0 sm:p-0' }">
+            <div class="flex items-center gap-2 border-b border-default p-4">
+              <UIcon :name="queue.icon" class="size-5 shrink-0 text-primary" aria-hidden="true" />
+              <h3 class="min-w-0 flex-1 font-semibold">{{ queue.title }}</h3>
+              <UBadge v-if="!queue.error" color="neutral" variant="soft">{{ queue.rows.length }}</UBadge>
+            </div>
+            <UAlert v-if="queue.error" color="error" variant="soft" title="No se pudo cargar la revisión" :actions="[{ label: 'Reintentar', onClick: () => queue.retry() }]" class="m-4" />
+            <p v-else-if="!queue.rows.length" class="p-4 text-sm text-muted">Sin pacientes por revisar.</p>
+            <ul v-else class="divide-y divide-default">
+              <li v-for="person in queue.rows.slice(0, 3)" :key="person.id">
+                <NuxtLink :to="`/pacientes/${person.id}`" class="flex min-h-16 items-center gap-2 px-4 py-2 hover:bg-elevated">
+                  <UAvatar :text="person.name.split(' ').map(part => part[0]).slice(0, 2).join('').toUpperCase()" size="sm" />
+                  <span class="min-w-0 flex-1"><span class="block truncate text-sm font-semibold">{{ person.name }}</span><span class="block truncate text-xs text-muted">{{ person.detail }}</span></span>
+                  <UBadge color="neutral" variant="soft" size="sm">{{ person.status }}</UBadge>
+                </NuxtLink>
+              </li>
+            </ul>
+            <UButton :to="queue.to" variant="link" class="m-2 min-h-11">Ver todos</UButton>
+          </UCard>
+        </div>
+      </section>
+
     </template>
     <template v-else-if="isParent">
       <h1 class="text-2xl font-semibold">

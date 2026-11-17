@@ -43,6 +43,8 @@ const pageTitle = computed(() => ({ '/': 'Inicio', '/pacientes': 'Pacientes', '/
 const search = ref('')
 const searchInput = ref<{ inputRef?: HTMLInputElement } | null>(null)
 const collapsed = ref(false)
+const narrowSidebar = ref(false)
+let releaseSidebarWidth: (() => void) | undefined
 const pageAction = computed(() => route.path === '/' || route.path === '/pacientes' ? { label: 'Nuevo paciente', to: '/pacientes/nuevo' } : null)
 const clinicName = 'Control Pediátrico'
 
@@ -74,6 +76,11 @@ const updateConnection = () => {
 
 onMounted(() => {
   updateConnection()
+  const tablet = window.matchMedia('(min-width: 1024px) and (max-width: 1199px)')
+  const resizeSidebar = () => { narrowSidebar.value = tablet.matches }
+  resizeSidebar()
+  tablet.addEventListener('change', resizeSidebar)
+  releaseSidebarWidth = () => tablet.removeEventListener('change', resizeSidebar)
   installDismissed.value = sessionStorage.getItem('install-dismissed') === 'yes'
   iosInstall.value = !installDismissed.value && /iP(hone|ad|od)/.test(navigator.userAgent) && !window.matchMedia('(display-mode: standalone)').matches && loggedIn.value
   window.addEventListener('beforeinstallprompt', onBeforeInstall)
@@ -84,6 +91,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  releaseSidebarWidth?.()
   window.removeEventListener('beforeinstallprompt', onBeforeInstall)
   window.removeEventListener('online', updateConnection)
   window.removeEventListener('offline', updateConnection)
@@ -165,11 +173,11 @@ useSeoMeta({
       storage-key="clinical-dashboard"
     >
       <UDashboardSidebar
-        v-model:collapsed="collapsed"
+        :collapsed="narrowSidebar || collapsed"
         collapsible
         :resizable="false"
         class="hidden lg:flex"
-        :ui="{ root: 'lg:w-64', footer: 'border-t border-default' }"
+        :ui="{ root: narrowSidebar || collapsed ? 'lg:w-16' : 'lg:w-64', footer: 'border-t border-default' }"
       >
         <template #header="{ collapsed: isCollapsed }">
           <NuxtLink
@@ -214,15 +222,12 @@ useSeoMeta({
           </div>
         </template>
         <template #footer="{ collapsed: isCollapsed }">
-          <div class="flex items-center gap-2 px-2 py-2">
+          <div v-if="!isCollapsed" class="flex items-center gap-2 px-2 py-2">
             <UAvatar
               :text="user?.name?.slice(0, 2).toUpperCase() || 'CP'"
               size="sm"
             />
-            <div
-              v-if="!isCollapsed"
-              class="min-w-0 flex-1"
-            >
+            <div class="min-w-0 flex-1">
               <p class="truncate text-sm font-semibold">
                 {{ user?.name || 'Personal de la clínica' }}
               </p>
@@ -230,12 +235,8 @@ useSeoMeta({
                 {{ isDoctor ? 'Pediatra' : isAdmin ? 'Administración' : 'Asistente' }}
               </p>
             </div>
-            <UColorModeButton
-              v-if="!isCollapsed"
-              aria-label="Cambiar tema"
-            />
+            <UColorModeButton aria-label="Cambiar tema" />
             <UButton
-              v-if="!isCollapsed"
               icon="i-lucide-log-out"
               variant="ghost"
               color="neutral"

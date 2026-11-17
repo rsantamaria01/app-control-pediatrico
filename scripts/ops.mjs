@@ -6,11 +6,12 @@ const paths = {
   'prepare': ['scripts/prepare-catalogs.mjs'],
   'db:migrate': ['scripts/migrate.mjs'],
   'bootstrap-admin': ['--experimental-strip-types', 'scripts/bootstrap-admin.ts', ...actions],
+  'demo-seed': ['node_modules/tsx/dist/cli.mjs', 'scripts/demo-seed.ts', ...actions],
   'who-import': ['node_modules/tsx/dist/cli.mjs', 'scripts/import-who.ts', action]
 }
 
 if (!(command in paths) || (command === 'who-import' && !['download', 'import'].includes(action))) {
-  process.stderr.write('Usage: ops prepare|db:migrate|bootstrap-admin|who-import download|import\n')
+  process.stderr.write('Usage: ops prepare|db:migrate|bootstrap-admin|demo-seed [--reset]|who-import download|import\n')
   process.exit(1)
 }
 if (command === 'who-import' && action === 'import' && process.env.WHO_ALLOW_CLINICAL_IMPORT !== 'yes') {
@@ -18,7 +19,7 @@ if (command === 'who-import' && action === 'import' && process.env.WHO_ALLOW_CLI
   process.exit(1)
 }
 
-const args = command === 'who-import' && action === 'download'
+const args = (command === 'who-import' && action === 'download') || (command === 'demo-seed' && process.env.DATABASE_URL && !process.env.DB_PASSWORD)
   ? paths[command]
   : ['scripts/database-env.mjs', 'node', ...paths[command]]
 const child = spawn(process.execPath, args, { stdio: 'inherit', env: process.env })

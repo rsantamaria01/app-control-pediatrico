@@ -135,7 +135,7 @@ export async function listLegacyReports(actor: Actor, patientId: string): Promis
 
 export async function listFamilyReports(actor: Actor, patientId: string): Promise<{ id: string, approvedAt: string }[]> {
   const db = useDb()
-  const [grant] = actor.roles.length === 1 && actor.roles[0] === 'PATIENT' ? await db.select({ patientId: guardianGrant.patientId }).from(guardianGrant).where(and(eq(guardianGrant.patientId, patientId), eq(guardianGrant.guardianId, actor.id), eq(guardianGrant.status, 'ACTIVE'))) : []
+  const [grant] = actor.roles.includes('PATIENT') ? await db.select({ patientId: guardianGrant.patientId }).from(guardianGrant).where(and(eq(guardianGrant.patientId, patientId), eq(guardianGrant.guardianId, actor.id), eq(guardianGrant.status, 'ACTIVE'))) : []
   if (!grant) throw createError({ statusCode: 404, statusMessage: 'Not found' })
   const rows = await db.select().from(familyReport).where(and(eq(familyReport.patientId, patientId), sql`${familyReport.approvedAt} IS NOT NULL`, sql`${familyReport.pdfBase64} IS NOT NULL`)).orderBy(desc(familyReport.approvedAt))
   const accessible: { id: string, approvedAt: string }[] = []
@@ -152,7 +152,7 @@ export async function listFamilyReports(actor: Actor, patientId: string): Promis
 
 export async function getApprovedReport(guardian: Actor, patientId: string, reportId: string): Promise<ApprovedReport> {
   const db = useDb()
-  if (guardian.roles.length !== 1 || guardian.roles[0] !== 'PATIENT') throw createError({ statusCode: 404, statusMessage: 'Not found' })
+  if (!guardian.roles.includes('PATIENT')) throw createError({ statusCode: 404, statusMessage: 'Not found' })
   const [match] = await db.select().from(familyReport).innerJoin(guardianGrant, and(eq(guardianGrant.patientId, familyReport.patientId), eq(guardianGrant.guardianId, guardian.id), eq(guardianGrant.status, 'ACTIVE')))
     .where(and(eq(familyReport.id, reportId), eq(familyReport.patientId, patientId), sql`${familyReport.approvedAt} IS NOT NULL`, sql`${familyReport.pdfBase64} IS NOT NULL`))
   const row = match?.family_report

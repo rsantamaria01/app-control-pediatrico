@@ -4,7 +4,7 @@ import type { PatientView, VisitSnapshot } from '#shared/types/measurement'
 const route = useRoute()
 const id = route.params.id as string
 const { data: patient } = await useFetch<PatientView>(`/api/pacientes/${encodeURIComponent(id)}/identidad`)
-const state = reactive({ measuredAt: '', weightKg: undefined as number | undefined, lengthHeightCm: undefined as number | undefined, position: 'RECUMBENT' as 'RECUMBENT' | 'STANDING', headCircumferenceCm: undefined as number | undefined, privateNote: '', parentAdvice: '', clinicianTrend: '', shareWithFamily: true, nextControlAt: '' })
+const state = reactive({ measuredAt: '', weightKg: undefined as number | undefined, lengthHeightCm: undefined as number | undefined, position: undefined as 'RECUMBENT' | 'STANDING' | undefined, headCircumferenceCm: undefined as number | undefined, privateNote: '', parentAdvice: '', clinicianTrend: '', shareWithFamily: true, nextControlAt: '' })
 const requestId = ref(crypto.randomUUID())
 
 const error = ref('')
@@ -12,6 +12,11 @@ const saving = ref(false)
 async function save() {
   saving.value = true
   error.value = ''
+  if (!state.position) {
+    error.value = 'Indique si la longitud o talla se midió acostado o de pie.'
+    saving.value = false
+    return
+  }
   try {
     await $fetch<VisitSnapshot>(`/api/pacientes/${encodeURIComponent(id)}/visitas`, { method: 'POST', body: {
       requestId: requestId.value, measuredAt: new Date(`${state.measuredAt}:00-05:00`).toISOString(), weightKg: state.weightKg,
@@ -103,10 +108,11 @@ async function save() {
               required
             />
           </UFormField>
-          <UFormField label="Posición">
+          <UFormField label="Posición de la medición" description="Seleccione cómo se midió al paciente; el cálculo OMS utiliza esta posición." required>
             <USelect
               v-model="state.position"
               :items="[{ label: 'Acostado', value: 'RECUMBENT' }, { label: 'De pie', value: 'STANDING' }]"
+               placeholder="Seleccione la posición"
               class="w-full"
             />
           </UFormField>

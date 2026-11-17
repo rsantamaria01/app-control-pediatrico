@@ -81,7 +81,7 @@ export async function submitBookingRequest(input: VerifiedBookingInput): Promise
 }
 
 export async function submitParentBooking(actor: Actor, input: unknown): Promise<PendingRequest> {
-  if (actor.roles.length !== 1 || !actor.roles.includes('PATIENT')) throw createError({ statusCode: 403, statusMessage: 'Access denied' })
+  if (!actor.roles.includes('PATIENT')) throw createError({ statusCode: 403, statusMessage: 'Access denied' })
   const values = parentBookingSchema.parse(input)
   return useDb().transaction(async (tx) => {
     await tx.execute('SELECT pg_advisory_xact_lock(1130011)')
@@ -143,7 +143,7 @@ export async function decideBookingRequest(actor: Actor, requestId: string, deci
 }
 
 export async function listParentAppointments(actor: Actor): Promise<ParentAppointment[]> {
-  if (actor.roles.length !== 1 || !actor.roles.includes('PATIENT')) throw createError({ statusCode: 403, statusMessage: 'Access denied' })
+  if (!actor.roles.includes('PATIENT')) throw createError({ statusCode: 403, statusMessage: 'Access denied' })
   const db = useDb()
   const rows = await db.select({ id: bookingRequest.id, name: bookingRequest.childName, startsAt: bookingRequest.startsAt, status: bookingRequest.status, appointmentId: bookingRequest.appointmentId, currentStart: appointment.startsAt, currentStatus: appointment.status }).from(bookingRequest).innerJoin(guardianGrant, and(eq(guardianGrant.patientId, bookingRequest.patientId), eq(guardianGrant.guardianId, actor.id), eq(guardianGrant.status, 'ACTIVE'))).leftJoin(appointment, eq(appointment.id, bookingRequest.appointmentId)).where(and(eq(bookingRequest.source, 'PARENT'), or(eq(bookingRequest.guardianId, actor.id), and(eq(bookingRequest.status, 'APPROVED'), sql`${bookingRequest.appointmentId} IS NOT NULL`)))).orderBy(sql`${bookingRequest.createdAt} DESC`)
   const scheduled = await db.select({ id: appointment.id, name: appointment.name, startsAt: appointment.startsAt, status: appointment.status }).from(appointment).innerJoin(guardianGrant, and(eq(guardianGrant.patientId, appointment.patientId), eq(guardianGrant.guardianId, actor.id), eq(guardianGrant.status, 'ACTIVE'))).where(sql`NOT EXISTS (SELECT 1 FROM booking_request WHERE booking_request.appointment_id = ${appointment.id})`)

@@ -43,7 +43,7 @@ export async function getGrantCandidate(actor: Actor, patientId: string) {
   const db = useDb()
   const [child] = await db.select({ id: patient.id, name: patient.name }).from(patient).where(eq(patient.id, patientId))
   if (!child) throw createError({ statusCode: 404, statusMessage: 'Not found' })
-  const grants = await db.select({ email: guardianGrant.contactEmail, status: guardianGrant.status, lastSendError: guardianGrant.lastSendError }).from(guardianGrant).where(eq(guardianGrant.patientId, patientId))
+  const grants = await db.select({ name: user.name, relationship: guardianGrant.relationship, email: guardianGrant.contactEmail, status: guardianGrant.status, lastSendError: guardianGrant.lastSendError }).from(guardianGrant).innerJoin(user, eq(user.id, guardianGrant.guardianId)).where(eq(guardianGrant.patientId, patientId))
   return { ...child, guardians: grants }
 }
 
@@ -287,7 +287,7 @@ export async function setVisitSharing(actor: Actor, patientId: string, visitId: 
 }
 
 function requireParent(actor: Actor) {
-  if (!actor.roles.includes('PATIENT') || actor.roles.some(role => role !== 'PATIENT')) throw createError({ statusCode: 403, statusMessage: 'Access denied' })
+  if (!actor.roles.includes('PATIENT')) throw createError({ statusCode: 403, statusMessage: 'Access denied' })
 }
 
 export async function listShareableChildren(actor: Actor): Promise<FamilyChildSummary[]> {
@@ -311,7 +311,7 @@ function familyVisit(row: { measuredAt: Date, weightKg: string, lengthHeightCm: 
   return { measuredAt: row.measuredAt.toISOString(), weightKg: Number(row.weightKg), lengthHeightCm: Number(row.lengthHeightCm), position: row.position, headCircumferenceCm: Number(row.headCircumferenceCm), nextControlAt: row.nextControlAt?.toISOString() ?? null, ...(row.parentAdvice ? { parentAdvice: row.parentAdvice } : {}) }
 }
 
-export async function getShareableChild(actor: Actor, patientId: string): Promise<FamilyChildView> {
+export async function getShareableChild(actor: Actor, patientId: string, includeHistory = false): Promise<FamilyChildView> {
   try {
     requireParent(actor)
   } catch (error) {
@@ -324,7 +324,7 @@ export async function getShareableChild(actor: Actor, patientId: string): Promis
     await recordAudit('PORTAL_READ', 'DENIED', actor.id, patientId)
     throw createError({ statusCode: 404, statusMessage: 'Not found' })
   }
-  const rows = await db.select({ measuredAt: visit.measuredAt, weightKg: visit.weightKg, lengthHeightCm: visit.lengthHeightCm, position: visit.position, headCircumferenceCm: visit.headCircumferenceCm, parentAdvice: visitText.parentAdvice, nextControlAt: visit.nextControlAt }).from(visit).leftJoin(visitText, eq(visit.id, visitText.visitId)).leftJoin(visitSharing, eq(visitSharing.visitId, visit.id)).where(and(eq(visit.patientId, patientId), sql`coalesce(${visitSharing.shared}, ${visit.shareWithFamily}) = true`)).orderBy(desc(visit.measuredAt), desc(visit.createdAt)).limit(100)
+  const rows = await db.select({ measuredAt: visit.measuredAt, weightKg: visit.weightKg, lengthHeightCm: visit.lengthHeightCm, position: visit.position, headCircumferenceCm: visit.headCircumferenceCm, parentAdvice: visitText.parentAdvice, nextControlAt: visit.nextControlAt }).from(visit).leftJoin(visitText, eq(visit.id, visitText.visitId)).leftJoin(visitSharing, eq(visitSharing.visitId, visit.id)).where(and(eq(visit.patientId, patientId), sql`coalesce(${visitSharing.shared}, ${visit.shareWithFamily}) = true`)).orderBy(desc(visit.measuredAt), desc(visit.createdAt)).limit(includeHistory ? 100 : 1)
   const visits = rows.map(familyVisit)
   await recordAudit('PORTAL_READ', 'ALLOWED', actor.id, patientId)
   return { ...child, visits }

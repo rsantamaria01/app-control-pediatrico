@@ -51,9 +51,36 @@
   .staff-sidebar {
     position: relative;
     z-index: 50;
+    overflow: hidden;
     background: var(--ui-bg);
     border-inline-end: 1px solid var(--ui-border);
   }
+  .staff-sidebar .sidebar-brand { position: relative; min-height: 44px; }
+  .staff-sidebar .sidebar-brand-link { padding-inline-start: 8px; }
+  .staff-sidebar .sidebar-brand-toggle { margin-inline-start: auto; }
+  .staff-sidebar:not(.staff-sidebar--open):not(.staff-sidebar--pinned) .sidebar-brand-link { width: 48px; flex: none; }
+  .staff-sidebar .sidebar-label { overflow: hidden; text-overflow: ellipsis; }
+  .staff-sidebar:not(.staff-sidebar--open):not(.staff-sidebar--pinned) .sidebar-label {
+    flex: 0 0 0;
+    max-width: 0;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .staff-sidebar:not(.staff-sidebar--open):not(.staff-sidebar--pinned) .sidebar-brand-toggle {
+    position: absolute;
+    inset-inline-start: 0;
+    top: 0;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .staff-sidebar:not(.staff-sidebar--open):not(.staff-sidebar--pinned) .sidebar-brand:hover .sidebar-brand-toggle,
+  .staff-sidebar:not(.staff-sidebar--open):not(.staff-sidebar--pinned) .sidebar-brand:focus-within .sidebar-brand-toggle {
+    opacity: 1;
+    pointer-events: auto;
+    background: var(--ui-bg);
+  }
+  .staff-sidebar:not(.staff-sidebar--open):not(.staff-sidebar--pinned) .sidebar-brand:focus-within .sidebar-brand-logo,
+  .staff-sidebar:not(.staff-sidebar--open):not(.staff-sidebar--pinned) .sidebar-brand:hover .sidebar-brand-logo { opacity: 0; }
   .staff-sidebar:not(.staff-sidebar--pinned) {
     width: 64px;
     min-width: 64px;
@@ -75,6 +102,8 @@
     justify-content: center;
   }
   @media (prefers-reduced-motion: no-preference) {
-    .staff-sidebar { transition: width 150ms ease-out, margin-right 150ms ease-out; }
+    .staff-sidebar { transition: width 200ms ease-out, min-width 200ms ease-out, flex-basis 200ms ease-out, margin-inline-end 200ms ease-out; }
+    .staff-sidebar .sidebar-label { transition: opacity 120ms ease-out 80ms; }
+    .staff-sidebar:not(.staff-sidebar--open):not(.staff-sidebar--pinned) .sidebar-label { transition-delay: 0ms; }
   }
 }

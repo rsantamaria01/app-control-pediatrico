@@ -4,7 +4,8 @@ import { and, eq, sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/node-postgres'
 import { Pool } from 'pg'
 import manifest from './who-2006-manifest.json' with { type: 'json' }
-import { account, patient, user, userRole, visit, whoDataset } from '../server/db/schema.ts'
+import { account, appointment, bookingRequest, patient, user, userRole, visit, whoDataset } from '../server/db/schema.ts'
+import { instant, localDate } from '../server/services/availability.ts'
 import { createVisit } from '../server/services/visits.ts'
 import { useDb } from '../server/utils/db.ts'
 import type { Actor } from '../shared/types/access.ts'
@@ -82,6 +83,17 @@ try {
     const credentials = await tx.select().from(account).where(and(eq(account.userId, doctorId), eq(account.providerId, 'credential')))
     if (credentials.length > 1 || (credentials[0] && (credentials[0].accountId !== doctorId || !credentials[0].password))) throw new Error('Demo doctor credential conflicts with existing data')
     if (!credentials.length) await tx.insert(account).values({ id: randomUUID(), accountId: doctorId, providerId: 'credential', userId: doctorId, password: await hashPassword(password) })
+    const demoDay = localDate(new Date())
+    await tx.insert(appointment).values({
+      id: '51e742c6-ad73-4d12-96e0-c78920802410', patientId: fixtures[0]!.id, name: fixtures[0]!.name,
+      contact: 'doctor.demo@example.invalid', reason: 'Control registrado para la demostración', startsAt: instant(demoDay, '09:00'),
+      endsAt: instant(demoDay, '09:30'), status: 'CONFIRMED', createdBy: doctorId
+    }).onConflictDoNothing()
+    await tx.insert(bookingRequest).values({
+      id: '81e742c6-ad73-4d12-96e0-c78920802410', source: 'PUBLIC', childName: 'Paciente Demo C',
+      guardianName: 'Representante Demo', email: 'representante.demo@example.invalid',
+      startsAt: instant(demoDay, '10:00'), consentVersion: 'demo', status: 'PENDING'
+    }).onConflictDoNothing()
     for (const fixture of fixtures) {
       const [existing] = await tx.select().from(patient).where(eq(patient.id, fixture.id))
       if (existing && (existing.name !== fixture.name || existing.birthDate !== fixture.birthDate || existing.sex !== fixture.sex || existing.createdBy !== doctorId)) throw new Error('Demo patient identity conflicts with existing data')
@@ -98,7 +110,7 @@ try {
       if (result.results.length !== 5 || result.results.some(entry => entry.status !== 'available' || entry.reference.version !== manifest.version)) throw new Error('Demo visit does not have five verified WHO results')
     }
   }
-  process.stdout.write('Demo doctor and two fictional patients seeded with five WHO-backed visits.\n')
+  process.stdout.write('Demo doctor, two fictional patients, one appointment and one pending request seeded with five WHO-backed visits.\n')
 } finally {
   await pool.end()
   if (visitsStarted) await useDb().$client.end()

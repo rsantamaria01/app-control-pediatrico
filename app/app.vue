@@ -37,9 +37,19 @@ function dismissInstall() {
 const route = useRoute()
 const { user, loggedIn, fetchSession, signOut } = useUserSession()
 const { data: navigation, refresh: refreshNavigation } = await useFetch<{ label: string, to: string }[]>('/api/auth/navigation', { default: () => [] })
+const staffAccess = computed(() => navigation.value.some(item => ['/pacientes', '/agenda'].includes(item.to) || item.to.startsWith('/admin/')))
+const { data: staffNotices, refresh: refreshStaffNotices } = await useFetch<{ id: string }[]>('/api/avisos/personal', { enabled: staffAccess, default: () => [] })
+const readStaffIds = useState<string[]>('read-staff-notices', () => [])
+onMounted(() => {
+  watch(() => user.value?.id, id => {
+    if (!id) return
+    try { readStaffIds.value = JSON.parse(localStorage.getItem(`staff-notice-read:${id}`) ?? '[]') } catch { readStaffIds.value = [] }
+  }, { immediate: true })
+})
+const staffUnread = computed(() => staffNotices.value.filter(notice => !readStaffIds.value.includes(notice.id)).length)
 const publicPage = computed(() => /^\/(acceso|recuperar|restablecer|invitacion|reservar|privacidad|sin-conexion|sesion-expirada|403)(\/|$)/.test(route.path))
 const isDoctor = computed(() => navigation.value.some(item => item.to === '/pacientes'))
-const isStaff = computed(() => navigation.value.some(item => ['/pacientes', '/agenda'].includes(item.to) || item.to.startsWith('/admin/')))
+const isStaff = staffAccess
 const isParent = computed(() => navigation.value.some(item => item.to === '/citas') && !isStaff.value)
 const hasFamily = computed(() => navigation.value.some(item => item.to === '/citas'))
 const isAdmin = computed(() => navigation.value.some(item => item.to.startsWith('/admin/')))
@@ -71,7 +81,7 @@ const mobileMoreItems = computed(() => {
   ].map(item => ({ ...item, icon: item.label === 'Volver a la consulta' ? 'i-lucide-arrow-left' : item.label === 'Administración' ? 'i-lucide-settings' : icons[item.to] }))
 })
 const icons: Record<string, string> = { '/': 'i-lucide-house', '/pacientes': 'i-lucide-users-round', '/agenda': 'i-lucide-calendar-days', '/agenda/horarios': 'i-lucide-clock', '/avisos': 'i-lucide-bell', '/perfil': 'i-lucide-user-round', '/citas': 'i-lucide-calendar-days', '/admin/inicio': 'i-lucide-house', '/admin/usuarios': 'i-lucide-users-round', '/admin/clinica': 'i-lucide-settings', '/admin/catalogos': 'i-lucide-book-open', '/admin/auditoria': 'i-lucide-scroll-text' }
-const navItems = computed(() => visibleItems.value.map(item => ({ ...item, icon: icons[item.to], active: route.path === item.to || (item.to !== '/' && route.path.startsWith(`${item.to}/`)) })))
+const navItems = computed(() => visibleItems.value.map(item => ({ ...item, icon: icons[item.to], badge: item.to === '/avisos' && isStaff.value && staffUnread.value ? String(staffUnread.value) : undefined, active: route.path === item.to || (item.to !== '/' && route.path.startsWith(`${item.to}/`)) })))
 const staffAdminItem = [{ label: 'Administración', to: '/admin/inicio', icon: 'i-lucide-settings' }]
 const pageTitle = computed(() => route.query.vista === 'familiar' && route.path === '/' && hasFamily.value ? 'Vista familiar' : ({ '/': 'Inicio', '/pacientes': 'Pacientes', '/pacientes/nuevo': 'Nuevo paciente', '/agenda': 'Agenda', '/agenda/horarios': 'Horarios', '/agenda/solicitudes': 'Solicitudes', '/avisos': 'Avisos', '/perfil': 'Perfil', '/admin/inicio': 'Configuración inicial', '/admin/usuarios': 'Usuarios', '/admin/clinica': 'Ajustes de la clínica', '/admin/catalogos': 'Catálogos', '/admin/auditoria': 'Auditoría' })[route.path] ?? (route.path.startsWith('/pacientes/') ? 'Ficha del paciente' : 'Control Pediátrico'))
 const pinnedSidebar = ref(false)
@@ -80,6 +90,19 @@ const sidebarHover = ref(false)
 const sidebarFocus = ref(false)
 const sidebarDismissed = ref(false)
 const sidebarExpanded = computed(() => pinnedSidebar.value || (!sidebarDismissed.value && (sidebarHover.value || sidebarFocus.value)))
+let openTimer: ReturnType<typeof setTimeout> | undefined
+let closeTimer: ReturnType<typeof setTimeout> | undefined
+function onSidebarEnter() {
+  clearTimeout(closeTimer)
+  openTimer = setTimeout(() => { sidebarHover.value = true }, 150)
+}
+function onSidebarLeave() {
+  clearTimeout(openTimer)
+  closeTimer = setTimeout(() => {
+    sidebarHover.value = false
+    sidebarDismissed.value = false
+  }, 250)
+}
 const userMenuItems = computed<DropdownMenuItem[][]>(() => [
   [
     { label: 'Ver perfil', icon: 'i-lucide-user-round', to: '/perfil' },
@@ -95,7 +118,10 @@ watch(loggedIn, async () => {
   await refreshNavigation()
 })
 watch(() => route.path, async () => {
-  if (import.meta.client) await refreshNavigation()
+  if (import.meta.client) {
+    await refreshNavigation()
+    if (isStaff.value) await refreshStaffNotices()
+  }
 })
 async function logout() {
   await signOut({ onSuccess: async () => {
@@ -115,6 +141,8 @@ function onSidebarFocusOut(event: FocusEvent) {
 function onSidebarEscape(event: KeyboardEvent) {
   if (event.key !== 'Escape' || pinnedSidebar.value || !sidebarExpanded.value || document.querySelector('[role="menu"][data-state="open"]')) return
   sidebarDismissed.value = true
+  clearTimeout(openTimer)
+  clearTimeout(closeTimer)
   sidebarHover.value = false
   sidebarFocus.value = false
 }
@@ -145,6 +173,8 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  clearTimeout(openTimer)
+  clearTimeout(closeTimer)
   window.removeEventListener('beforeinstallprompt', onBeforeInstall)
   window.removeEventListener('online', updateConnection)
   window.removeEventListener('offline', updateConnection)
@@ -270,30 +300,35 @@ useSeoMeta({
           class="staff-sidebar hidden lg:flex"
           :class="{ 'staff-sidebar--open': sidebarExpanded, 'staff-sidebar--pinned': pinnedSidebar }"
            :ui="{ root: 'lg:w-(--width)', header: 'px-2', body: 'px-2', footer: 'flex-col items-stretch border-t border-default px-2' }"
-          @mouseenter="sidebarHover = true"
-          @mouseleave="sidebarHover = false; sidebarDismissed = false"
+           @mouseenter="onSidebarEnter"
+           @mouseleave="onSidebarLeave"
           @focusin="sidebarFocus = true"
           @focusout="onSidebarFocusOut"
           @keydown="onSidebarEscape"
         >
-           <template #header>
-             <NuxtLink
-                :to="isAdminPanel || !staffItems.length ? '/admin/inicio' : isDoctor ? '/' : '/agenda'"
-                class="flex w-full min-w-0 items-center gap-2 py-1 font-semibold text-default"
-                :class="sidebarExpanded ? 'px-2' : 'justify-center px-0'"
-                :aria-label="sidebarExpanded ? undefined : clinicName"
-             >
-              <img
-                :src="brand.logo"
-                alt="Logo de la clínica"
-                class="size-8 shrink-0"
-              >
-               <span
-                  v-if="sidebarExpanded"
-                  class="min-w-0 text-sm"
-               >{{ clinicName }}<span class="block text-xs font-normal text-muted">{{ isAdminPanel || !staffItems.length ? 'Administración' : 'Control Pediátrico' }}</span></span>
-            </NuxtLink>
-          </template>
+            <template #header>
+              <div class="sidebar-brand flex w-full min-w-0 items-center">
+                <NuxtLink
+                  :to="isAdminPanel || !staffItems.length ? '/admin/inicio' : isDoctor ? '/' : '/agenda'"
+                  class="sidebar-brand-link flex min-w-0 flex-1 items-center gap-2 py-1 font-semibold text-default"
+                  :aria-label="clinicName"
+                >
+                  <img :src="brand.logo" alt="" class="sidebar-brand-logo size-8 shrink-0" aria-hidden="true">
+                  <span class="sidebar-label min-w-0 whitespace-nowrap text-sm">{{ clinicName }}<span class="block text-xs font-normal text-muted">{{ isAdminPanel || !staffItems.length ? 'Administración' : 'Control Pediátrico' }}</span></span>
+                </NuxtLink>
+                <UTooltip :text="pinnedSidebar ? 'Cerrar menú' : 'Abrir menú'">
+                  <UButton
+                    :icon="pinnedSidebar ? 'i-lucide-panel-left-close' : 'i-lucide-panel-left-open'"
+                    variant="ghost"
+                    color="neutral"
+                    :aria-label="pinnedSidebar ? 'Cerrar menú' : 'Abrir menú'"
+                    :aria-pressed="pinnedSidebar"
+                    class="sidebar-brand-toggle min-h-11 min-w-11 shrink-0"
+                    @click="setSidebarPinned"
+                  />
+                </UTooltip>
+              </div>
+           </template>
            <template #default>
              <UNavigationMenu
                :items="navItems"
@@ -322,19 +357,6 @@ useSeoMeta({
              </div>
           </template>
            <template #footer>
-              <UTooltip :text="sidebarExpanded ? 'Contraer menú' : sidebarHover || sidebarFocus ? 'Fijar menú abierto' : 'Expandir menú'" :disabled="sidebarExpanded">
-                <UButton
-                  :icon="pinnedSidebar ? 'i-lucide-panel-left-close' : 'i-lucide-panel-left-open'"
-                  :label="sidebarExpanded ? pinnedSidebar ? 'Contraer menú' : 'Fijar menú abierto' : undefined"
-                  variant="ghost"
-                  color="neutral"
-                  :aria-label="pinnedSidebar ? 'Contraer menú' : 'Fijar menú abierto'"
-                  :aria-pressed="pinnedSidebar"
-                  class="min-h-11 w-full"
-                  :class="sidebarExpanded ? 'justify-start px-2' : 'justify-center px-0'"
-                  @click="setSidebarPinned"
-                />
-              </UTooltip>
               <RoleEmulationMenu />
               <UDropdownMenu :items="userMenuItems" :content="{ side: 'right', align: 'end' }">
                <UButton

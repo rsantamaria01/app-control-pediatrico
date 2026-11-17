@@ -14,9 +14,9 @@ const target = process.env.DATABASE_URL
 if (!target) throw new Error('DATABASE_URL required')
 const url = new URL(target)
 const database = decodeURIComponent(url.pathname.slice(1))
-const disposable = /^pediatrico_design_[a-f0-9]{12}_test$/.test(database)
+const disposable = /^pediatrico_design_[a-f0-9]{12}_test$/.test(database) && database !== 'pediatrico_design_000000000000_test'
 const stablePreview = database === 'pediatrico_design_000000000000_test' && process.env.DEMO_SEED_DB === database
-if (!['postgres:', 'postgresql:'].includes(url.protocol) || !(disposable && database !== 'pediatrico_design_000000000000_test' || stablePreview) || url.search || url.hash || (process.env.DB_NAME && process.env.DB_NAME !== database) || (process.env.DEMO_SEED_DB && process.env.DEMO_SEED_DB !== database)) throw new Error('Only a disposable preview database or explicitly confirmed stable preview database is allowed')
+if (!['postgres:', 'postgresql:'].includes(url.protocol) || !(disposable || stablePreview) || url.search || url.hash || (process.env.DB_NAME && process.env.DB_NAME !== database) || (process.env.DEMO_SEED_DB && process.env.DEMO_SEED_DB !== database)) throw new Error('Only a disposable preview database or explicitly confirmed stable preview database is allowed')
 if (process.argv.slice(2).some(flag => flag !== '--reset') || process.argv.slice(2).length > 1) throw new Error('Usage: ops demo-seed [--reset]')
 const reset = process.argv.includes('--reset')
 const id = (kind: string, index: number) => {

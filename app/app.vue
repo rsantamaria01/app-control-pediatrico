@@ -37,7 +37,7 @@ function dismissInstall() {
 const route = useRoute()
 const { user, loggedIn, fetchSession, signOut } = useUserSession()
 const { data: navigation, refresh: refreshNavigation } = await useFetch<{ label: string, to: string }[]>('/api/auth/navigation', { default: () => [] })
-const { data: emulation } = await useFetch<{ available: boolean, active: { role: string } | null }>('/api/auth/emulacion', { key: 'role-emulation-state', default: () => ({ available: false, active: null }) })
+const { data: emulation, refresh: refreshEmulation } = await useFetch<{ available: boolean, active: { role: string } | null }>('/api/auth/emulacion', { key: 'role-emulation-state', default: () => ({ available: false, active: null }) })
 const emulationOpen = ref(false)
 async function stopEmulation() {
   await $fetch('/api/auth/emulacion', { method: 'DELETE' })
@@ -123,6 +123,7 @@ const clinicName = computed(() => savedBrand.value?.name ?? 'Pediatría')
 
 watch(loggedIn, async () => {
   await refreshNavigation()
+  await refreshEmulation()
 })
 watch(() => route.path, async () => {
   if (import.meta.client) {
@@ -133,6 +134,7 @@ watch(() => route.path, async () => {
 async function logout() {
   await signOut({ onSuccess: async () => {
     await refreshNavigation()
+    await refreshEmulation()
     await navigateTo('/acceso')
   } })
 }

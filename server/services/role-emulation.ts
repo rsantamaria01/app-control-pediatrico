@@ -20,10 +20,11 @@ export async function emulationState(event: H3Event) {
   if (!emulationEnabled()) return null
   const auth = await getUserSession(event)
   if (!auth?.user?.id || !auth.session?.id) return null
-  const [admin] = await useDb().select({ userId: userRole.userId }).from(userRole).where(and(eq(userRole.userId, auth.user.id), eq(userRole.role, 'ADMIN')))
-  if (!admin) return null
-  const [row] = await useDb().select().from(session).where(and(eq(session.id, auth.session.id), eq(session.userId, admin.userId)))
+  const [row] = await useDb().select().from(session).where(and(eq(session.id, auth.session.id), eq(session.userId, auth.user.id)))
   if (!row || row.expiresAt <= new Date()) return null
+  const [admin] = await useDb().select({ userId: userRole.userId }).from(userRole).where(and(eq(userRole.userId, auth.user.id), eq(userRole.role, 'ADMIN')))
+  if (!admin && (row.emulatedRole || row.emulatedUserId)) throw createError({ statusCode: 403, statusMessage: 'Invalid emulation state' })
+  if (!admin) return null
   if (!row.emulatedRole) {
     if (row.emulatedUserId) throw createError({ statusCode: 403, statusMessage: 'Invalid emulation state' })
     return null
@@ -56,7 +57,7 @@ export async function setEmulation(event: H3Event, role: Role | null, guardianId
   }
   await useDb().transaction(async (tx) => {
     const [current] = await tx.select().from(session).where(and(eq(session.id, row.id), eq(session.userId, adminId))).for('update')
-    if (!current || current.expiresAt <= new Date() || (role && current.emulatedRole)) throw createError({ statusCode: 409, statusMessage: 'Emulación ya activa o sesión vencida' })
+    if (!current || current.expiresAt <= new Date() || (role && current.emulatedRole) || (!role && !current.emulatedRole)) throw createError({ statusCode: 409, statusMessage: 'Estado de emulación inválido o sesión vencida' })
     if (guardianId) {
       const [active] = await tx.select({ id: guardianGrant.guardianId }).from(guardianGrant).where(and(eq(guardianGrant.guardianId, guardianId), eq(guardianGrant.status, 'ACTIVE'))).limit(1)
       if (!active) throw createError({ statusCode: 409, statusMessage: 'Representante sin acceso activo' })

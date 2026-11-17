@@ -80,6 +80,19 @@ const sidebarHover = ref(false)
 const sidebarFocus = ref(false)
 const sidebarDismissed = ref(false)
 const sidebarExpanded = computed(() => pinnedSidebar.value || (!sidebarDismissed.value && (sidebarHover.value || sidebarFocus.value)))
+let openTimer: ReturnType<typeof setTimeout> | undefined
+let closeTimer: ReturnType<typeof setTimeout> | undefined
+function onSidebarEnter() {
+  clearTimeout(closeTimer)
+  openTimer = setTimeout(() => { sidebarHover.value = true }, 150)
+}
+function onSidebarLeave() {
+  clearTimeout(openTimer)
+  closeTimer = setTimeout(() => {
+    sidebarHover.value = false
+    sidebarDismissed.value = false
+  }, 250)
+}
 const userMenuItems = computed<DropdownMenuItem[][]>(() => [
   [
     { label: 'Ver perfil', icon: 'i-lucide-user-round', to: '/perfil' },
@@ -115,6 +128,8 @@ function onSidebarFocusOut(event: FocusEvent) {
 function onSidebarEscape(event: KeyboardEvent) {
   if (event.key !== 'Escape' || pinnedSidebar.value || !sidebarExpanded.value || document.querySelector('[role="menu"][data-state="open"]')) return
   sidebarDismissed.value = true
+  clearTimeout(openTimer)
+  clearTimeout(closeTimer)
   sidebarHover.value = false
   sidebarFocus.value = false
 }
@@ -145,6 +160,8 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  clearTimeout(openTimer)
+  clearTimeout(closeTimer)
   window.removeEventListener('beforeinstallprompt', onBeforeInstall)
   window.removeEventListener('online', updateConnection)
   window.removeEventListener('offline', updateConnection)
@@ -267,30 +284,35 @@ useSeoMeta({
           class="staff-sidebar hidden lg:flex"
           :class="{ 'staff-sidebar--open': sidebarExpanded, 'staff-sidebar--pinned': pinnedSidebar }"
            :ui="{ root: 'lg:w-(--width)', header: 'px-2', body: 'px-2', footer: 'flex-col items-stretch border-t border-default px-2' }"
-          @mouseenter="sidebarHover = true"
-          @mouseleave="sidebarHover = false; sidebarDismissed = false"
+           @mouseenter="onSidebarEnter"
+           @mouseleave="onSidebarLeave"
           @focusin="sidebarFocus = true"
           @focusout="onSidebarFocusOut"
           @keydown="onSidebarEscape"
         >
-           <template #header>
-             <NuxtLink
-                :to="isAdminPanel || !staffItems.length ? '/admin/inicio' : isDoctor ? '/' : '/agenda'"
-                class="flex w-full min-w-0 items-center gap-2 py-1 font-semibold text-default"
-                :class="sidebarExpanded ? 'px-2' : 'justify-center px-0'"
-                :aria-label="sidebarExpanded ? undefined : clinicName"
-             >
-              <img
-                :src="brand.logo"
-                alt="Logo de la clínica"
-                class="size-8 shrink-0"
-              >
-               <span
-                  v-if="sidebarExpanded"
-                  class="min-w-0 text-sm"
-               >{{ clinicName }}<span class="block text-xs font-normal text-muted">{{ isAdminPanel || !staffItems.length ? 'Administración' : 'Control Pediátrico' }}</span></span>
-            </NuxtLink>
-          </template>
+            <template #header>
+              <div class="sidebar-brand flex w-full min-w-0 items-center">
+                <NuxtLink
+                  :to="isAdminPanel || !staffItems.length ? '/admin/inicio' : isDoctor ? '/' : '/agenda'"
+                  class="sidebar-brand-link flex min-w-0 flex-1 items-center gap-2 py-1 font-semibold text-default"
+                  :aria-label="clinicName"
+                >
+                  <img :src="brand.logo" alt="" class="sidebar-brand-logo size-8 shrink-0" aria-hidden="true">
+                  <span class="sidebar-label min-w-0 whitespace-nowrap text-sm">{{ clinicName }}<span class="block text-xs font-normal text-muted">{{ isAdminPanel || !staffItems.length ? 'Administración' : 'Control Pediátrico' }}</span></span>
+                </NuxtLink>
+                <UTooltip :text="pinnedSidebar ? 'Cerrar menú' : 'Abrir menú'">
+                  <UButton
+                    :icon="pinnedSidebar ? 'i-lucide-panel-left-close' : 'i-lucide-panel-left-open'"
+                    variant="ghost"
+                    color="neutral"
+                    :aria-label="pinnedSidebar ? 'Cerrar menú' : 'Abrir menú'"
+                    :aria-pressed="pinnedSidebar"
+                    class="sidebar-brand-toggle min-h-11 min-w-11 shrink-0"
+                    @click="setSidebarPinned"
+                  />
+                </UTooltip>
+              </div>
+           </template>
            <template #default>
              <UNavigationMenu
                :items="navItems"
@@ -319,19 +341,7 @@ useSeoMeta({
              </div>
           </template>
            <template #footer>
-              <UTooltip :text="sidebarExpanded ? 'Contraer menú' : sidebarHover || sidebarFocus ? 'Fijar menú abierto' : 'Expandir menú'" :disabled="sidebarExpanded">
-                <UButton
-                  :icon="pinnedSidebar ? 'i-lucide-panel-left-close' : 'i-lucide-panel-left-open'"
-                  :label="sidebarExpanded ? pinnedSidebar ? 'Contraer menú' : 'Fijar menú abierto' : undefined"
-                  variant="ghost"
-                  color="neutral"
-                  :aria-label="pinnedSidebar ? 'Contraer menú' : 'Fijar menú abierto'"
-                  :aria-pressed="pinnedSidebar"
-                  class="min-h-11 w-full"
-                  :class="sidebarExpanded ? 'justify-start px-2' : 'justify-center px-0'"
-                  @click="setSidebarPinned"
-                />
-              </UTooltip>
+
               <UDropdownMenu :items="userMenuItems" :content="{ side: 'right', align: 'end' }">
                <UButton
                  color="neutral"

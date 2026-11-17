@@ -308,7 +308,7 @@ function age(birthDate: string) {
     </template>
     <template v-else-if="isParent">
       <h1 class="text-2xl font-semibold">
-        Mis hijos
+        Hola{{ user?.name ? `, ${user.name.split(' ')[0]}` : '' }}
       </h1>
       <UAlert
         v-if="childrenError"
@@ -326,57 +326,25 @@ function age(birthDate: string) {
         v-else
         class="grid gap-4 sm:grid-cols-2"
       >
-        <UCard
+        <NuxtLink
           v-for="child in children"
           :key="child.id"
+          :to="`/hijos/${child.id}`"
+          class="block rounded-xl border border-default bg-default p-4 transition hover:border-primary focus-visible:outline-2 focus-visible:outline-primary"
         >
-          <h2 class="text-lg font-semibold">
-            {{ child.name }}
-          </h2>
-          <p class="text-sm text-muted">
-            {{ age(child.birthDate) }}
-          </p>
+          <span class="flex items-center gap-3">
+            <UAvatar :text="child.name.slice(0, 1).toUpperCase()" size="lg" />
+            <span class="min-w-0 flex-1"><span class="block text-lg font-semibold">{{ child.name }}</span><span class="text-sm text-muted">{{ age(child.birthDate) }}</span></span>
+            <UIcon name="i-lucide-chevron-right" class="size-5 text-muted" aria-hidden="true" />
+          </span>
           <template v-if="child.lastControl">
-            <p class="mt-3 font-medium">
-              Último control · {{ dateFormat.format(new Date(child.lastControl.measuredAt)) }}
-            </p>
-            <div class="mt-2 grid grid-cols-3 gap-2 text-sm tabular-nums">
-              <p>Peso<br><strong>{{ weightFormat.format(child.lastControl.weightKg) }} kg</strong></p>
-              <p>{{ child.lastControl.position === 'RECUMBENT' ? 'Longitud' : 'Talla' }}<br><strong>{{ sizeFormat.format(child.lastControl.lengthHeightCm) }} cm</strong></p>
-              <p>Cabeza<br><strong>{{ sizeFormat.format(child.lastControl.headCircumferenceCm) }} cm</strong></p>
-            </div>
-            <div
-              v-if="child.lastControl.parentAdvice"
-              class="mt-3 rounded-md bg-elevated p-3"
-            >
-              <p class="font-medium">
-                Indicaciones de tu pediatra
-              </p>
-              <p class="whitespace-pre-wrap text-sm">
-                {{ child.lastControl.parentAdvice }}
-              </p>
-            </div>
-            <p
-              v-if="child.lastControl.nextControlAt"
-              class="mt-3 text-sm"
-            >
-              Próximo control · {{ dateTimeFormat.format(new Date(child.lastControl.nextControlAt)) }}
-            </p>
+            <span class="mt-3 block font-medium">Último control · {{ dateFormat.format(new Date(child.lastControl.measuredAt)) }}</span>
+            <span class="mt-2 grid grid-cols-3 gap-2 text-sm tabular-nums"><span>Peso<br><strong>{{ weightFormat.format(child.lastControl.weightKg) }} kg</strong></span><span>{{ child.lastControl.position === 'RECUMBENT' ? 'Longitud' : 'Talla' }}<br><strong>{{ sizeFormat.format(child.lastControl.lengthHeightCm) }} cm</strong></span><span>Cabeza<br><strong>{{ sizeFormat.format(child.lastControl.headCircumferenceCm) }} cm</strong></span></span>
+            <span v-if="child.lastControl.parentAdvice" class="mt-3 block rounded-lg bg-primary/10 p-3"><span class="block font-medium text-primary">Indicaciones de tu pediatra</span><span class="line-clamp-2 text-sm">{{ child.lastControl.parentAdvice }}</span></span>
+            <span v-if="child.lastControl.nextControlAt" class="mt-3 block text-sm">Próximo control · {{ dateTimeFormat.format(new Date(child.lastControl.nextControlAt)) }}</span>
           </template>
-          <p
-            v-else
-            class="mt-3 text-sm text-muted"
-          >
-            Aún no hay controles compartidos.
-          </p>
-          <UButton
-            :to="`/hijos/${child.id}`"
-            variant="outline"
-            class="mt-3 min-h-11"
-          >
-            Ver todas
-          </UButton>
-        </UCard>
+          <span v-else class="mt-3 block text-sm text-muted">Aún no hay controles compartidos.</span>
+        </NuxtLink>
       </div>
     </template>
   </UContainer>

@@ -16,7 +16,7 @@ const isParent = computed(() => navigation.value.some(item => item.to === '/cita
 const isAdmin = computed(() => navigation.value.some(item => item.to.startsWith('/admin/')))
 const staffItems = computed(() => navigation.value.filter(item => !item.to.startsWith('/admin/')))
 const adminItems = computed(() => navigation.value.filter(item => item.to.startsWith('/admin/')))
-const visibleItems = computed(() => isParent.value ? navigation.value.filter(item => ['/', '/citas', '/avisos', '/perfil'].includes(item.to)) : staffItems.value)
+const visibleItems = computed(() => isParent.value ? navigation.value.filter(item => ['/', '/citas', '/avisos', '/perfil'].includes(item.to)) : staffItems.value.length ? staffItems.value : adminItems.value)
 const icons: Record<string, string> = { '/': 'i-lucide-house', '/pacientes': 'i-lucide-users-round', '/agenda': 'i-lucide-calendar-days', '/agenda/horarios': 'i-lucide-clock', '/avisos': 'i-lucide-bell', '/perfil': 'i-lucide-user-round', '/citas': 'i-lucide-calendar-days', '/admin/clinica': 'i-lucide-settings', '/admin/catalogos': 'i-lucide-book-open' }
 const navItems = computed(() => visibleItems.value.map(item => ({ ...item, icon: icons[item.to], active: route.path === item.to || (item.to !== '/' && route.path.startsWith(`${item.to}/`)) })))
 const adminNavItems = computed(() => adminItems.value.map(item => ({ ...item, icon: icons[item.to], active: route.path === item.to })))
@@ -91,16 +91,16 @@ useSeoMeta({
     <NuxtPwaManifest />
 
     <template v-if="!online">
-      <UContainer class="py-12">
-        <UCard>
-          <h1 class="text-2xl font-semibold">
-            Sin conexión
-          </h1>
-          <p class="mt-2 text-muted">
-            Conéctese a internet para consultar la información. No se guardan datos clínicos en este dispositivo.
-          </p>
-        </UCard>
-      </UContainer>
+      <main class="flex min-h-dvh items-center justify-center bg-default px-8 text-center">
+        <div class="w-full max-w-sm space-y-4">
+          <span class="mx-auto flex size-18 items-center justify-center rounded-full bg-elevated text-muted">
+            <UIcon name="i-lucide-wifi-off" class="size-8" aria-hidden="true" />
+          </span>
+          <h1 class="text-2xl font-bold">Sin conexión</h1>
+          <p class="text-muted">Para proteger la información de sus hijos, la app no guarda datos de salud en el teléfono. Conéctese a internet para continuar.</p>
+          <UButton block size="xl" class="min-h-12" @click="updateConnection">Reintentar</UButton>
+        </div>
+      </main>
     </template>
     <NuxtPage v-else-if="publicPage" />
     <template v-else-if="isParent">
@@ -131,6 +131,9 @@ useSeoMeta({
         </template>
       </UHeader>
       <main class="min-h-dvh bg-muted pb-24 lg:pb-0">
+        <header v-if="route.path === '/'" class="flex h-14 items-center gap-2 border-b border-default bg-default px-4 font-semibold lg:hidden">
+          <img :src="brand.logo" alt="" class="size-7" aria-hidden="true">{{ clinicName }}
+        </header>
         <NuxtPage />
       </main>
     </template>
@@ -224,6 +227,7 @@ useSeoMeta({
             :title="pageTitle"
             :toggle="false"
             class="hidden lg:flex"
+            :ui="{ root: 'bg-default' }"
           >
             <template #leading>
               <UDashboardSidebarCollapse />
@@ -242,6 +246,7 @@ useSeoMeta({
                   placeholder="Buscar paciente por nombre o cédula"
                   aria-label="Buscar paciente por nombre o cédula"
                   class="w-full"
+                  :ui="{ base: 'min-h-10 pr-16', trailing: 'pr-2' }"
                 >
                   <template #trailing>
                     <UKbd>Ctrl K</UKbd>
@@ -283,14 +288,14 @@ useSeoMeta({
       aria-label="Navegación principal"
       class="fixed inset-x-0 bottom-0 z-40 grid grid-flow-col border-t border-default bg-default pb-[env(safe-area-inset-bottom)] lg:hidden"
     >
-      <NuxtLink
-        v-for="item in visibleItems"
-        :key="item.to"
-        :to="item.to"
-        :aria-current="route.path === item.to ? 'page' : undefined"
-        class="flex min-h-16 min-w-0 flex-col items-center justify-center gap-0.5 px-1 text-center text-[11px] font-medium text-muted focus-visible:outline-2 focus-visible:outline-primary"
-        active-class="text-primary"
-      >
+        <NuxtLink
+          v-for="item in visibleItems"
+          :key="item.to"
+          :to="item.to"
+          :aria-current="route.path === item.to ? 'page' : undefined"
+          class="flex min-h-16 min-w-0 flex-col items-center justify-center gap-0.5 px-1 text-center text-[11px] font-medium text-muted focus-visible:outline-2 focus-visible:outline-primary"
+          active-class="text-primary font-semibold"
+        >
         <UIcon
           :name="icons[item.to] || 'i-lucide-circle'"
           class="size-5"

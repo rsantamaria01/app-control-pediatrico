@@ -155,7 +155,7 @@ try {
         }
         const elapsed = Math.max('gestationDays' in entry ? 100 : 1, j === count - 1 ? age - (age > 60 && index % 2 === 0 ? 20 : 1) : Math.floor(age * (j + 1) / count))
         const measuredAt = new Date(birth + elapsed * 86400000).toISOString()
-        const fraction = Math.sqrt(elapsed / age)
+        const fraction = 'gestationDays' in entry ? Math.max(0, elapsed - (280 - entry.gestationDays)) / Math.max(1, age - (280 - entry.gestationDays)) : Math.sqrt(elapsed / age)
         const weightKg = Number((3.2 + (entry.weight - 3.2) * fraction + (index === 6 && j === count - 1 ? 4 : 0)).toFixed(2))
         const lengthHeightCm = Number((50 + (entry.length - 50) * fraction).toFixed(1))
         const headCircumferenceCm = Number((35 + (entry.head - 35) * fraction).toFixed(1))

@@ -58,7 +58,7 @@ const mobileItems = computed(() => isAdmin.value && !staffItems.value.length
   : isAdmin.value && !isParent.value && !isDoctor.value
     ? visibleItems.value.filter(item => item.to !== '/perfil')
     : visibleItems.value)
-const mobileMoreItems = computed(() => isAdmin.value && !isParent.value && staffItems.value.length
+const mobileMoreItems = computed(() => isAdmin.value && !isParent.value && staffItems.value.length && mobileItems.value.length < 5
   ? [
       ...navigation.value.filter(item => item.to === '/perfil' && !mobileItems.value.some(mobile => mobile.to === item.to)),
       ...adminItems.value.filter(item => !mobileItems.value.some(mobile => mobile.to === item.to))

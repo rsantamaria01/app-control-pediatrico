@@ -5,7 +5,8 @@ import { INDICATOR_LABEL, WhoIndicator } from '#shared/utils/enums'
 const id = useRoute().params.id as string
 const { data, error, refresh } = await useFetch<{ name: string, charts: Partial<Record<WhoIndicator, FamilyChartView>> }>(`/api/hijos/${encodeURIComponent(id)}/crecimiento`)
 if (import.meta.server && error.value) throw createError({ statusCode: error.value.statusCode === 404 ? 404 : 503, statusMessage: 'No disponible' })
-const indicators = [WhoIndicator.WEIGHT_FOR_AGE, WhoIndicator.HEIGHT_FOR_AGE, WhoIndicator.HEAD_CIRCUMFERENCE_FOR_AGE]
+const indicators = [WhoIndicator.HEIGHT_FOR_AGE, WhoIndicator.WEIGHT_FOR_AGE, WhoIndicator.HEAD_CIRCUMFERENCE_FOR_AGE]
+const selectedIndicator = ref(WhoIndicator.WEIGHT_FOR_AGE)
 const showTable = ref(false)
 </script>
 
@@ -76,32 +77,25 @@ const showTable = ref(false)
           {{ showTable ? 'Ver gráfico' : 'Ver tabla' }}
         </UButton>
       </div>
-      <UCard
-        v-for="indicator in indicators"
-        :key="indicator"
-        :ui="{ body: 'space-y-3 p-4 sm:p-5' }"
-      >
-        <h2 class="text-base font-semibold">
-          {{ INDICATOR_LABEL[indicator] }}
-        </h2>
-        <template v-if="data.charts[indicator]">
-          <GrowthTable
-            v-if="showTable"
-            :view="data.charts[indicator]!"
-            family
-          />
-          <GrowthChart
-            v-else
-            :view="data.charts[indicator]!"
-            family
-          />
+      <div class="grid grid-cols-3 gap-1 rounded-lg bg-elevated p-1" role="group" aria-label="Medida de crecimiento">
+        <UButton
+          v-for="indicator in indicators"
+          :key="indicator"
+          :color="selectedIndicator === indicator ? 'neutral' : 'primary'"
+          :variant="selectedIndicator === indicator ? 'solid' : 'ghost'"
+          :aria-pressed="selectedIndicator === indicator"
+          class="min-h-11 justify-center text-sm"
+          @click="selectedIndicator = indicator"
+        >{{ indicator === WhoIndicator.HEIGHT_FOR_AGE ? 'Estatura' : indicator === WhoIndicator.WEIGHT_FOR_AGE ? 'Peso' : 'Cabeza' }}</UButton>
+      </div>
+      <UCard :ui="{ body: 'space-y-3 p-4 sm:p-5' }">
+        <h2 class="text-base font-semibold">{{ INDICATOR_LABEL[selectedIndicator] }}</h2>
+        <template v-if="data.charts[selectedIndicator]">
+          <GrowthTable v-if="showTable" :view="data.charts[selectedIndicator]!" family />
+          <GrowthChart v-else :view="data.charts[selectedIndicator]!" family />
+          <p v-if="!showTable" class="flex items-center gap-2 text-xs text-muted"><span class="h-1 w-4 rounded bg-(--color-patient)" />{{ data.name }}<span class="ml-2 h-1 w-4 rounded border-t border-dashed border-muted" />Referencia OMS</p>
         </template>
-        <p
-          v-else
-          class="text-muted"
-        >
-          Referencia OMS no disponible.
-        </p>
+        <p v-else class="text-muted">Referencia OMS no disponible.</p>
       </UCard>
     </template>
   </UContainer>

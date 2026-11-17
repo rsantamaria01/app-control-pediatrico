@@ -10,7 +10,7 @@ const showTable = ref(false)
 </script>
 
 <template>
-  <UContainer class="max-w-5xl space-y-6 py-8 pb-24">
+  <UContainer class="max-w-6xl space-y-5 py-5 pb-24 sm:py-7 lg:pb-8">
     <UAlert
       v-if="error"
       color="error"
@@ -19,29 +19,69 @@ const showTable = ref(false)
       :actions="[{ label: 'Reintentar', onClick: () => refresh() }]"
     />
     <template v-else-if="data">
-      <nav aria-label="Ruta" class="text-sm">
-        <NuxtLink to="/" class="text-primary">Inicio</NuxtLink> / <NuxtLink :to="`/hijos/${id}`" class="text-primary">{{ data.name }}</NuxtLink> / Crecimiento
+      <nav
+        aria-label="Ruta"
+        class="hidden items-center gap-2 text-sm text-muted lg:flex"
+      >
+        <NuxtLink
+          to="/"
+          class="hover:text-primary hover:underline"
+        >Inicio</NuxtLink>
+        <UIcon
+          name="i-lucide-chevron-right"
+          aria-hidden="true"
+          class="size-4"
+        />
+        <NuxtLink
+          :to="`/hijos/${id}`"
+          class="hover:text-primary hover:underline"
+        >{{ data.name }}</NuxtLink>
+        <UIcon
+          name="i-lucide-chevron-right"
+          aria-hidden="true"
+          class="size-4"
+        />
+        <span
+          aria-current="page"
+          class="font-semibold text-default"
+        >Crecimiento</span>
       </nav>
-      <h1 class="text-2xl font-semibold">
+      <div class="flex items-center gap-2 lg:hidden">
+        <UButton
+          :to="`/hijos/${id}`"
+          icon="i-lucide-chevron-left"
+          variant="ghost"
+          color="neutral"
+          aria-label="Volver a la ficha de mi hijo"
+          class="min-h-11 min-w-11"
+        />
+        <h1 class="text-xl font-bold tracking-tight">
+          Crecimiento de {{ data.name }}
+        </h1>
+      </div>
+      <h1 class="hidden text-2xl font-bold tracking-tight lg:block">
         Crecimiento de {{ data.name }}
       </h1>
-      <p class="text-sm text-muted">
-        Mediciones de controles compartidos por la clínica y referencias OMS. El eje de edad muestra la edad corregida o cronológica usada en cada medición; consulte la fecha y el tipo de edad en la tabla. Consulte las curvas con su pediatra.
+      <p class="max-w-3xl text-sm text-muted">
+        Mediciones compartidas por la clínica y referencias OMS. Consulte las curvas con su pediatra; la fecha y el tipo de edad usado figuran en la tabla.
       </p>
-      <UButton
-        variant="outline"
-        class="min-h-11"
-        :aria-pressed="showTable"
-        @click="showTable = !showTable"
-      >
-        {{ showTable ? 'Ver gráfico' : 'Ver tabla' }}
-      </UButton>
+      <div class="flex justify-end">
+        <UButton
+          variant="outline"
+          color="neutral"
+          class="min-h-11"
+          :aria-pressed="showTable"
+          @click="showTable = !showTable"
+        >
+          {{ showTable ? 'Ver gráfico' : 'Ver tabla' }}
+        </UButton>
+      </div>
       <UCard
         v-for="indicator in indicators"
         :key="indicator"
-        class="space-y-3"
+        :ui="{ body: 'space-y-3 p-4 sm:p-5' }"
       >
-        <h2 class="font-semibold">
+        <h2 class="text-base font-semibold">
           {{ INDICATOR_LABEL[indicator] }}
         </h2>
         <template v-if="data.charts[indicator]">
@@ -56,7 +96,10 @@ const showTable = ref(false)
             family
           />
         </template>
-        <p v-else class="text-muted">
+        <p
+          v-else
+          class="text-muted"
+        >
           Referencia OMS no disponible.
         </p>
       </UCard>

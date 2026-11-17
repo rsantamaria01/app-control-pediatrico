@@ -27,8 +27,12 @@ const collapsed = ref(false)
 const pageAction = computed(() => route.path === '/' || route.path === '/pacientes' ? { label: 'Nuevo paciente', to: '/pacientes/nuevo' } : null)
 const clinicName = 'Control Pediátrico'
 
-watch(loggedIn, async () => { await refreshNavigation() })
-watch(() => route.path, async () => { if (import.meta.client) await refreshNavigation() })
+watch(loggedIn, async () => {
+  await refreshNavigation()
+})
+watch(() => route.path, async () => {
+  if (import.meta.client) await refreshNavigation()
+})
 async function logout() {
   await signOut({ onSuccess: async () => {
     await refreshNavigation()
@@ -89,71 +93,209 @@ useSeoMeta({
     <template v-if="!online">
       <UContainer class="py-12">
         <UCard>
-          <h1 class="text-2xl font-semibold">Sin conexión</h1>
-          <p class="mt-2 text-muted">Conéctese a internet para consultar la información. No se guardan datos clínicos en este dispositivo.</p>
+          <h1 class="text-2xl font-semibold">
+            Sin conexión
+          </h1>
+          <p class="mt-2 text-muted">
+            Conéctese a internet para consultar la información. No se guardan datos clínicos en este dispositivo.
+          </p>
         </UCard>
       </UContainer>
     </template>
     <NuxtPage v-else-if="publicPage" />
     <template v-else-if="isParent">
-      <UHeader :title="clinicName" :toggle="false" class="hidden lg:flex">
+      <UHeader
+        :title="clinicName"
+        :toggle="false"
+        class="hidden lg:flex"
+      >
         <template #title>
-          <span class="inline-flex items-center gap-2"><img :src="brand.logo" alt="Logo de la clínica" class="size-8">{{ clinicName }}</span>
+          <span class="inline-flex items-center gap-2">
+            <img
+              :src="brand.logo"
+              alt="Logo de la clínica"
+              class="size-8"
+            >{{ clinicName }}
+          </span>
         </template>
         <template #right>
           <UNavigationMenu :items="navItems" />
           <UColorModeButton aria-label="Cambiar tema" />
-          <UButton icon="i-lucide-log-out" variant="ghost" color="neutral" aria-label="Cerrar sesión" @click="logout" />
+          <UButton
+            icon="i-lucide-log-out"
+            variant="ghost"
+            color="neutral"
+            aria-label="Cerrar sesión"
+            @click="logout"
+          />
         </template>
       </UHeader>
-      <main class="min-h-dvh bg-muted pb-24 lg:pb-0"><NuxtPage /></main>
+      <main class="min-h-dvh bg-muted pb-24 lg:pb-0">
+        <NuxtPage />
+      </main>
     </template>
-    <UDashboardGroup v-else-if="navigation?.length" storage-key="clinical-dashboard">
-      <UDashboardSidebar v-model:collapsed="collapsed" collapsible :resizable="false" class="hidden lg:flex" :ui="{ root: 'lg:w-64', footer: 'border-t border-default' }">
+    <UDashboardGroup
+      v-else-if="navigation?.length"
+      storage-key="clinical-dashboard"
+    >
+      <UDashboardSidebar
+        v-model:collapsed="collapsed"
+        collapsible
+        :resizable="false"
+        class="hidden lg:flex"
+        :ui="{ root: 'lg:w-64', footer: 'border-t border-default' }"
+      >
         <template #header="{ collapsed: isCollapsed }">
-          <NuxtLink to="/" class="flex items-center gap-2 px-2 py-1 font-semibold text-default">
-            <img :src="brand.logo" alt="Logo de la clínica" class="size-8 shrink-0">
-            <span v-if="!isCollapsed" class="min-w-0 text-sm">{{ clinicName }}<span class="block text-xs font-normal text-muted">Pediatría</span></span>
+          <NuxtLink
+            to="/"
+            class="flex items-center gap-2 px-2 py-1 font-semibold text-default"
+          >
+            <img
+              :src="brand.logo"
+              alt="Logo de la clínica"
+              class="size-8 shrink-0"
+            >
+            <span
+              v-if="!isCollapsed"
+              class="min-w-0 text-sm"
+            >{{ clinicName }}<span class="block text-xs font-normal text-muted">Pediatría</span></span>
           </NuxtLink>
         </template>
         <template #default="{ collapsed: isCollapsed }">
-          <UNavigationMenu :items="navItems" :collapsed="isCollapsed" orientation="vertical" aria-label="Principal" />
-          <div v-if="adminItems.length" class="mt-auto border-t border-default pt-3">
-            <p v-if="!isCollapsed" class="px-3 pb-2 text-xs font-semibold uppercase tracking-wide text-muted">Administración</p>
-            <UNavigationMenu :items="adminNavItems" :collapsed="isCollapsed" orientation="vertical" aria-label="Administración" />
+          <UNavigationMenu
+            :items="navItems"
+            :collapsed="isCollapsed"
+            orientation="vertical"
+            aria-label="Principal"
+          />
+          <div
+            v-if="adminItems.length"
+            class="mt-auto border-t border-default pt-3"
+          >
+            <p
+              v-if="!isCollapsed"
+              class="px-3 pb-2 text-xs font-semibold uppercase tracking-wide text-muted"
+            >
+              Administración
+            </p>
+            <UNavigationMenu
+              :items="adminNavItems"
+              :collapsed="isCollapsed"
+              orientation="vertical"
+              aria-label="Administración"
+            />
           </div>
         </template>
         <template #footer="{ collapsed: isCollapsed }">
           <div class="flex items-center gap-2 px-2 py-2">
-            <UAvatar :text="user?.name?.slice(0, 2).toUpperCase() || 'CP'" size="sm" />
-            <div v-if="!isCollapsed" class="min-w-0 flex-1"><p class="truncate text-sm font-semibold">{{ user?.name || 'Personal de la clínica' }}</p><p class="text-xs text-muted">{{ isDoctor ? 'Pediatra' : isAdmin ? 'Administración' : 'Asistente' }}</p></div>
-            <UColorModeButton v-if="!isCollapsed" aria-label="Cambiar tema" />
-            <UButton v-if="!isCollapsed" icon="i-lucide-log-out" variant="ghost" color="neutral" aria-label="Cerrar sesión" @click="logout" />
+            <UAvatar
+              :text="user?.name?.slice(0, 2).toUpperCase() || 'CP'"
+              size="sm"
+            />
+            <div
+              v-if="!isCollapsed"
+              class="min-w-0 flex-1"
+            >
+              <p class="truncate text-sm font-semibold">
+                {{ user?.name || 'Personal de la clínica' }}
+              </p>
+              <p class="text-xs text-muted">
+                {{ isDoctor ? 'Pediatra' : isAdmin ? 'Administración' : 'Asistente' }}
+              </p>
+            </div>
+            <UColorModeButton
+              v-if="!isCollapsed"
+              aria-label="Cambiar tema"
+            />
+            <UButton
+              v-if="!isCollapsed"
+              icon="i-lucide-log-out"
+              variant="ghost"
+              color="neutral"
+              aria-label="Cerrar sesión"
+              @click="logout"
+            />
           </div>
         </template>
       </UDashboardSidebar>
       <UDashboardPanel class="min-w-0 bg-muted">
         <template #header>
-          <UDashboardNavbar :title="pageTitle" :toggle="false" class="hidden lg:flex">
-            <template #leading><UDashboardSidebarCollapse /></template>
+          <UDashboardNavbar
+            :title="pageTitle"
+            :toggle="false"
+            class="hidden lg:flex"
+          >
+            <template #leading>
+              <UDashboardSidebarCollapse />
+            </template>
             <template #right>
-              <form v-if="isDoctor" role="search" class="hidden w-80 xl:block" @submit.prevent="searchPatients">
-                <UInput ref="searchInput" v-model="search" icon="i-lucide-search" placeholder="Buscar paciente por nombre o cédula" aria-label="Buscar paciente por nombre o cédula" class="w-full">
-                  <template #trailing><UKbd>Ctrl K</UKbd></template>
+              <form
+                v-if="isDoctor"
+                role="search"
+                class="hidden w-80 xl:block"
+                @submit.prevent="searchPatients"
+              >
+                <UInput
+                  ref="searchInput"
+                  v-model="search"
+                  icon="i-lucide-search"
+                  placeholder="Buscar paciente por nombre o cédula"
+                  aria-label="Buscar paciente por nombre o cédula"
+                  class="w-full"
+                >
+                  <template #trailing>
+                    <UKbd>Ctrl K</UKbd>
+                  </template>
                 </UInput>
               </form>
-              <UButton v-if="navigation.some(item => item.to === '/avisos')" to="/avisos" icon="i-lucide-bell" variant="ghost" color="neutral" aria-label="Avisos" />
-              <UButton v-if="pageAction" :to="pageAction.to" icon="i-lucide-plus" :label="pageAction.label" />
+              <UButton
+                v-if="navigation.some(item => item.to === '/avisos')"
+                to="/avisos"
+                icon="i-lucide-bell"
+                variant="ghost"
+                color="neutral"
+                aria-label="Avisos"
+              />
+              <UButton
+                v-if="pageAction"
+                :to="pageAction.to"
+                icon="i-lucide-plus"
+                :label="pageAction.label"
+              />
             </template>
           </UDashboardNavbar>
         </template>
-        <template #body><main class="min-h-full bg-muted pb-24 lg:pb-0"><NuxtPage /></main></template>
+        <template #body>
+          <main class="min-h-full bg-muted pb-24 lg:pb-0">
+            <NuxtPage />
+          </main>
+        </template>
       </UDashboardPanel>
     </UDashboardGroup>
-    <main v-else class="min-h-dvh bg-muted"><NuxtPage /></main>
-    <nav v-if="online && !publicPage && visibleItems.length" aria-label="Navegación principal" class="fixed inset-x-0 bottom-0 z-40 grid grid-flow-col border-t border-default bg-default pb-[env(safe-area-inset-bottom)] lg:hidden">
-      <NuxtLink v-for="item in visibleItems" :key="item.to" :to="item.to" :aria-current="route.path === item.to ? 'page' : undefined" class="flex min-h-16 min-w-0 flex-col items-center justify-center gap-0.5 px-1 text-center text-[11px] font-medium text-muted focus-visible:outline-2 focus-visible:outline-primary" active-class="text-primary">
-        <UIcon :name="icons[item.to] || 'i-lucide-circle'" class="size-5" aria-hidden="true" />{{ item.label }}
+    <main
+      v-else
+      class="min-h-dvh bg-muted"
+    >
+      <NuxtPage />
+    </main>
+    <nav
+      v-if="online && !publicPage && visibleItems.length"
+      aria-label="Navegación principal"
+      class="fixed inset-x-0 bottom-0 z-40 grid grid-flow-col border-t border-default bg-default pb-[env(safe-area-inset-bottom)] lg:hidden"
+    >
+      <NuxtLink
+        v-for="item in visibleItems"
+        :key="item.to"
+        :to="item.to"
+        :aria-current="route.path === item.to ? 'page' : undefined"
+        class="flex min-h-16 min-w-0 flex-col items-center justify-center gap-0.5 px-1 text-center text-[11px] font-medium text-muted focus-visible:outline-2 focus-visible:outline-primary"
+        active-class="text-primary"
+      >
+        <UIcon
+          :name="icons[item.to] || 'i-lucide-circle'"
+          class="size-5"
+          aria-hidden="true"
+        />{{ item.label }}
       </NuxtLink>
     </nav>
   </UApp>

@@ -13,6 +13,8 @@ const external = ref(false)
 const saveError = ref('')
 const adding = ref(false)
 const complement = reactive({ label: '', doseLabel: '', source: '' })
+const dateFormat = new Intl.DateTimeFormat('es-EC', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'America/Guayaquil' })
+const formatDate = (value: string) => dateFormat.format(new Date(`${value}T12:00:00Z`))
 async function saveDose() {
   if (!selected.value) return
   saveError.value = ''
@@ -34,13 +36,34 @@ async function saveComplement() {
 </script>
 
 <template>
-  <UCard class="space-y-4">
-    <h2 class="text-lg font-semibold">
-      Vacunas
-    </h2>
-    <p class="text-sm text-muted">
-      Revisión médica de borradores; no son indicaciones definitivas ni un esquema de recuperación automático.
-    </p>
+  <UCard :ui="{ body: 'p-0' }">
+    <div class="flex flex-wrap items-start justify-between gap-3 p-4">
+      <div class="space-y-1">
+        <h2 class="text-lg font-semibold">
+          Vacunas
+        </h2>
+        <p class="text-xs text-muted">
+          Catálogo en borrador para revisión médica; sin esquema de recuperación automático.
+        </p>
+      </div>
+      <div
+        v-if="data"
+        class="flex flex-wrap gap-2"
+      >
+        <UBadge
+          color="neutral"
+          variant="soft"
+        >
+          {{ data.applied.length }} aplicadas
+        </UBadge>
+        <UBadge
+          color="neutral"
+          variant="soft"
+        >
+          {{ data.pending.length }} por revisar
+        </UBadge>
+      </div>
+    </div>
     <UAlert
       v-if="error"
       color="error"
@@ -54,40 +77,84 @@ async function saveComplement() {
         description="El catálogo puede no estar disponible aún."
       />
       <div
-        v-if="data.pending.length"
+        v-if="data.pending.length || data.applied.length"
         class="overflow-x-auto"
+        role="region"
+        aria-label="Registro de vacunas"
+        tabindex="0"
       >
-        <h3 class="font-medium">
-          Por revisar con el médico · {{ data.pending.length }}
-        </h3>
         <table
-          class="w-full min-w-[640px] text-left text-sm"
-          aria-label="Vacunas por revisar"
+          class="w-full min-w-[680px] text-left text-sm tabular-nums"
+          aria-label="Vacunas registradas y por revisar"
         >
-          <thead>
+          <thead class="border-b border-default text-xs text-muted">
             <tr>
-              <th class="p-2">
+              <th
+                scope="col"
+                class="px-4 py-3 font-medium"
+              >
                 Vacuna
               </th>
-              <th class="p-2">
+              <th
+                scope="col"
+                class="px-4 py-3 font-medium"
+              >
                 Dosis
               </th>
-              <th class="p-2">
+              <th
+                scope="col"
+                class="px-4 py-3 font-medium"
+              >
+                Estado
+              </th>
+              <th
+                scope="col"
+                class="px-4 py-3 font-medium"
+              >
+                Fecha
+              </th>
+              <th
+                scope="col"
+                class="px-4 py-3 font-medium"
+              >
                 Procedencia
               </th>
-              <th class="p-2">
+              <th
+                scope="col"
+                class="px-4 py-3 font-medium"
+              >
                 Acción
               </th>
             </tr>
           </thead>
           <tbody>
             <tr
+              v-if="data.pending.length"
+              class="bg-elevated text-xs font-semibold text-muted"
+            >
+              <th
+                colspan="6"
+                scope="rowgroup"
+                class="px-4 py-2 text-left"
+              >
+                Por revisar con el médico
+              </th>
+            </tr>
+            <tr
               v-for="item in data.pending"
               :key="item.id"
-              class="border-t border-default"
+              class="border-t border-default align-top"
             >
-              <td class="p-2 font-medium">
-                {{ item.label }}<br>
+              <th
+                scope="row"
+                class="px-4 py-3 text-left font-semibold"
+              >
+                {{ item.label }}
+              </th>
+              <td class="px-4 py-3">
+                {{ item.doseLabel ?? 'Sin número de dosis en fuente' }}
+              </td>
+              <td class="px-4 py-3">
                 <UBadge
                   color="neutral"
                   variant="soft"
@@ -95,53 +162,86 @@ async function saveComplement() {
                   {{ item.badge }}
                 </UBadge>
               </td>
-              <td class="p-2">
-                {{ item.doseLabel ?? 'Sin número de dosis en fuente' }}
+              <td class="px-4 py-3 text-muted">
+                {{ item.recommendedAge ?? 'Sin edad documentada' }}
               </td>
-              <td class="p-2 text-muted">
-                {{ item.source }} · {{ item.version }} · {{ item.sourcePage }}<span v-if="item.recommendedAge"> · {{ item.recommendedAge }}</span><span v-if="item.minimumInterval"> · Intervalo documentado: {{ item.minimumInterval }}</span><span v-else> · Intervalo no documentado</span>
+              <td class="px-4 py-3 text-muted">
+                {{ item.source }} · {{ item.version }} · {{ item.sourcePage }}<span v-if="item.minimumInterval"> · Intervalo documentado: {{ item.minimumInterval }}</span><span v-else> · Intervalo no documentado</span>
               </td>
-              <td class="p-2">
+              <td class="px-4 py-2">
                 <UButton
                   variant="outline"
+                  color="neutral"
                   class="min-h-11"
                   @click="selected = item"
                 >
-                  Registrar dosis
+                  Registrar
                 </UButton>
+              </td>
+            </tr>
+            <tr
+              v-if="data.applied.length"
+              class="bg-elevated text-xs font-semibold text-muted"
+            >
+              <th
+                colspan="6"
+                scope="rowgroup"
+                class="px-4 py-2 text-left"
+              >
+                Dosis aplicadas
+              </th>
+            </tr>
+            <tr
+              v-for="dose in data.applied"
+              :key="dose.id"
+              class="border-t border-default align-top"
+            >
+              <th
+                scope="row"
+                class="px-4 py-3 text-left font-semibold"
+              >
+                {{ dose.label }}
+              </th>
+              <td class="px-4 py-3">
+                {{ dose.doseLabel ?? '—' }}
+              </td>
+              <td class="px-4 py-3">
+                <UBadge
+                  color="neutral"
+                  variant="soft"
+                >
+                  Aplicada<span v-if="dose.external"> fuera de la clínica</span>
+                </UBadge>
+              </td>
+              <td class="px-4 py-3">
+                {{ formatDate(dose.appliedAt) }}
+              </td>
+              <td class="px-4 py-3 text-muted">
+                {{ dose.catalogVersion }} · {{ dose.sourcePage }}<span v-if="dose.lot"> · Lote: {{ dose.lot }}</span><span v-if="dose.privateNote"> · Nota clínica: {{ dose.privateNote }}</span>
+              </td>
+              <td class="px-4 py-3">
+                —
               </td>
             </tr>
           </tbody>
         </table>
       </div>
-      <section
-        v-if="data.applied.length"
-        class="space-y-2"
-      >
-        <h3 class="font-medium">
-          Dosis aplicadas · {{ data.applied.length }}
-        </h3>
-        <ul class="divide-y divide-default">
-          <li
-            v-for="dose in data.applied"
-            :key="dose.id"
-            class="py-2 text-sm"
-          >
-            {{ dose.label }} · {{ dose.doseLabel }} · {{ dose.appliedAt }} · {{ dose.catalogVersion }} · {{ dose.sourcePage }}<span v-if="dose.external"> · Aplicación externa</span><span v-if="dose.lot"> · Lote: {{ dose.lot }}</span><span v-if="dose.privateNote"> · Nota clínica: {{ dose.privateNote }}</span>
-          </li>
-        </ul>
-      </section>
     </template>
-    <UButton
-      variant="outline"
-      class="min-h-11"
-      @click="adding = !adding"
-    >
-      + Vacuna complementaria
-    </UButton>
+    <div class="flex flex-wrap items-center justify-between gap-2 border-t border-default p-4">
+      <UButton
+        variant="outline"
+        color="neutral"
+        icon="i-lucide-plus"
+        class="min-h-11"
+        @click="adding = !adding"
+      >
+        Vacuna complementaria
+      </UButton>
+      <span class="text-xs text-muted">Revise la procedencia de cada dosis antes de registrarla.</span>
+    </div>
     <form
       v-if="adding"
-      class="grid gap-3 sm:grid-cols-2"
+      class="grid gap-3 border-t border-default p-4 sm:grid-cols-2"
       @submit.prevent="saveComplement"
     >
       <UFormField label="Vacuna complementaria">
@@ -172,61 +272,73 @@ async function saveComplement() {
         Guardar borrador
       </UButton>
     </form>
-    <form
-      v-if="selected"
-      class="space-y-3 rounded-lg border border-default p-3"
-      @submit.prevent="saveDose"
+    <UModal
+      :open="Boolean(selected)"
+      :title="`Registrar dosis · ${selected?.label ?? ''}`"
+      @update:open="!$event && (selected = null)"
     >
-      <h3 class="font-medium">
-        Registrar dosis · {{ selected.label }}
-      </h3>
-      <p class="text-sm text-muted">
-        {{ draftBadge }} · {{ selected.source }} · {{ selected.version }} · {{ selected.sourcePage }}
-      </p>
-      <div class="grid gap-3 sm:grid-cols-2">
-        <UFormField label="Fecha de aplicación">
-          <UInput
-            v-model="appliedAt"
-            type="date"
-            required
-            class="w-full"
-          />
-        </UFormField>
-        <UFormField label="Lote (privado)">
-          <UInput
-            v-model="lot"
-            class="w-full"
-          />
-        </UFormField>
-      </div>
-      <UFormField label="Nota clínica privada">
-        <UTextarea
-          v-model="privateNote"
-          class="w-full"
-        />
-      </UFormField>
-      <UCheckbox
-        v-model="external"
-        label="Aplicada fuera de la clínica"
-      />
-      <div class="flex gap-2">
-        <UButton
-          type="submit"
-          class="min-h-11"
+      <template #body>
+        <form
+          v-if="selected"
+          class="space-y-3"
+          @submit.prevent="saveDose"
         >
-          Guardar dosis
-        </UButton>
-        <UButton
-          variant="outline"
-          class="min-h-11"
-          @click="selected = null"
-        >
-          Cancelar
-        </UButton>
-      </div>
-    </form>
+          <p class="text-sm text-muted">
+            {{ draftBadge }} · {{ selected.source }} · {{ selected.version }} · {{ selected.sourcePage }}
+          </p>
+          <div class="grid gap-3 sm:grid-cols-2">
+            <UFormField label="Fecha de aplicación">
+              <UInput
+                v-model="appliedAt"
+                type="date"
+                required
+                class="w-full"
+              />
+            </UFormField>
+            <UFormField label="Lote (privado)">
+              <UInput
+                v-model="lot"
+                class="w-full"
+              />
+            </UFormField>
+          </div>
+          <UFormField label="Nota clínica privada">
+            <UTextarea
+              v-model="privateNote"
+              class="w-full"
+            />
+          </UFormField>
+          <UCheckbox
+            v-model="external"
+            label="Aplicada fuera de la clínica"
+          />
+          <UAlert
+            v-if="saveError"
+            color="error"
+            :description="saveError"
+          />
+          <div class="flex justify-end gap-2">
+            <UButton
+              type="button"
+              variant="outline"
+              color="neutral"
+              class="min-h-11"
+              @click="selected = null"
+            >
+              Cancelar
+            </UButton>
+            <UButton
+              type="submit"
+              class="min-h-11"
+            >
+              Guardar dosis
+            </UButton>
+          </div>
+        </form>
+      </template>
+    </UModal>
     <UAlert
-      v-if="saveError"
+      v-if="saveError && !selected"
       color="error"
       :description="saveError"
     />

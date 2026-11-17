@@ -104,432 +104,533 @@ async function sendTest(event: FormSubmitEvent<z.output<typeof smtpTestSchema>>)
 </script>
 
 <template>
-  <UContainer class="max-w-5xl space-y-6 py-6 pb-24">
-    <div class="space-y-2">
-      <h1 class="text-2xl font-semibold">
-        Ajustes de la clínica
-      </h1>
-      <p class="text-sm text-muted">
-        Configure el correo saliente y el proveedor de WhatsApp para los recordatorios de la clínica.
-      </p>
-    </div>
-    <UAlert
-      v-if="error"
-      color="error"
-      variant="soft"
-      title="No se pudo cargar la configuración de correo"
-      :actions="[{ label: 'Reintentar', onClick: () => refresh() }]"
-    />
-    <div
-      v-else-if="status === 'pending'"
-      class="space-y-3"
-      aria-label="Cargando configuración de correo"
-    >
-      <USkeleton class="h-32 w-full" /><USkeleton class="h-64 w-full" />
-    </div>
-    <div
-      v-else
-      class="grid gap-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]"
-    >
-      <section aria-labelledby="smtp-heading">
-        <UCard>
-          <div class="space-y-5">
-            <div class="flex flex-wrap items-start justify-between gap-2">
-              <div>
-                <h2
-                  id="smtp-heading"
-                  class="text-lg font-semibold"
-                >
-                  Correo saliente
-                </h2>
-                <p class="text-sm text-muted">
-                  El remitente aparecerá en los correos enviados desde esta clínica.
-                </p>
-              </div>
-              <UBadge
-                :color="data?.configured ? 'success' : 'neutral'"
-                variant="soft"
-              >
-                {{ data?.configured ? 'Configurado' : 'Sin configurar' }}
-              </UBadge>
-            </div>
-            <p class="text-sm text-muted">
-              {{ data?.source === 'ADMIN' ? 'Configurado en la clínica' : 'Configuración del servidor' }}<span v-if="lastChanged"> · Último cambio: {{ lastChanged }}</span>
-            </p>
-            <UForm
-              :schema="smtpSettingsSchema"
-              :state="settings"
-              class="space-y-4"
-              @submit="save"
-            >
-              <div class="grid gap-4 sm:grid-cols-2">
-                <UFormField
-                  name="host"
-                  label="Servidor SMTP"
-                  required
-                >
-                  <UInput
-                    v-model="settings.host"
-                    class="w-full"
-                    autocomplete="off"
-                  />
-                </UFormField>
-                <UFormField
-                  name="port"
-                  label="Puerto"
-                  required
-                >
-                  <UInputNumber
-                    v-model="settings.port"
-                    :min="1"
-                    :max="65535"
-                    class="w-full"
-                  />
-                </UFormField>
-              </div>
-              <UFormField
-                name="security"
-                label="Seguridad"
-                required
-              >
-                <USelect
-                  v-model="settings.security"
-                  :items="securityOptions"
-                  class="w-full"
-                />
-              </UFormField>
-              <div class="grid gap-4 sm:grid-cols-2">
-                <UFormField
-                  name="username"
-                  label="Usuario"
-                >
-                  <UInput
-                    v-model="settings.username"
-                    class="w-full"
-                    autocomplete="off"
-                  />
-                </UFormField>
-                <UFormField
-                  name="password"
-                  label="Contraseña"
-                  description="Déjela vacía para conservar la contraseña guardada."
-                >
-                  <UInput
-                    v-model="settings.password"
-                    type="password"
-                    class="w-full"
-                    autocomplete="new-password"
-                  />
-                </UFormField>
-              </div>
-              <div class="grid gap-4 sm:grid-cols-2">
-                <UFormField
-                  name="fromName"
-                  label="Nombre del remitente"
-                >
-                  <UInput
-                    v-model="settings.fromName"
-                    class="w-full"
-                  />
-                </UFormField>
-                <UFormField
-                  name="fromAddress"
-                  label="Correo del remitente"
-                  required
-                >
-                  <UInput
-                    v-model="settings.fromAddress"
-                    type="email"
-                    class="w-full"
-                  />
-                </UFormField>
-              </div>
-              <p class="text-xs text-muted">
-                La contraseña se guarda cifrada y no vuelve a mostrarse.
-              </p>
-              <UAlert
-                v-if="saveFeedback === 'saved'"
-                color="success"
-                variant="soft"
-                title="Configuración guardada"
-                role="status"
-              />
-              <UAlert
-                v-else-if="saveFeedback === 'error'"
-                color="error"
-                variant="soft"
-                title="No se pudo guardar la configuración"
-                role="alert"
-              />
-              <UButton
-                type="submit"
-                :loading="saving"
-                class="min-h-11"
-              >
-                Guardar conexión
-              </UButton>
-            </UForm>
-          </div>
-        </UCard>
-      </section>
-      <section aria-labelledby="test-heading">
-        <UCard>
-          <div class="space-y-4">
-            <h2
-              id="test-heading"
-              class="text-lg font-semibold"
-            >
-              Probar envío
-            </h2>
-            <p class="text-sm text-muted">
-              Envíe un correo de prueba a la dirección que indique. Guarde los cambios antes de probar.
-            </p>
-            <UForm
-              :schema="smtpTestSchema"
-              :state="recipient"
-              class="space-y-4"
-              @submit="sendTest"
-            >
-              <UFormField
-                name="email"
-                label="Correo de destino"
-                required
-              >
-                <UInput
-                  v-model="recipient.email"
-                  type="email"
-                  class="w-full"
-                  autocomplete="email"
-                />
-              </UFormField>
-              <UButton
-                type="submit"
-                color="neutral"
-                variant="outline"
-                :loading="testing"
-                class="min-h-11"
-              >
-                Enviar correo de prueba
-              </UButton>
-            </UForm>
-            <UAlert
-              v-if="testFeedback === 'sent'"
-              color="success"
-              variant="soft"
-              title="Correo de prueba enviado"
-              role="status"
-            />
-            <UAlert
-              v-else-if="testFeedback === 'limited'"
-              color="warning"
-              variant="soft"
-              title="Espere un momento antes de volver a probar"
-              role="alert"
-            />
-            <UAlert
-              v-else-if="testFeedback === 'unavailable'"
-              color="error"
-              variant="soft"
-              title="La prueba de correo no está disponible ahora"
-              role="alert"
-            />
-            <UAlert
-              v-else-if="testFeedback === 'failed'"
-              color="error"
-              variant="soft"
-              :title="testError || 'No se pudo enviar el correo de prueba'"
-              role="alert"
-            />
-          </div>
-        </UCard>
-      </section>
-    </div>
-    <section
-      id="recordatorios"
-      aria-labelledby="whatsapp-heading"
-    >
-      <UCard>
-        <div class="space-y-5">
-          <div class="flex flex-wrap items-start justify-between gap-3">
-            <div>
+  <div class="min-h-full bg-muted pb-24 lg:pb-8">
+    <header class="border-b border-default bg-default px-4 pt-5 sm:px-6">
+      <div class="mx-auto max-w-7xl">
+        <h1 class="text-xl font-bold text-default">
+          Ajustes de la clínica
+        </h1>
+        <div
+          class="mt-3 flex min-h-11 items-center gap-1 border-b border-default text-sm font-medium text-muted"
+          aria-label="Secciones de la clínica"
+        >
+          <span class="px-3 py-3">Marca</span>
+          <span class="px-3 py-3">Contacto</span>
+          <span
+            class="border-b-2 border-primary px-3 py-3 font-semibold text-primary"
+            aria-current="page"
+          >Recordatorios</span>
+        </div>
+      </div>
+    </header>
+
+    <UContainer class="max-w-7xl py-6">
+      <div class="grid items-start gap-5 xl:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]">
+        <div class="min-w-0 space-y-5">
+          <section
+            id="recordatorios"
+            aria-labelledby="channels-heading"
+            class="overflow-hidden rounded-xl border border-default bg-default"
+          >
+            <div class="p-4">
               <h2
-                id="whatsapp-heading"
-                class="text-lg font-semibold"
+                id="channels-heading"
+                class="text-lg font-semibold text-default"
               >
-                WhatsApp · recordatorios
+                Canales
               </h2>
               <p class="text-sm text-muted">
-                Los representantes eligen este canal en su perfil. Guardar la configuración no comprueba la entrega de mensajes.
+                Los representantes eligen sus canales en su perfil. WhatsApp solo se envía a quien lo aceptó.
               </p>
             </div>
-            <UBadge
-              v-if="!whatsappError && whatsappData"
-              :color="whatsappData.status === 'FAILED' ? 'error' : whatsappData.configured ? 'success' : 'neutral'"
-              variant="soft"
-            >
-              {{ whatsappData.status === 'FAILED' ? 'Último intento fallido' : whatsappData.configured ? 'Configurado' : 'Sin configurar' }}
-            </UBadge>
-          </div>
-          <UAlert
-            v-if="whatsappError"
-            color="error"
-            variant="soft"
-            title="No se pudo cargar la configuración de WhatsApp"
-            :actions="[{ label: 'Reintentar', onClick: () => refreshWhatsApp() }]"
-            role="alert"
-          />
-          <div
-            v-else-if="whatsappStatus === 'pending' || !whatsappData"
-            aria-label="Cargando configuración de WhatsApp"
-          >
-            <USkeleton class="h-48 w-full" />
-          </div>
-          <template v-else>
-            <p class="text-sm text-muted">
-              {{ whatsappData.source === 'ENV' ? 'Configuración del servidor: tiene prioridad y no se puede cambiar aquí.' : 'Configuración de la clínica' }}<span v-if="whatsappChangedAt"> · Último cambio: {{ whatsappChangedAt }}</span>
-              <span v-if="whatsappData.status === 'FAILED'"> · El último intento con esta configuración falló; revise el proveedor antes de depender de este canal.</span>
-              <span v-else-if="whatsappData.status === 'READY'"> · No hay fallo registrado para esta configuración; la entrega no está verificada.</span>
-            </p>
-            <p
-              v-if="whatsappData.source === 'ENV'"
-              class="text-sm text-muted"
-            >
-              Proveedor: {{ whatsappData.provider === 'META' ? 'Meta Cloud API' : whatsappData.provider === 'TWILIO' ? 'Twilio' : 'No definido' }}. Las credenciales se administran en el servidor.
-            </p>
-            <form
-              v-else
-              class="space-y-4"
-              @submit.prevent="saveWhatsApp"
-            >
-              <fieldset
-                class="space-y-2"
-                :disabled="savingWhatsApp"
-              >
-                <legend class="text-sm font-medium">
-                  Proveedor
-                </legend>
-                <div class="flex flex-wrap gap-4">
-                  <label class="flex min-h-11 items-center gap-2">
-                    <input
-                      v-model="whatsapp.provider"
-                      type="radio"
-                      name="whatsapp-provider"
-                      value="META"
-                    >
-                    Meta Cloud API
-                  </label>
-                  <label class="flex min-h-11 items-center gap-2">
-                    <input
-                      v-model="whatsapp.provider"
-                      type="radio"
-                      name="whatsapp-provider"
-                      value="TWILIO"
-                    >
-                    Twilio
-                  </label>
+
+            <div class="border-t border-default p-4">
+              <div class="flex flex-wrap items-start gap-3 sm:flex-nowrap">
+                <span class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-elevated text-muted"><UIcon
+                  name="i-lucide-mail"
+                  class="size-5"
+                  aria-hidden="true"
+                /></span>
+                <div class="min-w-0 flex-1">
+                  <h3
+                    id="smtp-heading"
+                    class="font-semibold text-default"
+                  >
+                    Email
+                  </h3>
+                  <p class="break-words text-sm text-muted">
+                    {{ data?.fromAddress ? `Remitente: ${data.fromName || 'Clínica'} <${data.fromAddress}>` : 'Configure el correo saliente de la clínica.' }}
+                  </p>
                 </div>
-              </fieldset>
-              <div class="grid gap-4 sm:grid-cols-2">
-                <label class="block space-y-1 text-sm font-medium">
-                  <span>{{ whatsapp.provider === 'META' ? 'Phone number ID de Meta' : 'Número remitente de Twilio (+ y código de país)' }}</span>
-                  <input
-                    v-model.trim="whatsapp.sender"
-                    class="min-h-11 w-full rounded-md border border-default bg-default px-3 font-normal text-default focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                    name="sender"
-                    autocomplete="off"
-                    required
-                    :pattern="whatsapp.provider === 'META' ? '[0-9]{5,30}' : '[+][1-9][0-9]{7,14}'"
-                  >
-                </label>
-                <label class="block space-y-1 text-sm font-medium">
-                  <span>{{ whatsapp.provider === 'META' ? 'Nombre de plantilla' : 'Content SID de Twilio (HX)' }}</span>
-                  <input
-                    v-model.trim="whatsapp.template"
-                    class="min-h-11 w-full rounded-md border border-default bg-default px-3 font-normal text-default focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                    name="template"
-                    autocomplete="off"
-                    required
-                    :pattern="whatsapp.provider === 'META' ? '[a-z][a-z0-9_]{1,100}' : 'HX[a-fA-F0-9]{32}'"
-                  >
-                </label>
-                <label
-                  v-if="whatsapp.provider === 'META'"
-                  class="block space-y-1 text-sm font-medium"
+                <UBadge
+                  v-if="!error && status !== 'pending'"
+                  :color="data?.configured ? 'success' : 'neutral'"
+                  variant="soft"
+                  class="shrink-0"
                 >
-                  <span>Idioma de la plantilla</span>
-                  <input
-                    v-model.trim="whatsapp.language"
-                    class="min-h-11 w-full rounded-md border border-default bg-default px-3 font-normal text-default focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                    name="language"
-                    autocomplete="off"
-                    required
-                    pattern="[a-z]{2}(_[A-Z]{2})?"
-                  >
-                </label>
-                <label
-                  v-else
-                  class="block space-y-1 text-sm font-medium"
-                >
-                  <span>Account SID de Twilio (AC)</span>
-                  <input
-                    v-model.trim="whatsapp.accountSid"
-                    class="min-h-11 w-full rounded-md border border-default bg-default px-3 font-normal text-default focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                    name="accountSid"
-                    autocomplete="off"
-                    required
-                    pattern="AC[a-fA-F0-9]{32}"
-                  >
-                </label>
+                  {{ data?.configured ? 'Configurado' : 'Sin configurar' }}
+                </UBadge>
               </div>
-              <label class="block space-y-1 text-sm font-medium">
-                <span>{{ whatsapp.provider === 'META' ? 'Token de acceso' : 'Auth Token de Twilio' }}</span>
-                <input
-                  v-model="whatsapp.secret"
-                  class="min-h-11 w-full rounded-md border border-default bg-default px-3 font-normal text-default focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                  name="secret"
-                  type="password"
-                  autocomplete="new-password"
-                  :required="secretRequired"
-                  maxlength="4096"
-                  :disabled="savingWhatsApp"
-                >
-              </label>
-              <p class="text-xs text-muted">
-                {{ secretRequired ? 'Ingrese un token para esta configuración.' : 'Deje el token vacío para conservar el guardado sin mostrarlo.' }} El token se guarda cifrado y no se vuelve a mostrar.
-              </p>
               <UAlert
-                v-if="whatsappFeedback === 'saved'"
-                color="success"
-                variant="soft"
-                title="Configuración guardada; el envío no está verificado"
-                role="status"
-              />
-              <UAlert
-                v-else-if="whatsappFeedback === 'invalid'"
+                v-if="error"
                 color="error"
                 variant="soft"
-                title="Revise los campos y el token antes de guardar"
+                title="No se pudo cargar la configuración de correo"
+                :actions="[{ label: 'Reintentar', onClick: () => refresh() }]"
                 role="alert"
+                class="mt-4"
               />
-              <UAlert
-                v-else-if="whatsappFeedback === 'error'"
-                color="error"
-                variant="soft"
-                title="No se pudo guardar la configuración de WhatsApp"
-                role="alert"
+              <USkeleton
+                v-else-if="status === 'pending'"
+                class="mt-4 h-32 w-full"
+                aria-label="Cargando configuración de correo"
               />
-              <UButton
-                type="submit"
-                :loading="savingWhatsApp"
-                :disabled="savingWhatsApp"
-                class="min-h-11"
+              <details
+                v-else
+                class="mt-4 sm:ml-[3.25rem]"
+                open
               >
-                Guardar conexión
-              </UButton>
-            </form>
-          </template>
+                <summary class="min-h-11 cursor-pointer py-2 text-sm font-semibold text-primary focus-visible:outline-2 focus-visible:outline-primary">
+                  Configurar correo saliente
+                </summary>
+                <div class="space-y-5 pt-3">
+                  <p class="text-sm text-muted">
+                    {{ data?.source === 'ADMIN' ? 'Configurado en la clínica' : 'Configuración del servidor' }}<span v-if="lastChanged"> · Último cambio: {{ lastChanged }}</span>
+                  </p>
+                  <UForm
+                    :schema="smtpSettingsSchema"
+                    :state="settings"
+                    class="space-y-4"
+                    @submit="save"
+                  >
+                    <div class="grid gap-4 sm:grid-cols-2">
+                      <UFormField
+                        name="host"
+                        label="Servidor SMTP"
+                        required
+                      >
+                        <UInput
+                          v-model="settings.host"
+                          class="w-full"
+                          autocomplete="off"
+                        />
+                      </UFormField>
+                      <UFormField
+                        name="port"
+                        label="Puerto"
+                        required
+                      >
+                        <UInputNumber
+                          v-model="settings.port"
+                          :min="1"
+                          :max="65535"
+                          class="w-full"
+                        />
+                      </UFormField>
+                    </div>
+                    <UFormField
+                      name="security"
+                      label="Seguridad"
+                      required
+                    >
+                      <USelect
+                        v-model="settings.security"
+                        :items="securityOptions"
+                        class="w-full"
+                      />
+                    </UFormField>
+                    <div class="grid gap-4 sm:grid-cols-2">
+                      <UFormField
+                        name="username"
+                        label="Usuario"
+                      >
+                        <UInput
+                          v-model="settings.username"
+                          class="w-full"
+                          autocomplete="off"
+                        />
+                      </UFormField>
+                      <UFormField
+                        name="password"
+                        label="Contraseña"
+                        description="Déjela vacía para conservar la contraseña guardada."
+                      >
+                        <UInput
+                          v-model="settings.password"
+                          type="password"
+                          class="w-full"
+                          autocomplete="new-password"
+                        />
+                      </UFormField>
+                    </div>
+                    <div class="grid gap-4 sm:grid-cols-2">
+                      <UFormField
+                        name="fromName"
+                        label="Nombre del remitente"
+                      >
+                        <UInput
+                          v-model="settings.fromName"
+                          class="w-full"
+                        />
+                      </UFormField>
+                      <UFormField
+                        name="fromAddress"
+                        label="Correo del remitente"
+                        required
+                      >
+                        <UInput
+                          v-model="settings.fromAddress"
+                          type="email"
+                          class="w-full"
+                        />
+                      </UFormField>
+                    </div>
+                    <p class="flex items-center gap-2 text-xs text-dimmed">
+                      <UIcon
+                        name="i-lucide-lock-keyhole"
+                        class="size-4 shrink-0"
+                        aria-hidden="true"
+                      />La contraseña se guarda cifrada y no vuelve a mostrarse.
+                    </p>
+                    <UAlert
+                      v-if="saveFeedback === 'saved'"
+                      color="success"
+                      variant="soft"
+                      title="Configuración guardada"
+                      role="status"
+                    />
+                    <UAlert
+                      v-else-if="saveFeedback === 'error'"
+                      color="error"
+                      variant="soft"
+                      title="No se pudo guardar la configuración"
+                      role="alert"
+                    />
+                    <UButton
+                      type="submit"
+                      :loading="saving"
+                      class="min-h-11"
+                    >
+                      Guardar conexión
+                    </UButton>
+                  </UForm>
+                  <div class="border-t border-default pt-4">
+                    <h4
+                      id="test-heading"
+                      class="font-semibold text-default"
+                    >
+                      Probar envío de correo
+                    </h4>
+                    <p class="mt-1 text-sm text-muted">
+                      Guarde los cambios antes de enviar un correo de prueba.
+                    </p>
+                    <UForm
+                      :schema="smtpTestSchema"
+                      :state="recipient"
+                      class="mt-4 flex flex-wrap items-end gap-3"
+                      @submit="sendTest"
+                    >
+                      <UFormField
+                        name="email"
+                        label="Correo de destino"
+                        required
+                        class="min-w-0 flex-1 basis-52"
+                      >
+                        <UInput
+                          v-model="recipient.email"
+                          type="email"
+                          class="w-full"
+                          autocomplete="email"
+                        />
+                      </UFormField>
+                      <UButton
+                        type="submit"
+                        color="neutral"
+                        variant="outline"
+                        :loading="testing"
+                        class="min-h-11"
+                      >
+                        Enviar correo de prueba
+                      </UButton>
+                    </UForm>
+                    <UAlert
+                      v-if="testFeedback === 'sent'"
+                      color="success"
+                      variant="soft"
+                      title="Correo de prueba enviado"
+                      role="status"
+                      class="mt-3"
+                    />
+                    <UAlert
+                      v-else-if="testFeedback === 'limited'"
+                      color="warning"
+                      variant="soft"
+                      title="Espere un momento antes de volver a probar"
+                      role="alert"
+                      class="mt-3"
+                    />
+                    <UAlert
+                      v-else-if="testFeedback === 'unavailable'"
+                      color="error"
+                      variant="soft"
+                      title="La prueba de correo no está disponible ahora"
+                      role="alert"
+                      class="mt-3"
+                    />
+                    <UAlert
+                      v-else-if="testFeedback === 'failed'"
+                      color="error"
+                      variant="soft"
+                      :title="testError || 'No se pudo enviar el correo de prueba'"
+                      role="alert"
+                      class="mt-3"
+                    />
+                  </div>
+                </div>
+              </details>
+            </div>
+
+            <div class="border-t border-default p-4">
+              <div class="flex flex-wrap items-start gap-3 sm:flex-nowrap">
+                <span class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-elevated text-muted"><UIcon
+                  name="i-lucide-message-circle"
+                  class="size-5"
+                  aria-hidden="true"
+                /></span>
+                <div class="min-w-0 flex-1">
+                  <h3
+                    id="whatsapp-heading"
+                    class="font-semibold text-default"
+                  >
+                    WhatsApp
+                  </h3>
+                  <p class="text-sm text-muted">
+                    {{ whatsappData?.sender ? `Remitente: ${whatsappData.sender}` : 'Configure el proveedor de recordatorios.' }}
+                  </p>
+                </div>
+                <UBadge
+                  v-if="!whatsappError && whatsappData"
+                  :color="whatsappData.status === 'FAILED' ? 'error' : whatsappData.configured ? 'success' : 'neutral'"
+                  variant="soft"
+                  class="shrink-0"
+                >
+                  {{ whatsappData.status === 'FAILED' ? 'Último intento fallido' : whatsappData.configured ? 'Configurado' : 'Sin configurar' }}
+                </UBadge>
+              </div>
+              <UAlert
+                v-if="whatsappError"
+                color="error"
+                variant="soft"
+                title="No se pudo cargar la configuración de WhatsApp"
+                :actions="[{ label: 'Reintentar', onClick: () => refreshWhatsApp() }]"
+                role="alert"
+                class="mt-4"
+              />
+              <USkeleton
+                v-else-if="whatsappStatus === 'pending' || !whatsappData"
+                class="mt-4 h-48 w-full"
+                aria-label="Cargando configuración de WhatsApp"
+              />
+              <div
+                v-else
+                class="mt-4 space-y-4 sm:ml-[3.25rem]"
+              >
+                <p class="text-sm text-muted">
+                  {{ whatsappData.source === 'ENV' ? 'Configuración del servidor: tiene prioridad y no se puede cambiar aquí.' : 'Configuración de la clínica' }}<span v-if="whatsappChangedAt"> · Último cambio: {{ whatsappChangedAt }}</span>
+                  <span v-if="whatsappData.status === 'FAILED'"> · El último intento con esta configuración falló; revise el proveedor antes de depender de este canal.</span>
+                  <span v-else-if="whatsappData.status === 'READY'"> · No hay fallo registrado para esta configuración; la entrega no está verificada.</span>
+                </p>
+                <p
+                  v-if="whatsappData.source === 'ENV'"
+                  class="text-sm text-muted"
+                >
+                  Proveedor: {{ whatsappData.provider === 'META' ? 'Meta Cloud API' : whatsappData.provider === 'TWILIO' ? 'Twilio' : 'No definido' }}. Las credenciales se administran en el servidor.
+                </p>
+                <form
+                  v-else
+                  class="space-y-4"
+                  @submit.prevent="saveWhatsApp"
+                >
+                  <fieldset
+                    class="space-y-2"
+                    :disabled="savingWhatsApp"
+                  >
+                    <legend class="text-sm font-medium text-muted">
+                      Proveedor
+                    </legend>
+                    <div class="flex flex-wrap gap-2 rounded-lg bg-elevated p-1 sm:w-fit">
+                      <label class="flex min-h-11 cursor-pointer items-center gap-2 rounded-md px-3 text-sm has-[:checked]:bg-default has-[:checked]:font-semibold has-[:checked]:shadow-sm">
+                        <input
+                          v-model="whatsapp.provider"
+                          type="radio"
+                          name="whatsapp-provider"
+                          value="META"
+                          class="accent-primary"
+                        >Meta Cloud API
+                      </label>
+                      <label class="flex min-h-11 cursor-pointer items-center gap-2 rounded-md px-3 text-sm has-[:checked]:bg-default has-[:checked]:font-semibold has-[:checked]:shadow-sm">
+                        <input
+                          v-model="whatsapp.provider"
+                          type="radio"
+                          name="whatsapp-provider"
+                          value="TWILIO"
+                          class="accent-primary"
+                        >Twilio
+                      </label>
+                    </div>
+                  </fieldset>
+                  <div class="grid gap-4 sm:grid-cols-2">
+                    <label class="block space-y-1 text-sm font-medium text-muted">
+                      <span>{{ whatsapp.provider === 'META' ? 'Phone number ID de Meta' : 'Número remitente de Twilio (+ y código de país)' }}</span>
+                      <input
+                        v-model.trim="whatsapp.sender"
+                        class="min-h-11 w-full rounded-lg border border-accented bg-default px-3 text-base font-normal text-default focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                        name="sender"
+                        autocomplete="off"
+                        required
+                        :pattern="whatsapp.provider === 'META' ? '[0-9]{5,30}' : '[+][1-9][0-9]{7,14}'"
+                      >
+                    </label>
+                    <label class="block space-y-1 text-sm font-medium text-muted">
+                      <span>{{ whatsapp.provider === 'META' ? 'Nombre de plantilla' : 'Content SID de Twilio (HX)' }}</span>
+                      <input
+                        v-model.trim="whatsapp.template"
+                        class="min-h-11 w-full rounded-lg border border-accented bg-default px-3 text-base font-normal text-default focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                        name="template"
+                        autocomplete="off"
+                        required
+                        :pattern="whatsapp.provider === 'META' ? '[a-z][a-z0-9_]{1,100}' : 'HX[a-fA-F0-9]{32}'"
+                      >
+                    </label>
+                    <label
+                      v-if="whatsapp.provider === 'META'"
+                      class="block space-y-1 text-sm font-medium text-muted"
+                    >
+                      <span>Idioma de la plantilla</span>
+                      <input
+                        v-model.trim="whatsapp.language"
+                        class="min-h-11 w-full rounded-lg border border-accented bg-default px-3 text-base font-normal text-default focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                        name="language"
+                        autocomplete="off"
+                        required
+                        pattern="[a-z]{2}(_[A-Z]{2})?"
+                      >
+                    </label>
+                    <label
+                      v-else
+                      class="block space-y-1 text-sm font-medium text-muted"
+                    >
+                      <span>Account SID de Twilio (AC)</span>
+                      <input
+                        v-model.trim="whatsapp.accountSid"
+                        class="min-h-11 w-full rounded-lg border border-accented bg-default px-3 text-base font-normal text-default focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                        name="accountSid"
+                        autocomplete="off"
+                        required
+                        pattern="AC[a-fA-F0-9]{32}"
+                      >
+                    </label>
+                  </div>
+                  <label class="block space-y-1 text-sm font-medium text-muted">
+                    <span>{{ whatsapp.provider === 'META' ? 'Token de acceso' : 'Auth Token de Twilio' }}</span>
+                    <input
+                      v-model="whatsapp.secret"
+                      class="min-h-11 w-full rounded-lg border border-accented bg-default px-3 text-base font-normal text-default focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                      name="secret"
+                      type="password"
+                      autocomplete="new-password"
+                      :required="secretRequired"
+                      maxlength="4096"
+                      :disabled="savingWhatsApp"
+                    >
+                  </label>
+                  <p class="flex items-start gap-2 text-xs text-dimmed">
+                    <UIcon
+                      name="i-lucide-lock-keyhole"
+                      class="size-4 shrink-0"
+                      aria-hidden="true"
+                    /><span>{{ secretRequired ? 'Ingrese un token para esta configuración.' : 'Deje el token vacío para conservar el guardado sin mostrarlo.' }} El token se guarda cifrado y no se vuelve a mostrar.</span>
+                  </p>
+                  <UAlert
+                    v-if="whatsappFeedback === 'saved'"
+                    color="success"
+                    variant="soft"
+                    title="Configuración guardada; el envío no está verificado"
+                    role="status"
+                  />
+                  <UAlert
+                    v-else-if="whatsappFeedback === 'invalid'"
+                    color="error"
+                    variant="soft"
+                    title="Revise los campos y el token antes de guardar"
+                    role="alert"
+                  />
+                  <UAlert
+                    v-else-if="whatsappFeedback === 'error'"
+                    color="error"
+                    variant="soft"
+                    title="No se pudo guardar la configuración de WhatsApp"
+                    role="alert"
+                  />
+                  <UButton
+                    type="submit"
+                    :loading="savingWhatsApp"
+                    :disabled="savingWhatsApp"
+                    class="min-h-11"
+                  >
+                    Guardar conexión
+                  </UButton>
+                </form>
+              </div>
+            </div>
+
+            <div class="flex flex-wrap items-start gap-3 border-t border-default p-4 sm:flex-nowrap">
+              <span class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-elevated text-muted"><UIcon
+                name="i-lucide-bell"
+                class="size-5"
+                aria-hidden="true"
+              /></span>
+              <div class="min-w-0 flex-1">
+                <h3 class="font-semibold text-default">
+                  En la app
+                </h3><p class="text-sm text-muted">
+                  Centro de avisos y notificaciones del sistema si instalaron la app.
+                </p>
+              </div>
+            </div>
+          </section>
+
+          <section
+            aria-labelledby="rules-heading"
+            class="rounded-xl border border-default bg-default p-4"
+          >
+            <h2
+              id="rules-heading"
+              class="text-lg font-semibold text-default"
+            >
+              Qué recordatorios se envían
+            </h2>
+            <p class="mt-1 text-sm text-muted">
+              Las reglas y horarios de envío todavía no se administran desde esta pantalla. La configuración de proveedores no activa recordatorios por sí sola.
+            </p>
+          </section>
         </div>
-      </UCard>
-    </section>
-  </UContainer>
+
+        <section
+          aria-labelledby="preview-heading"
+          class="min-w-0 rounded-xl border border-default bg-default p-4"
+        >
+          <h2
+            id="preview-heading"
+            class="text-lg font-semibold text-default"
+          >
+            Vista previa
+          </h2>
+          <div class="mt-4 rounded-lg border border-default bg-elevated p-5 text-sm text-muted">
+            La vista previa de mensajes aún no está disponible. No se muestran mensajes de ejemplo como si fueran envíos reales.
+          </div>
+        </section>
+      </div>
+    </UContainer>
+  </div>
 </template>

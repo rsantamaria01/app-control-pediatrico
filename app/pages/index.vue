@@ -2,6 +2,7 @@
 import type { Appointment } from '#shared/types/scheduling'
 import type { FamilyChildSummary } from '../../server/services/invitations'
 
+const { user } = useUserSession()
 const { data: navigation } = await useFetch<{ label: string, to: string }[]>('/api/auth/navigation')
 const isDoctor = computed(() => Boolean(navigation.value?.some(item => item.to === '/pacientes')))
 const isParent = computed(() => Boolean(navigation.value?.some(item => item.to === '/citas')) && !isDoctor.value)
@@ -46,7 +47,7 @@ function age(birthDate: string) {
             {{ todayLabel }}
           </p>
           <h1 class="text-2xl font-semibold tracking-tight">
-            {{ greetingLabel }}
+            {{ greetingLabel }}{{ user?.name ? `, ${user.name}` : '' }}
           </h1>
         </div>
         <UButton
@@ -378,20 +379,5 @@ function age(birthDate: string) {
         </UCard>
       </div>
     </template>
-    <div
-      v-else
-      class="space-y-5"
-    >
-      <UPageHero
-        title="Control Pediátrico"
-        description="Registro de medidas y curvas de crecimiento según los Patrones de Crecimiento Infantil de la OMS."
-      />
-      <UButton
-        to="/reservar"
-        class="min-h-11"
-      >
-        Solicitar cita
-      </UButton>
-    </div>
   </UContainer>
 </template>

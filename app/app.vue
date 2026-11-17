@@ -69,6 +69,7 @@ const navItems = computed(() => visibleItems.value.map(item => ({ ...item, icon:
 const adminNavItems = computed(() => adminItems.value.map(item => ({ ...item, icon: icons[item.to], active: route.path === item.to })))
 const pageTitle = computed(() => route.query.vista === 'familiar' && route.path === '/' && hasFamily.value ? 'Vista familiar' : ({ '/': 'Inicio', '/pacientes': 'Pacientes', '/pacientes/nuevo': 'Nuevo paciente', '/agenda': 'Agenda', '/agenda/horarios': 'Horarios', '/agenda/solicitudes': 'Solicitudes', '/avisos': 'Avisos', '/perfil': 'Perfil', '/admin/inicio': 'Configuración inicial', '/admin/usuarios': 'Usuarios', '/admin/clinica': 'Ajustes de la clínica', '/admin/catalogos': 'Catálogos', '/admin/auditoria': 'Auditoría' })[route.path] ?? (route.path.startsWith('/pacientes/') ? 'Ficha del paciente' : 'Control Pediátrico'))
 const pinnedSidebar = ref(false)
+const sidebarCollapsed = computed({ get: () => !pinnedSidebar.value, set: value => { pinnedSidebar.value = !value } })
 const sidebarHover = ref(false)
 const sidebarFocus = ref(false)
 const sidebarDismissed = ref(false)
@@ -104,12 +105,13 @@ function onSidebarEscape(event: KeyboardEvent) {
   sidebarHover.value = false
   sidebarFocus.value = false
 }
-watch(() => user.value?.id, (id) => {
-  if (!import.meta.client || !id) return
-  try {
-    pinnedSidebar.value = localStorage.getItem(`sidebar-pinned:${id}`) === 'yes'
-  } catch { pinnedSidebar.value = false }
-}, { immediate: true })
+onMounted(() => {
+  watch(() => user.value?.id, async (id) => {
+    if (!id) return
+    await nextTick()
+    try { pinnedSidebar.value = localStorage.getItem(`sidebar-pinned:${id}`) === 'yes' } catch { pinnedSidebar.value = false }
+  }, { immediate: true })
+})
 
 const updateConnection = () => {
   online.value = navigator.onLine
@@ -237,8 +239,8 @@ useSeoMeta({
           unit="px"
           :persistent="false"
         >
-        <UDashboardSidebar
-          :collapsed="!pinnedSidebar"
+         <UDashboardSidebar
+           v-model:collapsed="sidebarCollapsed"
           :collapsed-size="64"
           :default-size="256"
           collapsible

@@ -1,31 +1,34 @@
 # Design reference — Control Pediátrico UI v1
 
-Status: **reference only** (branch `design/handoff-v1`, 12 Nov 2026). The design was reviewed by
-the pediatrician who requested the app and accepted as the initial design. Nothing in this folder
-is production code. The build plan comes from OpenCode — see
+Status: [`DESIGN.md`](DESIGN.md) is the current, self-contained design specification.
+The board below is the **historical reference** (branch `design/handoff-v1`, 12 Nov 2026),
+reviewed by the pediatrician as the initial design. The 14 Nov feedback and dated decisions
+supersede conflicting examples. None of these files is production code. The build plan is
 [`docs/handoff/planning.md`](../handoff/planning.md).
 
 ## Sources, in order of authority
 
-1. **The design board (primary reference).**
+1. **Dated decisions and pediatrician feedback** in `docs/decisions/` and `docs/clinical/`.
+2. **The current design specification:** [`DESIGN.md`](DESIGN.md). Future UI tasks start here.
+3. **The design board (accepted visual baseline, historical source).**
    Claude Design canvas: https://claude.ai/artifact/8hLyiKyAVwadFMNRKiYS7w
    The board is private to Raul. Agents cannot open it; use the copies in this folder.
-2. **Board sources in this repo:** [`board/`](board/). One `.dc.html` file per artboard plus
+4. **Board sources in this repo:** [`board/`](board/). One `.dc.html` file per artboard plus
    `canvas.json` (titles and positions). These are the exact files published to the board.
    Each artboard is HTML + inline CSS with `{{hole}}` placeholders, `<sc-for>` / `<sc-if>`
    control flow and a small `renderVals()` class that builds the sample data. Read them for
    exact sizes, spacing, copy and component structure.
-3. **Screenshots:** [`screens/`](screens/). Rendered locally from `board/` with
+5. **Screenshots:** [`screens/`](screens/). Rendered locally from `board/` with
    [`tools/render-board.cjs`](tools/render-board.cjs) (Playwright, light theme unless the file
    name says `Dark`). Use them to see the layout at a glance.
-4. **Interactive prototype (secondary):** [`prototype/control-pediatrico-demo.html`](prototype/control-pediatrico-demo.html).
+6. **Interactive prototype (historical, secondary):** [`prototype/control-pediatrico-demo.html`](prototype/control-pediatrico-demo.html).
    Single HTML file the pediatrician used to review the flows (phone and desktop, every role).
    Open it in a browser. Use it for flow and interaction behaviour, not for pixel values.
    Published copy: https://claude.ai/artifact/CA3oh6MDARr1cpEGV8NqBv (private).
 
-When the board and the prototype disagree, the board wins. When either disagrees with
-[`docs/decisions/2026-11-10-ui-and-clinical.md`](../decisions/2026-11-10-ui-and-clinical.md),
-the decision record wins.
+Use [`DESIGN.md`](DESIGN.md) rather than opening the board for routine UI tasks. Historical
+board/prototype details never override the dated decisions or feedback; any new difference needs
+an explicit design decision and a DESIGN.md update.
 
 **Sample data warning.** Every patient, number and curve on the board and in the prototype is
 fictional. The growth curves are illustrative shapes, not WHO data. Never copy curve paths,

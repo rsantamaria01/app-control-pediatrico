@@ -43,7 +43,7 @@ export async function getGrantCandidate(actor: Actor, patientId: string) {
   const db = useDb()
   const [child] = await db.select({ id: patient.id, name: patient.name }).from(patient).where(eq(patient.id, patientId))
   if (!child) throw createError({ statusCode: 404, statusMessage: 'Not found' })
-  const grants = await db.select({ email: guardianGrant.contactEmail, status: guardianGrant.status, lastSendError: guardianGrant.lastSendError }).from(guardianGrant).where(eq(guardianGrant.patientId, patientId))
+  const grants = await db.select({ name: user.name, relationship: guardianGrant.relationship, email: guardianGrant.contactEmail, status: guardianGrant.status, lastSendError: guardianGrant.lastSendError }).from(guardianGrant).innerJoin(user, eq(user.id, guardianGrant.guardianId)).where(eq(guardianGrant.patientId, patientId))
   return { ...child, guardians: grants }
 }
 

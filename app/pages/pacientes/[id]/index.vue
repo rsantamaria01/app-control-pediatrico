@@ -23,7 +23,7 @@ const chartRange = ref<6 | 12 | 24 | 60>(60)
 const chartIndicators = [WhoIndicator.WEIGHT_FOR_AGE, WhoIndicator.HEIGHT_FOR_AGE, WhoIndicator.HEAD_CIRCUMFERENCE_FOR_AGE, WhoIndicator.BMI_FOR_AGE, WhoIndicator.WEIGHT_FOR_LENGTH, WhoIndicator.WEIGHT_FOR_HEIGHT]
 const sharing = reactive<Record<string, boolean>>({})
 const { data: sharingState } = await useFetch<Record<string, boolean>>(`/api/pacientes/${encodeURIComponent(id)}/visitas/compartir`, { immediate: isDoctor.value })
-const { data: guardianStatus } = await useFetch<{ guardians: { email: string, status: string, lastSendError: string | null }[] }>(`/api/guardian-grants/${encodeURIComponent(id)}`, { immediate: isDoctor.value })
+const { data: guardianStatus } = await useFetch<{ guardians: { name: string, relationship: string | null, email: string, status: string, lastSendError: string | null }[] }>(`/api/guardian-grants/${encodeURIComponent(id)}`, { immediate: isDoctor.value })
 const { data: pendingContacts, refresh: refreshPendingContacts } = await useFetch<{ id: string, name: string, relationship: string, phone: string, email: string | null }[]>(`/api/pacientes/${encodeURIComponent(id)}/contactos-pendientes`, { immediate: isDoctor.value, default: () => [] })
 const contactMatches = reactive<Record<string, { id: string, name: string, maskedContact: string } | null>>({})
 const contactChecked = reactive<Record<string, boolean>>({})
@@ -292,7 +292,7 @@ function authorName(visit: VisitSnapshot) {
                 v-for="(guardian, index) in guardianStatus?.guardians"
                 :key="`${guardian.email}-${index}`"
               >
-                Representante: {{ guardian.email }} · portal {{ guardianLabel(guardian.status).toLowerCase() }}
+                 Representante: {{ guardian.name }}<template v-if="guardian.relationship"> · {{ guardian.relationship }}</template> · {{ guardian.email }} · portal {{ guardianLabel(guardian.status).toLowerCase() }}
               </p>
               <p
                 v-for="contact in pendingContacts"

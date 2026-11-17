@@ -132,14 +132,20 @@ try {
       const age = Math.floor((now - birth) / 86400000)
       const count = age < 90 ? 2 : age < 365 ? 4 : 6
       for (let j = 0; j < count; j++) {
-        const elapsed = Math.max(1, j === count - 1 ? age - (age > 60 && index % 2 === 0 ? 20 : 1) : Math.floor(age * (j + 1) / count))
+        const requestId = id(`visit-${index}`, j)
+        const [existing] = await db.select({ id: visit.id, patientId: visit.patientId }).from(visit).where(eq(visit.requestId, requestId))
+        if (existing) {
+          if (existing.patientId !== childIds[index]) throw new Error('Demo visit identifier belongs to a different patient')
+          continue
+        }
+        const elapsed = Math.max('gestationDays' in entry ? 100 : 1, j === count - 1 ? age - (age > 60 && index % 2 === 0 ? 20 : 1) : Math.floor(age * (j + 1) / count))
         const measuredAt = new Date(birth + elapsed * 86400000).toISOString()
-        const fraction = (j + 1) / count
-        const weightKg = Number((Math.max(2.7, entry.weight * (0.65 + 0.35 * fraction)) + (index === 6 && j === count - 1 ? 5 : 0)).toFixed(2))
-        const lengthHeightCm = Number((Math.max(45, entry.length - Math.min(age / 90, 20) * (1 - fraction))).toFixed(1))
-        const headCircumferenceCm = Number((entry.head - Math.min(age / 180, 4) * (1 - fraction)).toFixed(1))
-        const result = await createVisit(doctor, childIds[index]!, { requestId: id(`visit-${index}`, j), measuredAt, weightKg, lengthHeightCm, headCircumferenceCm, position: elapsed < 730 ? 'RECUMBENT' : 'STANDING', shareWithFamily: j !== count - 2, privateNote: `Registro ficticio de demostración ${index + 1}.${j + 1}.`, parentAdvice: `Indicación ficticia de demostración ${index + 1}.${j + 1}; no es una recomendación médica.`, ...(j === count - 1 && index % 2 === 0 && elapsed > 21 ? { nextControlAt: new Date(Date.parse(measuredAt) + 10 * 86400000).toISOString() } : {}) })
-        if (!("gestationDays" in entry) && (result.results.length !== 5 || result.results.some(item => item.status !== 'available' || item.reference.version !== manifest.version))) console.warn(`WHO result partly unavailable for fictional child ${index + 1}, visit ${j + 1}: ${result.results.filter(item => item.status !== "available").map(item => item.indicator + "=" + item.status).join(",")}`)
+        const fraction = Math.sqrt(elapsed / age)
+        const weightKg = Number((3.2 + (entry.weight - 3.2) * fraction + (index === 6 && j === count - 1 ? 4 : 0)).toFixed(2))
+        const lengthHeightCm = Number((50 + (entry.length - 50) * fraction).toFixed(1))
+        const headCircumferenceCm = Number((35 + (entry.head - 35) * fraction).toFixed(1))
+        const result = await createVisit(doctor, childIds[index]!, { requestId, measuredAt, weightKg, lengthHeightCm, headCircumferenceCm, position: elapsed < 730 ? 'RECUMBENT' : 'STANDING', shareWithFamily: j !== count - 2, privateNote: `Registro ficticio de demostración ${index + 1}.${j + 1}.`, parentAdvice: `Indicación ficticia de demostración ${index + 1}.${j + 1}; no es una recomendación médica.`, ...(j === count - 1 && index % 2 === 0 && elapsed > 21 ? { nextControlAt: new Date(Date.parse(measuredAt) + 10 * 86400000).toISOString() } : {}) })
+        if (result.results.length !== 5 || result.results.some(item => item.status !== 'available' || item.reference.version !== manifest.version)) throw new Error(`Verified WHO results unavailable for fictional child ${index + 1}, visit ${j + 1}`)
       }
       const guardian = index < 4 ? 2 : 3
       await db.insert(guardianGrant).values({ patientId: childIds[index]!, guardianId: userIds[guardian]!, contactEmail: `${staff[guardian]!.username}@example.invalid`, relationship: 'Representante ficticio', proof: 'Vínculo ficticio para demostración', verifiedBy: doctor.id, status: index === 1 ? 'PENDING' : index === 2 ? 'UNINVITED' : 'ACTIVE' }).onConflictDoNothing()

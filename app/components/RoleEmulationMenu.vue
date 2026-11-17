@@ -1,5 +1,5 @@
 <script setup lang="ts">
-const { data: state, refresh } = await useFetch<{ available: boolean, active: { role: string } | null }>('/api/auth/emulacion', { default: () => ({ available: false, active: null }) })
+const { data: state, refresh } = await useFetch<{ available: boolean, active: { role: string } | null }>('/api/auth/emulacion', { key: 'role-emulation-state', default: () => ({ available: false, active: null }) })
 const open = ref(false)
 const search = ref('')
 const guardians = ref<{ id: string, name: string, username: string | null }[]>([])

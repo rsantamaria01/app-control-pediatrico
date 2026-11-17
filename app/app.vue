@@ -173,7 +173,7 @@ useSeoMeta({
 <template>
   <UApp :locale="locale">
     <NuxtPwaManifest />
-    <RoleEmulationBanner />
+    <RoleEmulationBanner v-if="loggedIn && !publicPage && online" />
 
     <NuxtPage v-slot="{ Component, route: pageRoute }">
       <template v-if="!online">

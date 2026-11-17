@@ -1,5 +1,5 @@
 <script setup lang="ts">
-const { data: state, refresh } = await useFetch<{ available: boolean, active: { role: 'ADMIN' | 'DOCTOR' | 'ASSISTANT' | 'PATIENT', name: string | null } | null }>('/api/auth/emulacion', { default: () => ({ available: false, active: null }) })
+const { data: state, refresh } = await useFetch<{ available: boolean, active: { role: 'ADMIN' | 'DOCTOR' | 'ASSISTANT' | 'PATIENT', name: string | null } | null }>('/api/auth/emulacion', { key: 'role-emulation-state', default: () => ({ available: false, active: null }) })
 const roles = { ADMIN: 'Administración', DOCTOR: 'Médico', ASSISTANT: 'Asistente', PATIENT: 'Representante' }
 const error = ref('')
 async function stop() {

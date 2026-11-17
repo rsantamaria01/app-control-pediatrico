@@ -1,0 +1,234 @@
+# Control Pediátrico — design specification
+
+Status: design contract for the `feat/alpha` app, 17 November 2026. UI strings below are Spanish (`es-EC`); specification prose is English. This document consolidates the accepted visual language of the historical board with the currently implemented flows. It does not turn board sample patients, reference curves, clinical claims, legal text or unbuilt screens into production data or functionality.
+
+## How to use this file
+
+1. Before changing UI, read the applicable dated decision and pediatrician feedback; they override this document if amended. Then read this file for the shell, tokens, route, copy, component and state checklist. Check the actual page/component for the current API and permissions. The accepted board remains the historical visual baseline for comparable layouts, but use it to resolve missing detail or compare images, not to reintroduce superseded copy; its prototype is not authoritative.
+2. Map every changed route to the screen inventory below, including phone (390×844; also test 375), tablet (1024×768), desktop (1440×900), light/dark and empty/error states. Follow `.agents/skills/design-fidelity/SKILL.md` for visual and structural verification; record justified deviations. Do not copy board numbers or curves.
+3. A drawn but unimplemented flow is marked **future board pattern**; it must not be described to users as available. When design or product behavior is changed, update this specification and its changelog along with the implementation.
+
+Authority: `docs/decisions/2026-11-10-ui-and-clinical.md` (including 14 Nov supersession) and `docs/clinical/2026-11-14-pediatrician-feedback-round-1.md` > this specification (consolidating the approved board's visual structure) > `docs/design/board/` and `docs/design/screens/` as the accepted visual baseline when not superseded > prototype for interaction ideas. The narrow 16 Nov catalog amendment in `docs/superpowers/specs/2026-11-12-first-release-design.md` takes priority over its older broad catalog checklist. Current `app/` code identifies implemented states, but does not silently override an accepted decision.
+
+## 1. Principles and audience
+
+- **Clinical clarity without automatic diagnosis.** Doctors record base measurements, view verified WHO references, raw Z and provisional percentiles, and interpret results with families. A review queue is a prompt for clinician attention, not a diagnosis. No made-up LMS values, automatic trend flags, traffic-light words (`Normal`, `Vigilar`, `Riesgo`) or extrapolation outside verified age/sex/position coverage. Compare unrounded Z strictly beyond ±2/±3; equal boundaries are not outside. An unavailable reference says `No disponible`.
+- **Limited sharing by design.** A guardian sees only verified linked children and the latest doctor-shared visit's date, weight, length/height and head circumference, shared advice and optional next control. Family home/detail and separate growth view never show Z, percentiles, BMI, SD labels, status colours, range assessments, diagnoses or private notes. A doctor controls visit sharing (default on); an unshared visit disappears from family projections. Current child detail also shows `Controles anteriores` for previously shared visits; this goes beyond the explicit latest-visit-only decision and needs product review, not elevation into an approved requirement. A family PDF is separately previewed and explicitly approved, not an extension of a chart permission.
+- **Role-specific tasks.** DOCTOR sees all patients in this clinic, clinical file, charts and review queues. ASSISTANT handles agenda, requests, hours and verified guardian invitations with only child name, contact and link status; never charts or measurements. PATIENT (guardian) has read-only approved child information, own bookings, notices and preferences. ADMIN handles clinic configuration and draft catalog review; ADMIN alone has no clinical access, and combined privileges require an explicit DOCTOR role. Public users can sign in, accept invitations, recover access and request a first booking; never see a staff/family shell or gain family access just by verifying booking contact.
+- **Honest status.** Bookings remain pending until staff approve; no fake confirmation. Draft source entries are facts with per-entry provenance and `Borrador - pendiente de revisión`, never copied third-party prose, invented intervals or definitive advice. Empty milestones stay empty until sourced or entered by a doctor. Unconfigured channels say `No configurado`; legal/privacy copy stays visibly draft pending counsel, with no invented response or retention deadlines. Source/rights checks are pilot gates, not reasons to invent alpha content.
+- **One clinic per deployment.** Only clinic logo and primary palette can change; neutral, Z display and chart colours are fixed. Offline shows no authenticated HTML or cached clinical records; `/api/**` is NetworkOnly.
+
+## 2. Foundations and tokens
+
+### Colours
+
+Actual configuration, reproduced exactly from `app/app.config.ts`:
+
+```ts
+export default defineAppConfig({
+  ui: {
+    colors: {
+      primary: 'brand',
+      neutral: 'slate'
+    }
+  }
+})
+```
+
+Actual CSS, reproduced exactly from `app/assets/css/main.css`:
+
+```css
+@import "tailwindcss";
+@import "@nuxt/ui";
+
+@theme static {
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --color-brand-50: #f0fdfa;
+  --color-brand-100: #ccfbf1;
+  --color-brand-200: #99f6e4;
+  --color-brand-300: #5eead4;
+  --color-brand-400: #2dd4bf;
+  --color-brand-500: #14b8a6;
+  --color-brand-600: #0d9488;
+  --color-brand-700: #0f766e;
+  --color-brand-800: #115e59;
+  --color-brand-900: #134e4a;
+  --color-brand-950: #042f2e;
+  --color-z-flag: #ea580c;
+  --color-z-watch: #eab308;
+  --color-z-band: #16a34a;
+  --color-curve-median: #334155;
+  --color-curve-sd1: #ca8a04;
+  --color-curve-sd2: #ea580c;
+  --color-curve-sd3: #dc2626;
+  --color-patient: #1d4ed8;
+}
+
+:root {
+  --ui-primary: var(--ui-color-primary-700);
+  --ui-radius: .5rem;
+}
+
+.dark {
+  --ui-primary: var(--ui-color-primary-400);
+  --color-curve-median: #e2e8f0;
+  --color-curve-sd1: #facc15;
+  --color-curve-sd2: #fb923c;
+  --color-curve-sd3: #f87171;
+  --color-patient: #60a5fa;
+}
+
+@layer base {
+  body { background: var(--ui-bg-muted); font-variant-numeric: tabular-nums; }
+  html { scroll-padding-bottom: calc(4rem + env(safe-area-inset-bottom, 0px)); }
+  :focus-visible {
+    outline: 2px solid var(--ui-primary);
+    outline-offset: 2px;
+  }
+}
+```
+
+The runtime accepts a configured clinic primary palette/logo through `clinicBrand`; the fixed clinical palette must not be rebranded. The board's example `button.defaultVariants.size: 'lg'` is **not** an actual `app.config.ts` override.
+
+| Scale | 50 | 100 | 200 | 300 | 400 | 500 | 600 | 700 | 800 | 900 | 950 |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| `brand` (teal) | `#f0fdfa` | `#ccfbf1` | `#99f6e4` | `#5eead4` | `#2dd4bf` | `#14b8a6` | `#0d9488` | `#0f766e` | `#115e59` | `#134e4a` | `#042f2e` |
+| `slate` (fixed neutral) | `#f8fafc` | `#f1f5f9` | `#e2e8f0` | `#cbd5e1` | `#94a3b8` | `#64748b` | `#475569` | `#334155` | `#1e293b` | `#0f172a` | `#020617` |
+
+| Semantic token | Light | Dark | Use |
+|---|---|---|---|
+| `--ui-bg` | `#ffffff` | `#0f172a` | Cards, panels, inputs |
+| `--ui-bg-muted` | `#f8fafc` | `#020617` | Page canvas |
+| `--ui-bg-elevated` | `#f1f5f9` | `#1e293b` | Selected rows, chips |
+| `--ui-border` | `#e2e8f0` | `#1e293b` | Cards, tables |
+| `--ui-border-accented` | `#cbd5e1` | `#334155` | Inputs, outline buttons |
+| `--ui-text` | `#0f172a` | `#f1f5f9` | Main text |
+| `--ui-text-muted` | `#475569` | `#cbd5e1` | Secondary text |
+| `--ui-text-dimmed` | `#64748b` | `#94a3b8` | Metadata; check ≥4.5:1 for text |
+| `--ui-primary` | `#0f766e` (brand 700) | `#2dd4bf` (brand 400) | Primary action, active nav, focus |
+
+Nuxt UI semantic `primary`, `neutral`, `warning`, `error`, `success` express intent; use tokens rather than raw Tailwind palette colours. Do not use success/warning/error to interpret a family's growth. The board's clinician Z display pairs are neutral background/text `#f1f5f9/#475569` (dark `#1e293b/#cbd5e1`); named result *within* ±2 `#fef9c3/#713f12` (dark `rgba(234,179,8,.18)/#fde047`); named result *outside* ±2 `#ffedd5/#9a3412` (dark `rgba(249,115,22,.18)/#fdba74`). Actual CSS fixed accents: `--color-z-flag: #ea580c`, `--color-z-watch: #eab308`, `--color-z-band: #16a34a`. A neutral value is `Z −1,39`; named examples for clinician review are `Riesgo de sobrepeso · +1,45` (eye icon) and `Talla baja · −2,41` (triangle icon). Names/thresholds and percentiles are provisional; colour never replaces text and icon. High weight-for-age uses `Revisar peso/longitud (< 2 a) o IMC/edad (≥ 2 a)` rather than a standalone high-weight diagnosis.
+
+### Type, space and shape
+
+| Token | Exact board value / use |
+|---|---|
+| Font | `Inter`, `system-ui`, sans-serif; tabular numerals. Body commonly 14/20, phone body 15 and inputs at least 16px to avoid iOS zoom. |
+| Display | 30px/36px, weight 700; patient hero/title. |
+| H1 / H2 / H3 | 24/32 weight 600; 18/28 weight 600; 15/22 weight 600. |
+| Value / legend | 28px weight 600 tabular; 12/16 weight 500. |
+| Spacing `1…8` | 4, 8, 12, 16, 24, 32, 48, 64px respectively (4px base). |
+| Radius | `sm` 4px, `md` 8px, `lg` 12px, `xl` 16px, `full` 999px; buttons/inputs 8, cards 12, sheets/modals 16, pills full. Actual Nuxt UI base radius is `.5rem`. |
+| Borders/shadows | Cards have a 1px border and **no card shadow**; separate surfaces with borders, not elevation. No general shadow scale is approved. Use focus outline 2px/2px offset, form focus border plus 3px halo. |
+| Target sizes | Board buttons/inputs 44px high; minimum touch target 44×44px. Current mobile tabs are at least 64px high, plus safe-area inset. |
+| Breakpoints | Staff sidebar/parent desktop header at `lg` ≥1024px; phone/tablet bottom tabs below 1024px; icon-collapse staff sidebar at 1024–1199px; wider sidebar at ≥1200px; chart compact controls at <640px in current app. Check 375/390, 1024 and 1440px. No other board-wide breakpoint scale is specified. |
+
+Fixed chart colours are independent of the clinic brand:
+
+| Series | Board light / dark | Stroke and fill | Current ECharts implementation note |
+|---|---|---|---|
+| Median `0` | `#334155` / `#e2e8f0` | 2px solid | Same. |
+| `±1 DE` | `#ca8a04` / `#facc15` | 1px dashed 4/3 | Current light `#a16207`, dark `#facc15`. |
+| `±2 DE` | `#ea580c` / `#fb923c` | 1.5px solid | Current light `#c2410c`, dark `#fb923c`. |
+| `±3 DE` | `#dc2626` / `#f87171` | 1.5px solid | Current light `#b91c1c`, dark `#f87171`. |
+| Area between −2 and +2 | `#16a34a` 7% / `#22c55e` 10% | Filled only between these curves | Current doctor chart matches; family chart deliberately omits status band. |
+| Patient | `#1d4ed8` / `#60a5fa` | 2.5px line; 7px hollow points | Same, never clinic primary. |
+| Grid | `#f1f5f9` / `#1e293b` | 1px; vertical dashed | Current chart uses `#cbd5e1` / `#334155`. |
+| Axes/ticks | `#cbd5e1` / `#475569` axis; `#64748b` / `#94a3b8` text | Inter 11px tabular | Current chart uses `#475569` / `#94a3b8` for label text. |
+
+`main.css` defines exact `--color-curve-median/sd1/sd2/sd3/patient` as the **board** colours in each theme; `app/utils/growth-chart-option.ts` contains the noted alternative light colours actually used in ECharts. Treat this as a documented implementation difference, not as two palettes to mix within one chart. Verify contrast and harmonize only through a reviewed UI change.
+
+## 3. Role shells and navigation
+
+All authenticated staff use `UDashboardGroup` + `UDashboardSidebar` + `UDashboardPanel` at ≥1024px. Sidebar is 256px normally and 64px at 1024–1199px or when manually collapsed. Header: clinic logo, `Pediatría`, subtitle `Control Pediátrico`; vertical `UNavigationMenu` entries with lucide icon + label (and count badge only when real data supplies a count); footer `UAvatar`, user name, `Pediatra`/`Asistente`/`Administración`, theme toggle, sign-out. Staff with ADMIN additionally receive the separated `Administración` group at the bottom; a sole ADMIN sees only admin links. The top `UDashboardNavbar` has title (subpage breadcrumbs/back link in its page header), collapse control, doctor patient search `Buscar paciente por nombre o cédula` at ≥1200px (`Ctrl K`), `Avisos` bell when available, and contextual `Nuevo paciente` primary action. Patient creation has `Cancelar`/`Crear paciente` in its own page header. On home below 1024px the shell shows a clinic-brand bar and doctor search button; fixed role tabs respect `env(safe-area-inset-bottom)` and have **no more than five** items.
+
+| Role | Top-level items and lucide icons | Child routes / constraints |
+|---|---|---|
+| DOCTOR | `Inicio` (`house`) `/`; `Pacientes` (`users-round`) `/pacientes`; `Agenda` (`calendar-days`) `/agenda`; `Avisos` (`bell`) `/avisos`; `Perfil` (`user-round`) `/perfil` | `/pacientes/nuevo`, `/pacientes/:id`, `/pacientes/:id/visitas/nueva`, `/pacientes/:id/informe`, `/pacientes/{vacunacion-por-revisar,crecimiento-por-revisar,controles-pendientes}`, `/catalogos`, `/agenda/solicitudes`, `/agenda/horarios`, `/representantes/invitar` are drill-down pages, never extra phone tabs. |
+| ASSISTANT | `Agenda` (`calendar-days`) `/agenda`; `Horarios` (`clock`) `/agenda/horarios`; `Avisos` (`bell`) `/avisos`; `Perfil` (`user-round`) `/perfil` | `/agenda/solicitudes`, `/representantes/invitar`; only names, scheduling/contact/status, no `Abrir ficha`. `Avisos` is a current-shell addition to historical NavMap, not clinical access. |
+| PATIENT/guardian | `Inicio` (`house`) `/`; `Citas` (`calendar-days`) `/citas`; `Avisos` (`bell`) `/avisos`; `Perfil` (`user-round`) `/perfil` | `/hijos/:id`, `/hijos/:id/crecimiento`, `/hijos/:id/informe` and owned appointments. Desktop uses `UHeader` with the same horizontal items, logo, theme and sign-out; phone uses the four bottom tabs and a brand bar on home. |
+| ADMIN | `Clínica` (`settings`) `/admin/clinica`; `Catálogos` (`book-open`) `/admin/catalogos` | Current menu is intentionally smaller than the board's proposed `Configuración inicial`, `Usuarios`, `Auditoría`. ADMIN+DOCTOR shows the administration group below the five doctor links. ADMIN-only phone tabs contain only admin links. |
+| Public | No authenticated shell or tabs | `/acceso`, `/recuperar`, `/restablecer/:token`, `/invitacion/:token`, `/reservar` are separate pages. `/privacidad` is a **current missing linked page** (login and booking link to it); legal copy needs counsel review and visible draft status before implementation. `/sin-conexion`, `/403`, `/sesion-expirada` were board routes without dedicated pages; offline is in the shell. |
+
+Navigation is capability-filtered in `server/utils/shell-navigation.ts`: unknown roles give no links, only available routes are returned, duplicates are removed; server authorization remains mandatory. The signed-in root `/` renders the doctor or guardian home, not a generic landing. An assistant or admin visiting `/` is routed to the appropriate role landing (`/agenda` or `/admin/clinica`); login `/acceso` redirects authenticated users to their role landing. Subpages stay under their parent role's nav. Agenda state uses `/agenda?vista=dia|semana|mes` and optional `fecha=YYYY-MM-DD`, not independent tab routes. The former board `/acceso/codigo` OTP sign-in route is obsolete. Public booking verification **does** use a code but never creates a portal account. A `403` is an access-denied state, not permission to show private content before navigating away. The doctor-only `/catalogos` and staff `/representantes/invitar` pages currently exist but are not top-level navigation entries; reach them from authorized flows, not a fabricated extra tab.
+
+## 4. Component contract and shared states
+
+| Pattern | Nuxt UI / application component and variant | Behavior and copy |
+|---|---|---|
+| Containers/cards | `UContainer`, `UCard`, `UDashboardPanel`; card `:ui="{ body: 'p-0 sm:p-0' }"` for compact divided lists | Muted page canvas, bordered default card, no decorative child illustration. Whole patient/queue row is a focusable link with avatar, compact metadata and chevron. |
+| Tables and tabs | `UTable` or semantic scrollable table; `UTabs` or accessible pressed-state view buttons; `UPagination` when needed | Header labels and row associations; scroll tables horizontally on phone, never truncate clinical values. Agenda's day/week/month uses semantic view controls and a custom calendar/grid. |
+| Badges/status | `UBadge color="neutral" variant="soft"` for provenance/status; `color="warning" variant="soft"` for draft catalog entries; `success` only for an operational event, not growth interpretation | `Borrador - pendiente de revisión` per sourced entry with version/page/hash available; `Pendiente de aprobación`, `Sin invitar`, `Pendiente de activación`, `Activo` are explicit status text. Doctor Z chips use the fixed tokens above, real value, and optional icon/name. |
+| Forms | `UForm` with shared Zod schema, `UFormField name/label/description/required`, `UInput`, `UInputNumber`, `USelect`, `UTextarea`, `URadioGroup`/semantic radio cards, `UCheckbox`, `USwitch`, `UButton type="submit" :loading` | Bind errors to fields and add a form-level summary; visible selected state and keyboard control. `Femenino`/`Masculino` are sex-at-birth radio options; invitation toggle is optional, valid email is required only when inviting. Password input has visible strength hint. Do not send secrets to logs or previews. |
+| Actions | `UButton` solid primary for the single principal action, `variant="outline" color="neutral"` for secondary, `variant="ghost"` for icon/back/link, `block size="xl"` on a prominent phone action | Icon-only actions require `aria-label`. Preserve save/cancel semantics and safe-area clearance. |
+| Temporary overlays | `UModal` for bounded confirmations, dose entry, appointment create/detail and iOS install hint; board proposes `USlideover` for visit/detail at ≥1024px | Actual new visit is a **full page at all widths**, including tablet. Do not move clinical fields into an overlay without a reviewed implementation change. Phone patient creation keeps its fixed save action; visit creation instead places save after the scrolling form. |
+| Feedback | `UAlert color="error" variant="soft"` in the affected block, `actions=[{ label: 'Reintentar', onClick }]`; `UEmpty` icon + short title + one action; `USkeleton` matching cards/rows/chart; `useToast`/`UApp` for transient save feedback | Examples: `Aún no hay mediciones` + `Registrar primera visita`, `No se pudo cargar la revisión` + `Reintentar`, `No hay horarios libres este día.` No full-page spinner except splash; keep failure localized. Critical persistent delivery/permission state must remain visible, not toast-only. |
+| Network/PWA | Offline shell and install banner/`UModal`; `UColorModeButton` and accessible theme choice in profile | `Sin conexión`; `Para proteger la información de sus hijos, la app no guarda datos de salud en el teléfono. Conéctese a internet para continuar.`; `Reintentar`. No clinical records offline or cached authenticated pages. |
+
+Component names from the historical `Handoff` board are patterns, not proof of implementation. In particular, its OTP `UPinInput` applies only to the public booking verification concept, not to sign-in; `UStepper`, `UCalendar`, `USlideover`, `UColorPicker`, `UFileUpload` and three fixed print sheets are board proposals wherever the corresponding current screen does not use them. Use the current project's installed Nuxt UI v4 APIs and source patterns when implementing.
+
+## 5. Screen and page patterns
+
+For each screen, read the ordered regions left-to-right/top-to-bottom. Unless otherwise noted: desktop content sits inside the staff sidebar/top bar or guardian header with responsive cards; tablet keeps the desktop sidebar (often icon collapsed) while multi-column content may stack; phone stacks content above bottom tabs, scrolls horizontal dense lists/tables, uses labelled back controls and safe-area-aware fixed actions. Dark mode retains the same region order and replaces canvas/card/border/text tokens as above; never darken print PDFs. A sample status or measurement in an artboard is not live clinical content.
+
+### Doctor and clinical pages
+
+| Route / reference | Purpose; ordered regions, components, exact copy | Responsive, state and dark notes |
+|---|---|---|
+| `/` · `Dashboard1440`, `DoctorMobile` | Clinician's compact day overview per 14 Nov feedback: dated greeting; `Hoy` card with `Citas`, `Por confirmar`, `Atendido`, `Ver agenda completa`; `Próximas citas` cards/rows with time, patient link, age · last weight, reason and optional small tag; request count/link; `Mis pacientes` with counted links **only** `Vacunación por revisar`, `Crecimiento por revisar`, `Controles pendientes`. | Current desktop stacks the summary and upcoming-appointment sections; phone stacks compact appointments; no board's expanded `Fuera de ±2 DE` and `Cómo vienen creciendo` lists or automatic trend labels. Counts are real or empty; don't create fake board appointments. Dark doctor-phone artboard uses same hierarchy. |
+| `/pacientes` · `DoctorMobile` | Fast lookup: `Pacientes` + `Nuevo paciente` (`+ Nuevo` in approved mockup), `Buscar por nombre o identificación`, A–Z/`Resultados`, compact alphabetical avatar/name/age · latest weight rows with at most one small pending badge; whole row opens file/chart. | One column on phone, search first; no diagnosis, Z or traffic-light status in list. Empty/error use local prompt/retry. |
+| `/pacientes/nuevo` · `NewPatient1440`, `DoctorMobile` | Quick form: breadcrumb/back and `Cancelar`/`Crear paciente`; `Datos del paciente` (`Nombres`, `Apellidos`, `Fecha de nacimiento`, `Sexo registrado al nacer`, `Femenino`/`Masculino`, `Cédula / NUI`, `Historia clínica HSM (opcional)`); `Contacto familiar` (`Nombre completo`, `Parentesco`, `Teléfono / WhatsApp` +593, `Correo electrónico`, `Agregar otro representante`, identity/link verification); `Acceso familiar` (`Invitar al portal de padres`, `Para enviar la invitación se requiere un correo electrónico válido.`); save opens the patient file. | Form cards/grid on desktop, stacked on phone with bottom `Crear paciente` action; check duplicate cédula and possible matches, allow provisional no-ID record. Birth/perinatal history is **not** on this screen (older board's `Antecedentes al nacer` is superseded); enter it in the file. Saving patient is independent of invitation delivery; display `Sin invitar`/`Pendiente de activación`/`Activo` and failed delivery honestly. |
+| `/pacientes/:id` · `PatientDetail1440`, `Tablet1024`, `DoctorMobile`, dark variants | File: breadcrumb or phone back; identity/sex/age/last visit/next control and representatives; `Nueva visita`, `Agendar cita`, `Informe PDF`; five indicator cards; tabs `Crecimiento`, `Visitas`, `Vacunas`, `Hitos`, `Controles`, `Antecedentes`, `Acceso familiar`; `Curvas de crecimiento OMS` indicator/range/table controls, chart, `Última visita` shareable advice/private note distinction, `Mediciones`; tab-specific records. | Desktop chart and last visit can sit side-by-side at wide width; at 1024 and phone summary flows below chart. Phone cards and tab row scroll; indicator select replaces multi-button row below `sm`; table scrolls. `Aún no hay mediciones` + `Registrar primera visita` when empty. Dark variant retains all regions, brightens curves. `Antecedentes` houses gestation, birth measurements, notes and individual corrected-age extension. |
+| `/pacientes/:id/visitas/nueva` · `Tablet1024`, `DoctorMobile` | Full-page visit form: patient/context; `Fecha y hora`, `Peso (kg)`, `Longitud o talla (cm)`, measurement position, `Perímetro cefálico (cm)`; `Observaciones y recomendaciones`: `Nota privada`, `Recomendaciones para la familia`, `Tendencia marcada por el profesional`, `Próximo control (si se conoce)`, `Compartir con la familia` (default on); `Guardar visita`. | The board's ≥1024 slideover, live Z preview and separate indications field are **not** current app behavior; don't claim them. Phone save follows the form (the board's sticky save is not currently implemented); reserve bottom clearance above the tabs. For under-24-month standing measurements the verified 0.7 cm position adjustment is a clinical calculation, not a fictitious form preview. No automatic trend flag. |
+| `/pacientes/:id/informe` · `ReportA4` p1–p3 | Separate `Informe familiar` flow: `Crear vista previa` → `Vista previa del PDF familiar` → `Aprobar este informe para la familia`; doctor `Informe médico` and `Descargar PDF médico`. **Decision override:** C8 says never include private clinical notes in any PDF. Current UI additionally offers `Incluir notas clínicas privadas en el PDF médico`; this conflicts with C8 and requires a separate implementation decision/fix; it is not approved PDF design. | Preview before explicit approval; family output omits Z, percentile, interpretations and private notes. Family and medical PDFs are not interchangeable; see §6. The board's fixed three pages are an aspiration, not a guarantee of generated page count. |
+| Patient `Vacunas` / `Hitos` / `Controles` tabs · `VaccinesMilestones1440` | `Vacunas`: `Por revisar con el médico`, `Dosis aplicadas`, provenance/draft badges, `Vacuna complementaria`, `Registrar dosis` modal; no automatic catch-up. `Desarrollo`/Hitos: sourced age windows and recorded observations, `Registrar hito`; `Tamizajes del desarrollo y autismo`, `Registrar tamizaje`. `Controles por edad`: sourced review and `Registrar control realizado`/`Agregar control individual`. | Separate stacked cards/tables on phone, horizontal table scroll; wider desktop two columns where useful. Unseeded milestones show an honest empty state. Board vaccine names/timelines are illustrative; no unsourced overdue status or definitive recommendation. |
+| `/pacientes/crecimiento-por-revisar`, `/pacientes/vacunacion-por-revisar`, `/pacientes/controles-pendientes` · 14 Nov clinician feedback | Back to home, heading, short caveat, count/list of linked patient rows. `Crecimiento por revisar`: `Selección provisional para revisión médica; no constituye un diagnóstico ni se comunica automáticamente a las familias.` `Vacunación por revisar`: MSP/complementary sourced rows, draft/version/page, verified contact with `Abrir WhatsApp (si usa este número)` / `Llamar`. `Controles pendientes`: the current page says `Controles vencidos sin cita; sujetos a revisión médica. Una reserva no registra un control completado.` **Decision override:** a past-due control is pending if not completed, irrespective of whether an appointment is booked. Current `controls-review.ts` excludes patients with future pending/confirmed appointments; this discrepancy requires a separate implementation fix, not a new design rule. | One-column rows on phone, generous desktop container; `No hay pacientes por revisar`, `No hay pacientes con vacunas por revisar` or `Sin controles pendientes` if empty, skeletons/retry on loading/error. No family or assistant exposure. Review membership is provisional; not an automated clinical classification. |
+| `/catalogos` · `VaccinesMilestones1440` source follow-up | Doctor-only `Catálogos preventivos`: category selector `Vacunas MSP`, `Hitos motores`, `Hitos del desarrollo`, `Tamizajes`, `Controles por edad`; version/publisher/source and per-row `Borrador - pendiente de revisión`, file/page/provenance; `Agregar hito` and `Guardar borrador` for doctor-entered milestones. | Two-column cards at ≥1024, stacked at phone; `Aún no hay hitos del desarrollo registrados` when none; not patient-facing guidance or reminders. No copied prose or invented source age/interval. |
+
+### Scheduling and contact
+
+| Route / reference | Purpose; ordered regions and copy | Responsive, state and dark notes |
+|---|---|---|
+| `/agenda` · `Agenda1440`, `AgendaViews1440`, `AgendaMobile` | Top `Agenda`, `Día`/`Semana`/`Mes`, date arrows + `Hoy`, `Disponibilidad`/`Horarios`, `Nueva cita`; day chronological list, week time grid, month calendar; appointment detail `Cita` and `Reprogramar`, request/availability summaries. Create modal asks `Nombre`, `Contacto`, doctor-only `Motivo`, optional `ID de paciente registrado`, day/free hour; detail can `Confirmar cita` / `Marcar atendida` as permitted. | Desktop week seven-day hourly grid; below `lg` week becomes day-grouped list, month compact seven-column grid; day is phone default. Request summary stacks below/alongside at `xl`; phone links to requests instead of inline approval. Current appointment create/detail are `UModal`, not board's phone full-page or desktop slideover. ASSISTANT sees schedule/contact only and never `Abrir ficha`. Empty day and API errors need honest states. |
+| `/agenda/solicitudes` · `Agenda1440`, `AgendaMobile` | `Solicitudes de citas`, `Ver agenda`, pending cards with request time, representative/contact, `Pendiente de aprobación`, `Aprobar`, `Rechazar`. Manual approval, no automatic portal account. | Desktop list, phone stacked cards; `Sin solicitudes pendientes` when empty. Request remains pending until explicit staff action; do not promise board's automatic invitation. |
+| `/agenda/horarios` · `Availability1440` | `Horarios de atención`, weekly `Días y horas` switches and opening/closing times, `Duración de las citas`/`Control y consulta`, `Días bloqueados` with `Fecha`, `Desde`, `Hasta`, `Bloquear`, `Quitar`, and `Guardar horarios`. | Desktop day/time grid and stacked side card; below `lg` columns stack and time fields wrap. The board's lunch pause and separately configurable `Primera consulta` duration are **not implemented**; do not draw functional fake controls. |
+| `/representantes/invitar` · guardian-link flow | `Invitar representante`, `Verifique el vínculo familiar antes de enviar una invitación.`; search child, inspect limited guardian contact/status; representative name/email/phone/relationship, `Verificar representante`, optional account match `Confirmo que es la misma persona`, `Cómo verificó el vínculo`; `Registrar representante sin invitar` / `Registrar y enviar invitación` / `Reenviar invitación`. | Narrow responsive cards. Distinguish `Sin invitar`, `Pendiente de activación`, `Activo`, failed delivery; evidence recorded before grant. ASSISTANT view is limited to child name and contact/link status, never chart links or clinical data. |
+
+### Family, public, system and administration
+
+| Route / reference | Purpose; ordered regions and copy | Responsive, state and dark notes |
+|---|---|---|
+| Family `/` · `ParentMobile` | `Hola, [nombre]`; one clickable child card per linked child with identity/age, `Último control` date and base `Peso`/`Talla`/`Cabeza`, `Indicaciones de tu pediatra` and `Ver todas las indicaciones` where shared, optional `Próximo control`; invitations/appointments only when authorized. | Phone single-column under brand bar and four tabs; desktop compact cards under `UHeader`. No chart or growth assessment, no Z/check/range words. Dark `ParentMobileDark` keeps layout. No linked child → neutral empty state, not mock data. |
+| `/hijos/:id` · `ParentMobile`, `ParentDesktop1440`, `ParentMobileDark` | Child switcher/name and age, `Ver informe PDF` / `Agendar cita`; `Último control` with shared weight/height/head circumference; `Cómo ha crecido` + `Ver gráficos` (navigation, not chart on detail); `Próximo control`, `Indicaciones de tu pediatra`, `Vacunas aplicadas` (recorded shareable subset). Current app also shows `Controles anteriores` with previously shared measures; the approved latest-only family home/detail decision does not authorize this extra history. Review/remove it separately before treating it as part of this design contract. | Desktop about 1.6:1 two-column layout with controls/advice on right; phone stacked; dark same structure with dark tokens. No family Z, percentile, `dentro del rango esperado`, checks, private note or inferred overdue claim. |
+| `/hijos/:id/crecimiento` · separate feedback section | `Crecimiento`: metric selector, reference-and-patient-point `GrowthChart` and accessible measurements table; `Referencia OMS no disponible.` for unsupported data. | Desktop chart wide; phone one metric selector, compact range chips and scrollable table. Family curves are neutral unlabelled references; no SD labels, Z, percentile, status shading or interpretation in chart, tooltip, table or API. Exact curve count/presentation requires pediatrician confirmation before changing it. |
+| `/hijos/:id/informe` | Approved family reports only, download/link of each explicitly approved immutable snapshot. | Empty/denied states reveal no unapproved report; print output stays white in dark mode. |
+| `/citas` · `ParentMobile` booking pattern | Own appointments and request flow: select child, date/available slot, submit; `Solicitud enviada. Pendiente de aprobación; aún no es una cita confirmada.` | Phone calendar/slot controls stack and remain keyboard accessible; desktop can split picker/summary. Historical board `Cita confirmada` immediately after choosing a slot and reprogram/cancel affordances are **not** a promise about a pending request. |
+| `/acceso` · `Login1440`, `AuthMobile` | Split login: left teal clinic/mission panel, right `Ingresar` form, `Usuario`, `Contraseña`, `Ingresar`, password recovery and `Reservar una primera cita`; invitation-only explanation `Las cuentas se crean por invitación de la clínica.` Generic failure `Usuario o contraseña incorrectos`. | Phone hides left brand panel, shows logo above centered form; no email sign-in or `Enviar código`/OTP screen. Dark uses surface tokens and contrast. Signed-in users redirect by role. |
+| `/invitacion/:token`, `/recuperar`, `/restablecer/:token` · `AuthMobile` layout pattern | Invitation `Crear acceso` with username/password and strength hint; recovery accepts username/email with account-independent `Si la cuenta existe, enviaremos instrucciones al correo registrado`; reset `Nueva contraseña`. | Narrow `UCard`/form, phone full width; invalid/expired token and rate-limit states need actionable, non-enumerating errors. Email is for invitation/recovery, never OTP sign-in. Legal consent board copy remains draft, not approved wording. |
+| `/reservar` · `BookingMobile` | Public four-step request (date/free slot → child/representative data → draft consent → pasteable six-digit contact verification → pending result). Headings include `Fecha y horario`, `Datos`, `Consentimiento`, `Ingrese el código`, `Solicitud enviada`; unavailable day `No hay horarios libres este día.` | Phone full-width stacked stepper/controls; desktop centered column; error `No se pudieron consultar los horarios` + retry. No automatic confirmation, child chart, login or invitation from verified booking contact. The board's preliminary landing screen is not currently a separate page. |
+| `/avisos`, `/perfil` · `PwaSystemMobile` | Notices `Avisos` with read/unread filters, `Marcar leídos`, grouped `HOY` / `ANTERIORES`. Profile has `Recordatorios` (in-app always on, email/WhatsApp if configured), `Apariencia`/`Tema` (`Claro`/`Oscuro`/`Sistema`), and sign-out; staff-only unavailable preferences use honest `Notificaciones no disponibles`. | Same role shell and private notices; phone stacked rows, desktop cards. Board `Mis datos`, `Exportar (PDF / JSON)` and `Pedir eliminación` await a reviewed legal/admin implementation; don't present them as working here. Never leak one family's notices to another. |
+| Shell install/offline and errors · `PwaSystemMobile`, `Icons` | Install banner `Instale la app en su teléfono` / `Instalar`; iOS `Agregar a la pantalla de inicio`; offline `Sin conexión`, privacy explanation and `Reintentar`. App icon uses concept A (growth curve). | Phone install only where supported; offline replaces all authenticated content, no cached clinical data. Board's standalone `/sin-conexion`, `/403`, `/sesion-expirada` and illustrative 404 composition are historical patterns, not implemented app routes. |
+| `/admin/clinica` · `ClinicSettings1440` | `Ajustes de la clínica`, static unavailable section labels `Marca`, `Contacto`, active `Recordatorios`, configured SMTP and Meta/Twilio settings with ENV override; `Canales`, provider configured/not configured/failure states, test-send controls, `Qué recordatorios se envían`, `Vista previa`. | Admin desktop cards/sidebar; phone stacked with admin bottom links. Actual rules are **not administered here** and message previews are **unavailable**; do not show board's editable seven-rule table, fake sample sends or unverified template approval as live. Secrets are never echoed. |
+| `/admin/catalogos` · sourced catalog pattern | `Catálogos preventivos`, administrative version review grouped by `Hitos motores OMS`, `Hitos CDC`, `Tamizajes`, `Controles AAP`, `Vacunas MSP`; source publisher/version/date/hash and per-entry draft badge/page. | Two-column entries ≥1024, stacked phone; empty `Sin entradas verificadas para [categoría]`; no clinical write for ADMIN and no definitive recommendation. |
+| Future board patterns · `AdminWizard1440`, `AdminAudit1440` | Setup `Prepare su clínica`, five steps `Clínica` / `Marca` / `Contacto` / `Primer médico` / `Recordatorios`, logo/primary contrast preview; users `Usuarios`, staff/parent invitation and status; `Registro de auditoría` with filters/CSV; `Solicitudes de datos` with draft legal workflow. | These artboards have **no current `/admin/inicio`, `/admin/usuarios`, `/admin/auditoria` app pages**. Only logo/primary may vary; Z/curves remain fixed. The board's dates, deadlines, template claims and `Normal`/`Vigilar` preview chips are not approved content. |
+
+## 6. Growth charts and printable reports
+
+**Doctor ECharts contract.** `GrowthChart.client.vue` registers CanvasRenderer, LineChart, Grid/Tooltip/DataZoom/Aria components and uses `growthChartOption` with live theme. Only independently validated, versioned official WHO rows may supply points/curves. WHO 2006 five indicators (length/height-for-age, weight-for-age, weight-for-length/height, BMI-for-age, head-circumference-for-age) stop at verified coverage; sex is strictly filtered. Separate recumbent/standing tables and verified 0.7cm adjustment apply. Corrected age through 24 months or per-patient extension to 36 for extreme prematurity; display age basis on results. WHO 2007 for older children is later scope—show unavailable, never extend the 2006 curves. Immutable reference/version/age-basis snapshots preserve prior results.
+
+For a doctor, draw seven labelled SD curves `−3`, `−2`, `−1`, `0`, `+1`, `+2`, `+3`, patient line/points in fixed blue, the green-tinted band **only between −2 and +2**, labels at curve ends, and legend/text matching fixed palette in both themes. X uses age in months for verified 0–5 data (length/height-based weight uses cm); Y has the measured unit (`kg`, `cm`, `kg/m²`). Doctor point tooltip: date, value/unit, chronological or corrected age as applicable, raw Z and provisional percentile; optional WHO name only if supported. Selected point and corresponding table row identify the same observation. `aria.enabled`, generated description, `Ver tabla`/measurements table and keyboard `Acercar`/`Alejar`/`Restablecer zoom` are required, not tooltip-only data. Desktop/tablet offers inside pan/zoom plus a 24px slider; current app hides slider below 640px and shows `6 m`, `1 a`, `Todo` (unless a page supplies a fixed range); age-centred phone ranges do not hide older points when `Todo` is chosen. The board sample's fixed `max:24` is not the full verified coverage.
+
+**Family variant.** Separate `/hijos/:id/crecimiento` chart only. Verified reference curves and shared patient points are neutral and non-interpretive; current ECharts uses dotted neutral lines, no band/end SD labels and a date/value/age tooltip only. Do not reintroduce the historical board's parent Z, `dentro / fuera del rango esperado`, coloured status band, clinical names or seven labelled SD lanes. The number/presentation of reference lines is still subject to pediatrician review. Both variants need a readable table for non-visual and no-chart use; chart never replaces an accessible textual result for the clinician.
+
+**PDF.** Historical `ReportA4`, `ReportA4p2`, `ReportA4p3` establish a white A4 print language: repeating clinic logo/title and patient identity/date, latest-values table, verified growth panels, source/reference/version and numbered footer; page 2 continues charts; page 3 groups advice/next control and only approved available content. Board entries/vaccines/clinical numbers are illustrations, not PDF requirements. Actual `server/services/reports.ts` generates content-dependent page count. Doctor report can display clinician-only results/curves, but **no private clinical notes in any PDF** under C8. The current doctor-only optional private-note switch conflicts with this decision; document it as an implementation gap pending a separately reviewed fix, never as an approved pattern. Family PDF requires doctor preview and explicit approval of a stable allowlisted snapshot, then serves only to the linked family; it contains shared base measurements, neutral verified curves, shared advice/next control and source attribution, **never private notes, Z, percentiles or interpretation under current policy**. Do not insert invented clinic contacts, vaccine schedules, milestones, screening results or generic recommendations to fill a board page. The report stays white regardless of app dark mode. The exact future family-PDF Z/percentile policy needs pediatrician approval; approval of a report alone does not grant clinical data to family screens.
+
+## 7. Accessibility and language
+
+- Target WCAG 2.2 AA: normal text ≥4.5:1, large text ≥3:1 and essential non-text/chart lines ≥3:1 in both themes; verify primary/logo changes independently. 2px visible focus with 2px offset; never suppress focus for aesthetic parity. Minimum 44×44px touch targets; labelled icon actions; `aria-current` on active tab/route, `aria-pressed` or real radio state on selectors; meaningful heading order and table headers. Colour is never the only signal of a Z, source or booking state.
+- All forms have associated labels, required-state and field error text plus an error summary; preserve input values on failure. Keyboard-operable calendar/slots/agenda, radio cards, switches, modals and close controls; code entry permits paste. Modal focus enters/returns correctly. Keep search navigable by keyboard (`Ctrl K` on doctor desktop). Provide chart table and keyboard zoom; label sex neutrally, never pink/blue. Check 200% zoom, reduced motion, 375/390 phone, 1024 tablet, 1440 desktop, both themes and safe-area bars without obscuring last fields.
+- UI tone: clear, calm, precise, respectful; no premature reassurance, diagnosis, legal promise or fake delivery. Use Spanish labels exactly as specified; product copy uses `usted` for public/family instructions where appropriate and `tu pediatra` in the approved family heading. Prefer action + object (`Registrar dosis`, `Guardar visita`, `Ver agenda completa`) and honest states (`Pendiente de aprobación`, `No configurado`, `No disponible`). Clinical names, percentile thresholds, review criteria and family wording remain provisional until pediatrician review; draft legal copy is visibly `Borrador · pendiente de revisión legal` and does not claim the board's illustrative `15 días` or `5 años` as law.
+- Locale `es-EC`, clinic-local time (default `America/Guayaquil`) for appointment display, unambiguous short dates (`10 nov 2026`) and 24-hour times (`10:30`); machine date in URLs is `YYYY-MM-DD`. Decimal comma, tabular numerals and true minus U+2212: `8,20 kg`, `76,4 cm`, `Z −1,39`; units `kg`, `cm`, `kg/m²`, months/years as applicable. Do not round before comparing clinical thresholds. Names/source titles are not translated into invented clinical guidance.
+
+## Changelog
+
+- **2026-11-17 — v1:** Consolidated historical board foundations, screens, NavMap, Handoff, ChartSpec and dark/print patterns with the dated username/password, pediatrician family/doctor-home/quick-registration decisions and the current `feat/alpha` implementation. Distinguished implemented routes from future board patterns and recorded chart palette differences without endorsing fictional data.

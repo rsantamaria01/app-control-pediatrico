@@ -61,9 +61,14 @@ const visibleItems = computed(() => isParent.value ? navigation.value.filter(ite
 const mobileItems = computed(() => isAdminPanel.value || isAdmin.value && !staffItems.value.length
   ? adminItems.value.filter(item => ['/admin/clinica', '/admin/catalogos'].includes(item.to))
   : visibleItems.value)
-const mobileMoreItems = computed(() => isAdmin.value && !isParent.value && mobileItems.value.length < 5
-  ? (isAdminPanel.value || !staffItems.value.length ? adminItems.value : [{ label: 'Administración', to: '/admin/inicio' }]).filter(item => !mobileItems.value.some(mobile => mobile.to === item.to)).map(item => ({ ...item, icon: icons[item.to] }))
-  : [])
+const mobileMoreItems = computed(() => {
+  if (isParent.value || !isAdmin.value) return []
+  const adminLinks = isAdminPanel.value || !staffItems.value.length ? adminItems.value : [{ label: 'Administración', to: '/admin/inicio' }]
+  return [
+    ...adminLinks.filter(item => !mobileItems.value.some(mobile => mobile.to === item.to)),
+    ...(isAdminPanel.value && clinicalLanding.value ? [{ label: 'Volver a la consulta', to: clinicalLanding.value }] : [])
+  ].map(item => ({ ...item, icon: item.label === 'Volver a la consulta' ? 'i-lucide-arrow-left' : item.label === 'Administración' ? 'i-lucide-settings' : icons[item.to] }))
+})
 const icons: Record<string, string> = { '/': 'i-lucide-house', '/pacientes': 'i-lucide-users-round', '/agenda': 'i-lucide-calendar-days', '/agenda/horarios': 'i-lucide-clock', '/avisos': 'i-lucide-bell', '/perfil': 'i-lucide-user-round', '/citas': 'i-lucide-calendar-days', '/admin/inicio': 'i-lucide-house', '/admin/usuarios': 'i-lucide-users-round', '/admin/clinica': 'i-lucide-settings', '/admin/catalogos': 'i-lucide-book-open', '/admin/auditoria': 'i-lucide-scroll-text' }
 const navItems = computed(() => visibleItems.value.map(item => ({ ...item, icon: icons[item.to], active: route.path === item.to || (item.to !== '/' && route.path.startsWith(`${item.to}/`)) })))
 const staffAdminItem = [{ label: 'Administración', to: '/admin/inicio', icon: 'i-lucide-settings' }]
@@ -226,9 +231,8 @@ useSeoMeta({
           </template>
         </UHeader>
         <main class="min-h-dvh bg-muted pb-24 lg:pb-0">
-          <header
-            v-if="route.path === '/'"
-            class="flex h-14 items-center gap-2 border-b border-default bg-default px-4 font-semibold lg:hidden"
+           <header
+             class="flex h-14 items-center gap-2 border-b border-default bg-default px-4 font-semibold lg:hidden"
           >
             <img
               :src="brand.logo"
@@ -375,9 +379,8 @@ useSeoMeta({
           </template>
           <template #body>
             <main class="min-h-full bg-muted pb-24 lg:pb-0">
-              <header
-                v-if="route.path === '/'"
-                class="flex h-14 items-center justify-between border-b border-default bg-default px-4 lg:hidden"
+               <header
+                 class="flex h-14 items-center justify-between border-b border-default bg-default px-4 lg:hidden"
               >
                 <span class="flex items-center gap-2 font-semibold">
                   <img

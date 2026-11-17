@@ -36,10 +36,10 @@ const children = [
   { name: 'Planeta de Cartón Ocho', birthDate: '2022-06-18', sex: 'MALE', weight: 16, length: 105, head: 51 }
 ] as const
 const staff = [
-  { username: 'doctora.demo', name: 'Doctora de Demostración', role: 'DOCTOR' },
-  { username: 'asistente.demo', name: 'Asistente de Demostración', role: 'ASSISTANT' },
-  { username: 'familia.demo1', name: 'Familia Ficticia Uno', role: 'PATIENT' },
-  { username: 'familia.demo2', name: 'Familia Ficticia Dos', role: 'PATIENT' }
+  { username: 'doctor', name: 'Doctora de Demostración', role: 'DOCTOR' },
+  { username: 'asistente', name: 'Asistente de Demostración', role: 'ASSISTANT' },
+  { username: 'familiar', name: 'Familia Ficticia Uno', role: 'PATIENT' },
+  { username: 'familiar2', name: 'Familia Ficticia Dos', role: 'PATIENT' }
 ] as const
 const pool = new Pool({ connectionString: target })
 const db = drizzle(pool)

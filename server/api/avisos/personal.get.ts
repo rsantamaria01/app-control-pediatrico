@@ -1,6 +1,6 @@
 import { and, desc, eq, gte, inArray, lt } from 'drizzle-orm'
 import { createError, defineEventHandler } from 'h3'
-import { appointment, bookingRequest, guardianGrant, notificationOutbox, patient, staffNoticeRead } from '../../db/schema'
+import { appointment, bookingRequest, guardianGrant, notificationOutbox, patient, setupToken, staffNoticeRead } from '../../db/schema'
 import { localDate } from '../../services/availability'
 import { resolveActor } from '../../services/access'
 import { listPendingControls } from '../../services/controls-review'
@@ -33,8 +33,8 @@ export default defineEventHandler(async (event): Promise<StaffNotice[]> => {
         ['controls', 'Controles pendientes', '/pacientes/controles-pendientes', controls]
       ] as const) notices.push(...rows.slice(0, 10).map(row => ({ id: `${kind}:${row.id}`, title, context: row.name, icon: 'i-lucide-clipboard-list', to, createdAt: now.toISOString() })))
     }
-    const invitations = await db.select({ id: patient.id, name: patient.name, status: guardianGrant.status, verifiedAt: guardianGrant.verifiedAt }).from(guardianGrant).innerJoin(patient, eq(patient.id, guardianGrant.patientId)).where(inArray(guardianGrant.status, ['PENDING', 'ACTIVE', 'FAILED'])).orderBy(desc(guardianGrant.verifiedAt)).limit(20)
-    notices.push(...invitations.map(row => ({ id: `invitation:${row.id}:${row.status}`, title: row.status === 'ACTIVE' ? 'Invitación activada' : row.status === 'FAILED' ? 'Invitación con entrega fallida' : 'Invitación pendiente de activación', context: row.name, icon: 'i-lucide-user-check', to: '/representantes/invitar', createdAt: row.verifiedAt.toISOString() })))
+    const invitations = await db.select({ id: patient.id, guardianId: guardianGrant.guardianId, name: patient.name, status: guardianGrant.status, verifiedAt: guardianGrant.verifiedAt, expiresAt: setupToken.expiresAt }).from(guardianGrant).innerJoin(patient, eq(patient.id, guardianGrant.patientId)).leftJoin(setupToken, eq(setupToken.id, guardianGrant.tokenId)).where(inArray(guardianGrant.status, ['PENDING', 'ACTIVE', 'FAILED'])).orderBy(desc(guardianGrant.verifiedAt)).limit(20)
+    notices.push(...invitations.map(row => ({ id: `invitation:${row.id}:${row.guardianId}:${row.status}`, title: row.status === 'ACTIVE' ? 'Invitación activada' : row.status === 'FAILED' ? 'Invitación con entrega fallida' : row.expiresAt && row.expiresAt < now ? 'Invitación vencida' : 'Invitación pendiente de activación', context: row.name, icon: 'i-lucide-user-check', to: '/representantes/invitar', createdAt: row.verifiedAt.toISOString() })))
   }
   if (admin) {
     const failures = await db.select({ id: notificationOutbox.id, channel: notificationOutbox.channel, state: notificationOutbox.state, createdAt: notificationOutbox.createdAt }).from(notificationOutbox).where(and(inArray(notificationOutbox.channel, ['EMAIL', 'WHATSAPP']), inArray(notificationOutbox.state, ['FAILED', 'NOT_CONFIGURED']))).orderBy(desc(notificationOutbox.createdAt)).limit(20)

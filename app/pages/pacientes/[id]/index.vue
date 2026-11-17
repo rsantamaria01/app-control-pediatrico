@@ -14,6 +14,11 @@ const latest = computed(() => data.value?.visits[0])
 const { data: growth } = await useFetch<{ charts: Partial<Record<WhoIndicator, ChartView>> }>(`/api/pacientes/${encodeURIComponent(id)}/crecimiento`, { immediate: isDoctor.value })
 const chartIndicator = ref<WhoIndicator>(WhoIndicator.WEIGHT_FOR_AGE)
 const showGrowthTable = ref(false)
+const tableReference = ref<HTMLElement | null>(null)
+function showTable() {
+  showGrowthTable.value = true
+  nextTick(() => tableReference.value?.scrollIntoView({ block: 'nearest' }))
+}
 const chartRange = ref<6 | 12 | 24 | 60>(60)
 const chartIndicators = [WhoIndicator.WEIGHT_FOR_AGE, WhoIndicator.HEIGHT_FOR_AGE, WhoIndicator.HEAD_CIRCUMFERENCE_FOR_AGE, WhoIndicator.BMI_FOR_AGE, WhoIndicator.WEIGHT_FOR_LENGTH, WhoIndicator.WEIGHT_FOR_HEIGHT]
 const sharing = reactive<Record<string, boolean>>({})
@@ -875,7 +880,7 @@ function authorName(visit: VisitSnapshot) {
                   :variant="showGrowthTable ? 'solid' : 'outline'"
                   class="min-h-11"
                   :aria-pressed="showGrowthTable"
-                  @click="showGrowthTable = true"
+                   @click="showTable"
                 >
                   Tabla
                 </UButton>
@@ -946,23 +951,15 @@ function authorName(visit: VisitSnapshot) {
               </UButton>
             </aside>
           </div>
-          <GrowthTable
-            v-if="showGrowthTable && growth?.charts[chartIndicator]"
-            :view="growth.charts[chartIndicator]!"
-          />
-          <p
-            v-else-if="showGrowthTable"
-            class="text-sm text-muted"
-          >
-            Referencia OMS no disponible.
-          </p>
+           <p v-if="showGrowthTable && !growth?.charts[chartIndicator]" class="text-sm text-muted">Referencia OMS no disponible.</p>
         </section>
-        <section
-          v-if="patientSection === 'crecimiento' || patientSection === 'visitas'"
-          class="space-y-3"
-        >
-          <h2 class="text-lg font-semibold">
-            Mediciones
+         <section
+           v-if="patientSection === 'crecimiento' || patientSection === 'visitas'"
+           ref="tableReference"
+           class="space-y-3"
+         >
+           <h2 class="text-lg font-semibold">
+             Mediciones
           </h2><UCard>
             <div class="overflow-x-auto">
               <table

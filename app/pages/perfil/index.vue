@@ -10,6 +10,7 @@ watch(isParent, async (allowed) => {
   if (allowed) await refresh()
 })
 const { user, signOut } = useUserSession()
+const auth = useAuthClient()
 const roles = computed(() => [navigation.value.some(item => item.to === '/admin/clinica') && 'Administración', navigation.value.some(item => item.to === '/pacientes') && 'Pediatra', navigation.value.some(item => item.to === '/agenda' && !navigation.value.some(link => link.to === '/pacientes')) && 'Asistente'].filter(Boolean).join(' · '))
 const passwordOpen = ref(false)
 const currentPassword = ref('')
@@ -22,7 +23,9 @@ async function changePassword() {
   passwordSaved.value = false
   changingPassword.value = true
   try {
-    await $fetch('/api/auth/change-password', { method: 'POST', body: { currentPassword: currentPassword.value, newPassword: newPassword.value, revokeOtherSessions: false } })
+    if (!auth) throw new Error('Auth unavailable')
+    const { error } = await auth.changePassword({ currentPassword: currentPassword.value, newPassword: newPassword.value, revokeOtherSessions: true })
+    if (error) throw error
     currentPassword.value = ''
     newPassword.value = ''
     passwordOpen.value = false
@@ -93,7 +96,7 @@ async function updatePreference(channel: 'email' | 'whatsapp', event: Event) {
         <UButton v-if="!passwordOpen" variant="outline" color="neutral" class="mt-3 min-h-11" @click="passwordOpen = true">Cambiar contraseña</UButton>
         <form v-else class="mt-3 space-y-3" @submit.prevent="changePassword">
           <UFormField label="Contraseña actual" required><UInput v-model="currentPassword" type="password" autocomplete="current-password" required class="w-full" /></UFormField>
-          <UFormField label="Nueva contraseña" description="Use al menos 12 caracteres." required><UInput v-model="newPassword" type="password" autocomplete="new-password" required minlength="12" class="w-full" /></UFormField>
+          <UFormField label="Nueva contraseña" description="Use al menos 10 caracteres y evite contraseñas comunes." required><UInput v-model="newPassword" type="password" autocomplete="new-password" required minlength="10" class="w-full" /></UFormField>
           <div class="flex gap-2"><UButton type="submit" :loading="changingPassword" class="min-h-11">Guardar contraseña</UButton><UButton variant="ghost" color="neutral" class="min-h-11" @click="passwordOpen = false">Cancelar</UButton></div>
         </form>
       </section>

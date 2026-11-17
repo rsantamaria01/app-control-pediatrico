@@ -62,7 +62,7 @@ async function select(item: CommandResult) {
 }
 
 const groups = computed(() => [
-  { id: 'patients', label: 'PACIENTES', ignoreFilter: true, items: results.value.patients.map(item => ({ ...item, onSelect: () => select(item) })) },
+  { id: 'patients', label: 'PACIENTES', ignoreFilter: true, items: results.value.patients.map(item => ({ ...item, avatar: { text: item.label.split(' ').slice(0, 2).map(part => part.charAt(0)).join('').toUpperCase() }, icon: undefined, onSelect: () => select(item) })) },
   { id: 'screens', label: 'PANTALLAS', ignoreFilter: true, items: results.value.screens.map(item => ({ ...item, onSelect: () => select(item) })) },
   { id: 'actions', label: 'ACCIONES', ignoreFilter: true, items: results.value.actions.map(item => ({ ...item, onSelect: () => select(item) })) }
 ].filter(group => group.items.length))

@@ -19,6 +19,12 @@ export async function searchCommands(actor: Actor, query: string): Promise<Comma
   const mode = search.startsWith('>') ? 'actions' : search.startsWith('@') ? 'patients' : 'all'
   const term = mode === 'all' ? search : search.slice(1).trim()
   const match = (label: string) => !term || label.toLocaleLowerCase('es-EC').includes(term.toLocaleLowerCase('es-EC'))
+  const age = (birthDate: string) => {
+    const now = new Date()
+    const [year, month, day] = birthDate.split('-').map(Number)
+    const months = (now.getUTCFullYear() - year!) * 12 + now.getUTCMonth() + 1 - month! - (now.getUTCDate() < day! ? 1 : 0)
+    return months < 12 ? `${months} m` : `${Math.floor(months / 12)} a ${months % 12} m`
+  }
   const doctor = actor.roles.includes('DOCTOR')
   const assistant = actor.roles.includes('ASSISTANT') && !doctor
   const guardian = actor.roles.includes('PATIENT') && !doctor && !assistant && !actor.roles.includes('ADMIN')
@@ -54,7 +60,7 @@ export async function searchCommands(actor: Actor, query: string): Promise<Comma
     const rows = await db.select({ id: patient.id, name: patient.name, birthDate: patient.birthDate, nationalId: patient.nationalId, hsmRecord: patient.hsmRecord }).from(patient)
       .where(or(ilike(sql`unaccent(${patient.name})`, `%${escaped}%`), ilike(patient.nationalId, `%${escaped}%`), ilike(patient.hsmRecord, `%${escaped}%`)))
       .orderBy(asc(sql`unaccent(${patient.name})`), asc(patient.id)).limit(12)
-    patients = rows.map(row => ({ id: `patient:${row.id}`, label: row.name, description: `${row.birthDate} · ${row.nationalId || row.hsmRecord || 'Sin identificación'}`, icon: 'i-lucide-user-round', to: `/pacientes/${encodeURIComponent(row.id)}` }))
+    patients = rows.map(row => ({ id: `patient:${row.id}`, label: row.name, description: `${age(row.birthDate)} · ${row.nationalId || row.hsmRecord || 'Sin identificación'}`, icon: 'i-lucide-user-round', to: `/pacientes/${encodeURIComponent(row.id)}` }))
   } else if (assistant) {
     const rows = await db.select({ id: patient.id, name: patient.name }).from(patient)
       .where(ilike(sql`unaccent(${patient.name})`, `%${escaped}%`))

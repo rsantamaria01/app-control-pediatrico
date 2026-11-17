@@ -55,10 +55,10 @@ const adminItems = computed(() => isAdmin.value
 const visibleItems = computed(() => isParent.value ? navigation.value.filter(item => ['/', '/citas', '/avisos', '/perfil'].includes(item.to)) : staffItems.value.length ? staffItems.value : adminItems.value)
 const mobileItems = computed(() => isAdmin.value && !staffItems.value.length
   ? adminItems.value.filter(item => ['/admin/clinica', '/admin/catalogos'].includes(item.to))
-  : isAdmin.value && !isParent.value
+  : isAdmin.value && !isParent.value && !isDoctor.value
     ? visibleItems.value.filter(item => item.to !== '/perfil')
     : visibleItems.value)
-const mobileMoreItems = computed(() => isAdmin.value && !isParent.value
+const mobileMoreItems = computed(() => isAdmin.value && !isParent.value && staffItems.value.length
   ? [
       ...navigation.value.filter(item => item.to === '/perfil' && !mobileItems.value.some(mobile => mobile.to === item.to)),
       ...adminItems.value.filter(item => !mobileItems.value.some(mobile => mobile.to === item.to))
@@ -463,9 +463,9 @@ useSeoMeta({
           aria-hidden="true"
         />{{ item.label }}
       </NuxtLink>
-      <UDropdownMenu
-        v-if="mobileMoreItems.length"
-        :items="mobileMoreItems"
+       <UDropdownMenu
+         v-if="mobileMoreItems.length && mobileItems.length < 5"
+         :items="mobileMoreItems"
         :content="{ align: 'end', side: 'top' }"
       >
         <UButton

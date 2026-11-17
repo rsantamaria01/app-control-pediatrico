@@ -9,12 +9,15 @@
         "apiKey": "{env:OMNIROUTE_API_KEY}"
       },
       "models": {
-        "models-max": { "name": "models-max" },
-        "models-high": { "name": "models-high" },
-        "models-balanced": { "name": "models-balanced" },
+        "models-max": { "name": "models-max", "attachment": true, "modalities": { "input": ["text", "image"], "output": ["text"] } },
+        "models-high": { "name": "models-high", "attachment": true, "modalities": { "input": ["text", "image"], "output": ["text"] } },
+        "models-balanced": { "name": "models-balanced", "attachment": true, "modalities": { "input": ["text", "image"], "output": ["text"] } },
         "models-fast": { "name": "models-fast" }
       }
     }
+  },
+  "permission": {
+    "external_directory": { "/tmp/*": "allow", "/tmp/**": "allow" }
   },
   "model": "omniroute/models-high",
   "small_model": "omniroute/models-fast",

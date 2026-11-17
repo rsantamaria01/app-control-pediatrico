@@ -14,6 +14,7 @@ const latest = computed(() => data.value?.visits[0])
 const { data: growth } = await useFetch<{ charts: Partial<Record<WhoIndicator, ChartView>> }>(`/api/pacientes/${encodeURIComponent(id)}/crecimiento`, { immediate: isDoctor.value })
 const chartIndicator = ref<WhoIndicator>(WhoIndicator.WEIGHT_FOR_AGE)
 const showGrowthTable = ref(false)
+const chartRange = ref<6 | 12 | 24 | 60>(60)
 const chartIndicators = [WhoIndicator.WEIGHT_FOR_AGE, WhoIndicator.HEIGHT_FOR_AGE, WhoIndicator.HEAD_CIRCUMFERENCE_FOR_AGE, WhoIndicator.BMI_FOR_AGE, WhoIndicator.WEIGHT_FOR_LENGTH, WhoIndicator.WEIGHT_FOR_HEIGHT]
 const sharing = reactive<Record<string, boolean>>({})
 const { data: sharingState } = await useFetch<Record<string, boolean>>(`/api/pacientes/${encodeURIComponent(id)}/visitas/compartir`, { immediate: isDoctor.value })
@@ -129,12 +130,50 @@ const labels: Record<WhoIndicator, string> = {
 }
 const weightFormat = new Intl.NumberFormat('es-EC', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const lengthFormat = new Intl.NumberFormat('es-EC', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
-const preventiveTab = ref<'vacunas' | 'desarrollo' | 'controles'>('vacunas')
+const patientSection = ref<'crecimiento' | 'visitas' | 'vacunas' | 'desarrollo' | 'controles' | 'antecedentes' | 'acceso'>('crecimiento')
 const dateFormat = new Intl.DateTimeFormat('es-EC', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'America/Guayaquil' })
+const birthFormat = new Intl.DateTimeFormat('es-EC', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })
+const age = computed(() => {
+  const birthDate = data.value?.patient.birthDate
+  if (!birthDate) return ''
+  const [year, month, day] = birthDate.split('-').map(Number)
+  const now = new Date()
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Guayaquil', year: 'numeric', month: '2-digit', day: '2-digit' }).format(now).split('-').map(Number)
+  const months = Math.max(0, (today[0]! - year!) * 12 + today[1]! - month! - (today[2]! < day! ? 1 : 0))
+  return months < 12 ? `${months} meses` : `${Math.floor(months / 12)} años ${months % 12} meses`
+})
+const initials = computed(() => data.value?.patient.name.split(' ').map(part => part[0]).slice(0, 2).join('').toUpperCase() ?? '')
+const indicatorValues = computed(() => latestResults.value.map(result => ({
+  result,
+  value: result.indicator === WhoIndicator.WEIGHT_FOR_AGE || result.indicator === WhoIndicator.WEIGHT_FOR_LENGTH || result.indicator === WhoIndicator.WEIGHT_FOR_HEIGHT ? weightFormat.format(latest.value!.weightKg) : lengthFormat.format(result.indicator === WhoIndicator.HEIGHT_FOR_AGE ? latest.value!.lengthHeightCm : result.indicator === WhoIndicator.HEAD_CIRCUMFERENCE_FOR_AGE ? latest.value!.headCircumferenceCm : latest.value!.bmi),
+  unit: result.indicator === WhoIndicator.WEIGHT_FOR_AGE || result.indicator === WhoIndicator.WEIGHT_FOR_LENGTH || result.indicator === WhoIndicator.WEIGHT_FOR_HEIGHT ? 'kg' : result.indicator === WhoIndicator.BMI_FOR_AGE ? 'kg/m²' : 'cm'
+})))
+const selectedVisits = computed(() => data.value?.visits.map(visit => ({
+  visit,
+  result: visit.results.find(result => result.parentResultId === null && result.indicator === chartIndicator.value)
+})) ?? [])
+const chartRangeOptions = [{ label: '6 m', value: 6 }, { label: '1 a', value: 12 }, { label: '0–2 a', value: 24 }, { label: 'Todo', value: 60 }] as const
+const zFormat = new Intl.NumberFormat('es-EC', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+function zLabel(z: number) {
+  return `Z ${z < 0 ? '−' : '+'}${zFormat.format(Math.abs(z))}`
+}
+function ageAtVisit(measuredAt: string, result: VisitSnapshot['results'][number] | undefined) {
+  if (result?.status === 'available') {
+    const days = result.reference.referenceAgeDays
+    return `${days} días · ${result.reference.ageBasis === 'CORRECTED' ? 'corregida' : 'cronológica'}`
+  }
+  const [year, month, day] = data.value!.patient.birthDate.split('-').map(Number)
+  const [visitYear, visitMonth, visitDay] = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Guayaquil', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(measuredAt)).split('-').map(Number)
+  const months = Math.max(0, (visitYear! - year!) * 12 + visitMonth! - month! - (visitDay! < day! ? 1 : 0))
+  return `${months < 12 ? `${months} m` : `${Math.floor(months / 12)} a ${months % 12} m`} · cronológica`
+}
+function authorName(visit: VisitSnapshot) {
+  return (visit as VisitSnapshot & { authorName?: string }).authorName || '—'
+}
 </script>
 
 <template>
-  <UContainer class="max-w-6xl space-y-6 py-8 pb-24">
+  <UContainer class="max-w-[1240px] space-y-5 py-4 pb-24 lg:py-6">
     <UAlert
       v-if="error"
       color="error"
@@ -146,77 +185,244 @@ const dateFormat = new Intl.DateTimeFormat('es-EC', { day: 'numeric', month: 'sh
     <template v-else-if="data">
       <nav
         aria-label="Ruta"
-        class="flex items-center gap-2 text-sm"
+        class="hidden items-center gap-2 text-sm text-muted lg:flex"
       >
         <NuxtLink
           to="/pacientes"
-          class="text-primary hover:underline"
+          class="hover:text-primary hover:underline"
         >Pacientes</NuxtLink>
-        <span class="text-muted">/</span>
-        <span>{{ data.patient.name }}</span>
+        <UIcon
+          name="i-lucide-chevron-right"
+          aria-hidden="true"
+          class="size-4"
+        />
+        <span class="font-semibold text-default">{{ data.patient.name }}</span>
       </nav>
-      <div class="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 class="text-2xl font-semibold">
-            {{ data.patient.name }}
-          </h1>
-          <p class="text-sm text-muted">
-            {{ data.patient.sex === 'FEMALE' ? 'Niña' : 'Niño' }} · Nacimiento {{ data.patient.birthDate }}
-          </p>
+      <div class="flex items-center gap-2 lg:hidden">
+        <UButton
+          to="/pacientes"
+          icon="i-lucide-chevron-left"
+          variant="ghost"
+          color="neutral"
+          aria-label="Volver a pacientes"
+          class="min-h-11 min-w-11"
+        />
+        <h1 class="min-w-0 flex-1 truncate font-semibold">
+          {{ data.patient.name }}
+        </h1>
+      </div>
+      <UCard :ui="{ body: 'p-4 sm:p-5' }">
+        <div class="flex flex-wrap items-start gap-4 sm:gap-5">
+          <UAvatar
+            :text="initials"
+            size="xl"
+            class="hidden shrink-0 sm:flex"
+          />
+          <div class="min-w-0 flex-1 space-y-4">
+            <div class="flex flex-wrap items-center gap-2">
+              <h1 class="hidden text-2xl font-bold text-default sm:block">
+                {{ data.patient.name }}
+              </h1>
+              <UBadge
+                color="neutral"
+                variant="soft"
+              >
+                {{ data.patient.sex === 'FEMALE' ? 'Niña' : 'Niño' }}
+              </UBadge>
+              <UBadge
+                v-if="data.patient.gestationDays !== undefined"
+                color="neutral"
+                variant="soft"
+              >
+                {{ data.patient.gestationDays < 259 ? 'Prematuro' : 'A término' }} · {{ Math.floor(data.patient.gestationDays / 7) }}+{{ data.patient.gestationDays % 7 }} sem
+              </UBadge>
+            </div>
+            <dl class="flex flex-wrap gap-x-8 gap-y-3 text-sm">
+              <div>
+                <dt class="text-muted">
+                  Edad
+                </dt><dd class="font-semibold">
+                  {{ age }}
+                </dd>
+              </div>
+              <div>
+                <dt class="text-muted">
+                  Nacimiento
+                </dt><dd class="font-semibold">
+                  {{ birthFormat.format(new Date(`${data.patient.birthDate}T12:00:00Z`)) }}
+                </dd>
+              </div>
+              <div>
+                <dt class="text-muted">
+                  Cédula
+                </dt><dd class="font-semibold">
+                  {{ data.patient.nationalId ?? 'Sin registrar' }}
+                </dd>
+              </div>
+              <div v-if="latest">
+                <dt class="text-muted">
+                  Última visita
+                </dt><dd class="font-semibold">
+                  {{ dateFormat.format(new Date(latest.measuredAt)) }}
+                </dd>
+              </div>
+              <div v-if="latest?.nextControlAt">
+                <dt class="text-muted">
+                  Próximo control
+                </dt><dd class="font-semibold">
+                  {{ dateFormat.format(new Date(latest.nextControlAt)) }}
+                </dd>
+              </div>
+            </dl>
+            <div
+              v-if="guardianStatus?.guardians.length || pendingContacts?.length"
+              class="space-y-1 text-sm text-muted"
+            >
+              <p
+                v-for="(guardian, index) in guardianStatus?.guardians"
+                :key="`${guardian.email}-${index}`"
+              >
+                Representante: {{ guardian.email }} · portal {{ guardianLabel(guardian.status).toLowerCase() }}
+              </p>
+              <p
+                v-for="contact in pendingContacts"
+                :key="contact.id"
+              >
+                Representante por vincular: {{ contact.name }} ({{ contact.relationship }}) · sin acceso al portal
+              </p>
+            </div>
+          </div>
+          <div class="flex w-full flex-wrap gap-2 xl:w-auto">
+            <UButton
+              :to="`/pacientes/${id}/visitas/nueva`"
+              icon="i-lucide-plus"
+              class="min-h-11 flex-1 justify-center sm:flex-none"
+            >
+              Nueva visita
+            </UButton>
+            <UButton
+              to="/agenda"
+              icon="i-lucide-calendar-days"
+              variant="outline"
+              color="neutral"
+              aria-label="Agendar cita"
+              class="min-h-11 sm:hidden"
+            />
+            <UButton
+              to="/agenda"
+              icon="i-lucide-calendar-days"
+              variant="outline"
+              color="neutral"
+              class="hidden min-h-11 sm:inline-flex"
+            >
+              Agendar cita
+            </UButton>
+            <UButton
+              :to="`/pacientes/${id}/informe`"
+              icon="i-lucide-file-text"
+              variant="outline"
+              color="neutral"
+              aria-label="Informe PDF"
+              class="min-h-11 sm:hidden"
+            />
+            <UButton
+              :to="`/pacientes/${id}/informe`"
+              icon="i-lucide-file-text"
+              variant="outline"
+              color="neutral"
+              class="hidden min-h-11 sm:inline-flex"
+            >
+              Informe PDF
+            </UButton>
+          </div>
         </div>
-        <div class="flex flex-wrap gap-2">
-          <UButton
-            :to="`/pacientes/${id}/informe`"
-            variant="outline"
-            size="lg"
+      </UCard>
+      <section
+        v-if="latest && latestResults.length && patientSection === 'crecimiento'"
+        aria-label="Resumen por indicador"
+        class="flex gap-3 overflow-x-auto pb-1 lg:grid lg:grid-cols-5 lg:overflow-visible"
+      >
+        <button
+          v-for="entry in indicatorValues"
+          :key="entry.result.id"
+          type="button"
+          class="min-w-40 flex-1 space-y-2 rounded-xl border border-default bg-default p-3 text-left focus-visible:outline-2 focus-visible:outline-primary lg:min-w-0"
+          :class="chartIndicator === entry.result.indicator ? 'border-primary' : ''"
+          :aria-pressed="chartIndicator === entry.result.indicator"
+          @click="chartIndicator = entry.result.indicator as WhoIndicator"
+        >
+          <span class="block text-xs font-medium text-muted">{{ labels[entry.result.indicator as WhoIndicator] }}</span>
+          <span class="block text-xl font-bold tabular-nums">{{ entry.value }} <span class="text-xs font-medium text-muted">{{ entry.unit }}</span></span>
+          <span
+            v-if="entry.result.status === 'available'"
+            class="flex flex-wrap items-center gap-1.5"
           >
-            Informes
-          </UButton>
-          <UButton
-            :to="`/representantes/invitar?patient=${encodeURIComponent(id)}`"
-            variant="outline"
-            size="lg"
+            <UBadge
+              v-if="entry.result.classification.name"
+              :color="entry.result.classification.tone === 'neutral' ? 'neutral' : 'warning'"
+              variant="soft"
+              class="max-w-full whitespace-normal"
+            >
+              <UIcon
+                :name="entry.result.classification.tone === 'flag' ? 'i-lucide-triangle-alert' : 'i-lucide-eye'"
+                aria-hidden="true"
+                class="mr-1 size-3.5"
+              />
+              {{ entry.result.classification.name }}
+            </UBadge>
+            <span class="text-sm font-semibold tabular-nums">{{ zLabel(entry.result.z) }}</span>
+          </span>
+          <span
+            v-else
+            class="block text-sm text-muted"
+          >No disponible</span>
+          <span
+            v-if="entry.result.status === 'available'"
+            class="block text-xs text-muted tabular-nums"
+          >{{ formatGrowthValues(entry.result.z, entry.result.percentile).split(' · ')[1] }}</span>
+        </button>
+      </section>
+      <p
+        v-if="latest?.clinicianTrend && patientSection === 'crecimiento'"
+        class="text-sm text-muted"
+      >
+        Tendencia indicada por el profesional: {{ latest.clinicianTrend }}
+      </p>
+      <div class="min-w-0 overflow-hidden rounded-xl border border-default bg-default">
+        <nav
+          aria-label="Secciones del paciente"
+          class="flex gap-1 overflow-x-auto border-b border-default px-3"
+        >
+          <button
+            v-for="section in ([['crecimiento', 'Crecimiento'], ['visitas', 'Visitas'], ['vacunas', 'Vacunas'], ['desarrollo', 'Hitos'], ['controles', 'Controles'], ['antecedentes', 'Antecedentes'], ['acceso', 'Acceso familiar']] as const)"
+            :key="section[0]"
+            type="button"
+            class="min-h-11 shrink-0 border-b-2 px-3 text-sm font-medium focus-visible:outline-2 focus-visible:outline-primary"
+            :class="patientSection === section[0] ? 'border-primary text-primary' : 'border-transparent text-muted'"
+            :aria-pressed="patientSection === section[0]"
+            @click="patientSection = section[0]"
           >
-            Invitar representante
-          </UButton>
-          <UButton
-            :to="`/pacientes/${id}/visitas/nueva`"
-            icon="i-lucide-plus"
-            size="lg"
-          >
-            Nueva visita
-          </UButton>
-        </div>
+            {{ section[1] }}<span
+              v-if="section[0] === 'visitas'"
+              class="ml-1 text-xs"
+            >{{ data.visits.length }}</span>
+          </button>
+        </nav>
       </div>
       <section
-        class="space-y-3"
+        v-if="patientSection === 'vacunas' || patientSection === 'desarrollo' || patientSection === 'controles'"
         aria-label="Seguimiento preventivo"
       >
-        <nav
-          class="flex flex-wrap gap-2"
-          aria-label="Secciones preventivas"
-        >
-          <UButton
-            v-for="tab in (['vacunas', 'desarrollo', 'controles'] as const)"
-            :key="tab"
-            variant="outline"
-            class="min-h-11"
-            :aria-pressed="preventiveTab === tab"
-            @click="preventiveTab = tab"
-          >
-            {{ tab === 'vacunas' ? 'Vacunas' : tab === 'desarrollo' ? 'Desarrollo' : 'Controles' }}
-          </UButton>
-        </nav>
         <PatientsVaccinesTab
-          v-if="preventiveTab === 'vacunas'"
+          v-if="patientSection === 'vacunas'"
           :patient-id="id"
         />
         <PatientsMilestonesTab
-          v-if="preventiveTab === 'desarrollo'"
+          v-if="patientSection === 'desarrollo'"
           :patient-id="id"
         />
         <PatientsCheckupsTab
-          v-if="preventiveTab === 'controles'"
+          v-if="patientSection === 'controles'"
           :patient-id="id"
         />
       </section>
@@ -226,265 +432,283 @@ const dateFormat = new Intl.DateTimeFormat('es-EC', { day: 'numeric', month: 'sh
         variant="soft"
         :description="patientWarning"
       />
-      <UCard class="space-y-4">
-        <h2 class="font-semibold">
-          Identificación y antecedentes perinatales
-        </h2>
-        <p>Fecha de nacimiento: {{ data.patient.birthDate }} · Cédula / NUI: {{ data.patient.nationalId ?? 'Sin registrar' }} · Historia clínica HSM: {{ data.patient.hsmRecord ?? 'Sin registrar' }}</p>
-        <p>{{ data.patient.gestationDays === undefined ? 'Edad gestacional sin registrar · se considera a término hasta que se registre' : `Edad gestacional: ${Math.floor(data.patient.gestationDays / 7)} semanas y ${data.patient.gestationDays % 7} días` }}</p>
-        <p v-if="data.patient.perinatalNotes">
-          {{ data.patient.perinatalNotes }}
-        </p>
-        <form
-          v-if="!data.patient.nationalId"
-          class="flex flex-wrap items-end gap-3"
-          @submit.prevent="saveIdentity"
-        >
-          <UFormField label="Agregar cédula / NUI">
-            <UInput
-              v-model="identity"
-              inputmode="numeric"
-              maxlength="10"
-            />
-          </UFormField>
-          <UButton
-            type="submit"
-            class="min-h-11"
-          >
-            Guardar cédula
-          </UButton>
-        </form>
-        <UAlert
-          v-if="identityError"
-          color="error"
-          variant="soft"
-          :description="identityError"
-        />
-        <form
-          class="space-y-3"
-          @submit.prevent="saveHistory"
-        >
-          <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            <UFormField label="Edad gestacional (semanas)">
-              <UInputNumber
-                v-model="history.gestationWeeks"
-                :min="20"
-                :max="43"
-                class="w-full"
-              />
-            </UFormField>
-            <UFormField label="Días adicionales">
-              <UInputNumber
-                v-model="history.gestationExtraDays"
-                :min="0"
-                :max="6"
-                class="w-full"
-              />
-            </UFormField>
-            <UFormField label="Peso al nacer (kg)">
-              <UInputNumber
-                v-model="history.birthWeightKg"
-                :min="0.1"
-                :max="20"
-                class="w-full"
-              />
-            </UFormField>
-            <UFormField label="Talla al nacer (cm)">
-              <UInputNumber
-                v-model="history.birthLengthCm"
-                :min="0.1"
-                :max="80"
-                class="w-full"
-              />
-            </UFormField>
-            <UFormField label="Perímetro cefálico al nacer (cm)">
-              <UInputNumber
-                v-model="history.birthHeadCircumferenceCm"
-                :min="0.1"
-                :max="60"
-                class="w-full"
-              />
-            </UFormField>
-          </div>
-          <UFormField label="Notas perinatales">
-            <UTextarea
-              v-model="history.perinatalNotes"
-              class="w-full"
-            />
-          </UFormField>
-          <UCheckbox
-            :model-value="history.correctionUntilMonths === 36"
-            label="Prematuro extremo: corregir hasta 36 meses"
-            @update:model-value="history.correctionUntilMonths = $event ? 36 : 24"
-          />
-          <UButton
-            type="submit"
-            variant="outline"
-            class="min-h-11"
-          >
-            Guardar antecedentes
-          </UButton>
-        </form>
-        <UAlert
-          v-if="historyError"
-          color="error"
-          variant="soft"
-          :description="historyError"
-        />
-      </UCard>
-      <UCard
-        v-if="pendingContacts?.length"
-        class="space-y-4"
+      <div
+        v-if="patientSection === 'antecedentes' || patientSection === 'acceso'"
+        class="space-y-5"
       >
-        <h2 class="font-semibold">
-          Contactos pendientes de vincular
-        </h2>
-        <div
-          v-for="contact in pendingContacts"
-          :key="contact.id"
-          class="space-y-2 rounded-lg border border-default p-3"
+        <UCard
+          v-if="patientSection === 'antecedentes'"
+          class="space-y-4"
         >
-          <p class="font-medium">
-            {{ contact.name }} · {{ contact.relationship }}
+          <h2 class="font-semibold">
+            Identificación y antecedentes perinatales
+          </h2>
+          <p>Fecha de nacimiento: {{ data.patient.birthDate }} · Cédula / NUI: {{ data.patient.nationalId ?? 'Sin registrar' }} · Historia clínica HSM: {{ data.patient.hsmRecord ?? 'Sin registrar' }}</p>
+          <p>{{ data.patient.gestationDays === undefined ? 'Edad gestacional sin registrar · se considera a término hasta que se registre' : `Edad gestacional: ${Math.floor(data.patient.gestationDays / 7)} semanas y ${data.patient.gestationDays % 7} días` }}</p>
+          <p v-if="data.patient.perinatalNotes">
+            {{ data.patient.perinatalNotes }}
           </p>
-          <p class="text-sm">
-            {{ contact.phone }}<span v-if="contact.email"> · {{ contact.email }}</span>
-          </p>
-          <p class="text-sm text-muted">
-            El vínculo no se registró. Verifique la identidad antes de reintentar; la familia aún no tiene acceso.
-          </p>
-          <div class="grid gap-3 sm:grid-cols-2">
-            <UFormField label="Nombre del contacto">
-              <UInput
-                v-model="editableContact(contact).name"
-                class="w-full"
-                @update:model-value="contactChecked[contact.id] = false"
-              />
-            </UFormField>
-            <UFormField label="Parentesco del contacto">
-              <UInput
-                v-model="editableContact(contact).relationship"
-                class="w-full"
-                @update:model-value="contactChecked[contact.id] = false"
-              />
-            </UFormField>
-            <UFormField label="Teléfono del contacto">
-              <UInput
-                v-model="editableContact(contact).phone"
-                type="tel"
-                class="w-full"
-                @update:model-value="contactChecked[contact.id] = false"
-              />
-            </UFormField>
-            <UFormField label="Correo del contacto">
-              <UInput
-                v-model="editableContact(contact).email"
-                type="email"
-                class="w-full"
-                @update:model-value="contactChecked[contact.id] = false"
-              />
-            </UFormField>
-          </div>
-          <UFormField label="Cómo verificó la corrección">
-            <UTextarea
-              v-model="editableContact(contact).proof"
-              class="w-full"
-            />
-          </UFormField>
-          <UButton
-            type="button"
-            variant="outline"
-            class="min-h-11"
-            :aria-label="`Verificar identidad de ${contact.name}`"
-            @click="checkPendingContact(contact)"
+          <form
+            v-if="!data.patient.nationalId"
+            class="flex flex-wrap items-end gap-3"
+            @submit.prevent="saveIdentity"
           >
-            Verificar identidad
-          </UButton>
-          <p
-            v-if="contactChecked[contact.id] && !contactMatches[contact.id]"
-            role="status"
-          >
-            Sin cuenta previa
-          </p>
-          <div v-if="contactChecked[contact.id] && contactMatches[contact.id]">
-            <p>Cuenta existente: {{ contactMatches[contact.id]?.name }} · {{ contactMatches[contact.id]?.maskedContact }}</p>
-            <UCheckbox
-              v-model="contactConfirmed[contact.id]"
-              label="Confirmo que es la misma persona"
-            />
-          </div>
-          <UButton
-            type="button"
-            class="min-h-11"
-            :disabled="!contactChecked[contact.id] || Boolean(contactMatches[contact.id] && !contactConfirmed[contact.id])"
-            :aria-label="`Reintentar vínculo de ${contact.name}`"
-            @click="retryContact(contact)"
-          >
-            Reintentar vínculo
-          </UButton>
+            <UFormField label="Agregar cédula / NUI">
+              <UInput
+                v-model="identity"
+                inputmode="numeric"
+                maxlength="10"
+              />
+            </UFormField>
+            <UButton
+              type="submit"
+              class="min-h-11"
+            >
+              Guardar cédula
+            </UButton>
+          </form>
           <UAlert
-            v-if="contactErrors[contact.id]"
+            v-if="identityError"
             color="error"
             variant="soft"
-            :description="contactErrors[contact.id]"
+            :description="identityError"
           />
-        </div>
-      </UCard>
-      <UCard>
-        <h2 class="font-semibold">
-          Acceso familiar
-        </h2>
-        <p
-          v-if="!guardianStatus?.guardians.length"
-          class="text-sm text-muted"
-        >
-          Sin invitar
-        </p>
-        <p
-          v-for="guardian in guardianStatus?.guardians"
-          :key="guardian.email"
-          class="text-sm"
-        >
-          {{ guardian.email }} · {{ guardianLabel(guardian.status) }}<span v-if="guardian.lastSendError"> · Último error de envío: {{ guardian.lastSendError }}</span>
-        </p>
-      </UCard>
-      <UAlert
-        v-if="shareError"
-        color="error"
-        variant="soft"
-        :title="shareError"
-      />
-      <UCard
-        v-if="data.visits.length"
-        class="space-y-3"
-      >
-        <h2 class="font-semibold">
-          Compartir con la familia
-        </h2>
-        <div
-          v-for="item in data.visits"
-          :key="item.id"
-          class="flex flex-wrap items-center justify-between gap-2 border-t border-default py-2"
-        >
-          <span>{{ dateFormat.format(new Date(item.measuredAt)) }}</span>
-          <UButton
-            variant="outline"
-            :aria-label="`${sharing[item.id] ?? sharingState?.[item.id] ?? item.shareWithFamily ? 'Dejar de compartir' : 'Compartir'} visita del ${dateFormat.format(new Date(item.measuredAt))}`"
-            @click="changeSharing(item.id, !(sharing[item.id] ?? sharingState?.[item.id] ?? item.shareWithFamily))"
+          <form
+            class="space-y-3"
+            @submit.prevent="saveHistory"
           >
-            {{ (sharing[item.id] ?? sharingState?.[item.id] ?? item.shareWithFamily) ? 'Compartida · cambiar' : 'No compartida · cambiar' }}
-          </UButton>
-        </div>
-      </UCard>
+            <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <UFormField label="Edad gestacional (semanas)">
+                <UInputNumber
+                  v-model="history.gestationWeeks"
+                  :min="20"
+                  :max="43"
+                  class="w-full"
+                />
+              </UFormField>
+              <UFormField label="Días adicionales">
+                <UInputNumber
+                  v-model="history.gestationExtraDays"
+                  :min="0"
+                  :max="6"
+                  class="w-full"
+                />
+              </UFormField>
+              <UFormField label="Peso al nacer (kg)">
+                <UInputNumber
+                  v-model="history.birthWeightKg"
+                  :min="0.1"
+                  :max="20"
+                  class="w-full"
+                />
+              </UFormField>
+              <UFormField label="Talla al nacer (cm)">
+                <UInputNumber
+                  v-model="history.birthLengthCm"
+                  :min="0.1"
+                  :max="80"
+                  class="w-full"
+                />
+              </UFormField>
+              <UFormField label="Perímetro cefálico al nacer (cm)">
+                <UInputNumber
+                  v-model="history.birthHeadCircumferenceCm"
+                  :min="0.1"
+                  :max="60"
+                  class="w-full"
+                />
+              </UFormField>
+            </div>
+            <UFormField label="Notas perinatales">
+              <UTextarea
+                v-model="history.perinatalNotes"
+                class="w-full"
+              />
+            </UFormField>
+            <UCheckbox
+              :model-value="history.correctionUntilMonths === 36"
+              label="Prematuro extremo: corregir hasta 36 meses"
+              @update:model-value="history.correctionUntilMonths = $event ? 36 : 24"
+            />
+            <UButton
+              type="submit"
+              variant="outline"
+              class="min-h-11"
+            >
+              Guardar antecedentes
+            </UButton>
+          </form>
+          <UAlert
+            v-if="historyError"
+            color="error"
+            variant="soft"
+            :description="historyError"
+          />
+        </UCard>
+        <UCard
+          v-if="patientSection === 'acceso' && pendingContacts?.length"
+          class="space-y-4"
+        >
+          <h2 class="font-semibold">
+            Contactos pendientes de vincular
+          </h2>
+          <div
+            v-for="contact in pendingContacts"
+            :key="contact.id"
+            class="space-y-2 rounded-lg border border-default p-3"
+          >
+            <p class="font-medium">
+              {{ contact.name }} · {{ contact.relationship }}
+            </p>
+            <p class="text-sm">
+              {{ contact.phone }}<span v-if="contact.email"> · {{ contact.email }}</span>
+            </p>
+            <p class="text-sm text-muted">
+              El vínculo no se registró. Verifique la identidad antes de reintentar; la familia aún no tiene acceso.
+            </p>
+            <div class="grid gap-3 sm:grid-cols-2">
+              <UFormField label="Nombre del contacto">
+                <UInput
+                  v-model="editableContact(contact).name"
+                  class="w-full"
+                  @update:model-value="contactChecked[contact.id] = false"
+                />
+              </UFormField>
+              <UFormField label="Parentesco del contacto">
+                <UInput
+                  v-model="editableContact(contact).relationship"
+                  class="w-full"
+                  @update:model-value="contactChecked[contact.id] = false"
+                />
+              </UFormField>
+              <UFormField label="Teléfono del contacto">
+                <UInput
+                  v-model="editableContact(contact).phone"
+                  type="tel"
+                  class="w-full"
+                  @update:model-value="contactChecked[contact.id] = false"
+                />
+              </UFormField>
+              <UFormField label="Correo del contacto">
+                <UInput
+                  v-model="editableContact(contact).email"
+                  type="email"
+                  class="w-full"
+                  @update:model-value="contactChecked[contact.id] = false"
+                />
+              </UFormField>
+            </div>
+            <UFormField label="Cómo verificó la corrección">
+              <UTextarea
+                v-model="editableContact(contact).proof"
+                class="w-full"
+              />
+            </UFormField>
+            <UButton
+              type="button"
+              variant="outline"
+              class="min-h-11"
+              :aria-label="`Verificar identidad de ${contact.name}`"
+              @click="checkPendingContact(contact)"
+            >
+              Verificar identidad
+            </UButton>
+            <p
+              v-if="contactChecked[contact.id] && !contactMatches[contact.id]"
+              role="status"
+            >
+              Sin cuenta previa
+            </p>
+            <div v-if="contactChecked[contact.id] && contactMatches[contact.id]">
+              <p>Cuenta existente: {{ contactMatches[contact.id]?.name }} · {{ contactMatches[contact.id]?.maskedContact }}</p>
+              <UCheckbox
+                v-model="contactConfirmed[contact.id]"
+                label="Confirmo que es la misma persona"
+              />
+            </div>
+            <UButton
+              type="button"
+              class="min-h-11"
+              :disabled="!contactChecked[contact.id] || Boolean(contactMatches[contact.id] && !contactConfirmed[contact.id])"
+              :aria-label="`Reintentar vínculo de ${contact.name}`"
+              @click="retryContact(contact)"
+            >
+              Reintentar vínculo
+            </UButton>
+            <UAlert
+              v-if="contactErrors[contact.id]"
+              color="error"
+              variant="soft"
+              :description="contactErrors[contact.id]"
+            />
+          </div>
+        </UCard>
+        <UCard v-if="patientSection === 'acceso'">
+          <h2 class="font-semibold">
+            Acceso familiar
+          </h2>
+          <p
+            v-if="!guardianStatus?.guardians.length"
+            class="text-sm text-muted"
+          >
+            Sin invitar
+          </p>
+          <p
+            v-for="guardian in guardianStatus?.guardians"
+            :key="guardian.email"
+            class="text-sm"
+          >
+            {{ guardian.email }} · {{ guardianLabel(guardian.status) }}<span v-if="guardian.lastSendError"> · Último error de envío: {{ guardian.lastSendError }}</span>
+          </p>
+        </UCard>
+        <UButton
+          v-if="patientSection === 'acceso'"
+          :to="`/representantes/invitar?patient=${encodeURIComponent(id)}`"
+          icon="i-lucide-user-plus"
+          variant="outline"
+          class="min-h-11"
+        >
+          Invitar representante
+        </UButton>
+        <UAlert
+          v-if="patientSection === 'acceso' && shareError"
+          color="error"
+          variant="soft"
+          :title="shareError"
+        />
+        <UCard
+          v-if="patientSection === 'acceso' && data.visits.length"
+          class="space-y-3"
+        >
+          <h2 class="font-semibold">
+            Compartir con la familia
+          </h2>
+          <div
+            v-for="item in data.visits"
+            :key="item.id"
+            class="flex flex-wrap items-center justify-between gap-2 border-t border-default py-2"
+          >
+            <span>{{ dateFormat.format(new Date(item.measuredAt)) }}</span>
+            <UButton
+              variant="outline"
+              :aria-label="`${sharing[item.id] ?? sharingState?.[item.id] ?? item.shareWithFamily ? 'Dejar de compartir' : 'Compartir'} visita del ${dateFormat.format(new Date(item.measuredAt))}`"
+              @click="changeSharing(item.id, !(sharing[item.id] ?? sharingState?.[item.id] ?? item.shareWithFamily))"
+            >
+              {{ (sharing[item.id] ?? sharingState?.[item.id] ?? item.shareWithFamily) ? 'Compartida · cambiar' : 'No compartida · cambiar' }}
+            </UButton>
+          </div>
+        </UCard>
+      </div>
       <UEmpty
-        v-if="!latest"
+        v-if="!latest && (patientSection === 'crecimiento' || patientSection === 'visitas')"
         icon="i-lucide-clipboard-list"
         title="Aún no hay mediciones"
         description="Registre la primera visita para ver los resultados."
         :actions="[{ label: 'Registrar primera visita', to: `/pacientes/${id}/visitas/nueva` }]"
       />
-      <template v-else>
+      <template v-if="latest">
         <section
+          v-if="patientSection === 'visitas'"
           aria-label="Última visita"
           class="space-y-3"
         >
@@ -578,61 +802,172 @@ const dateFormat = new Intl.DateTimeFormat('es-EC', { day: 'numeric', month: 'sh
           </UCard>
         </section>
         <section
+          v-if="patientSection === 'crecimiento'"
           class="space-y-3"
           aria-label="Curvas de crecimiento"
         >
           <h2 class="text-lg font-semibold">
             Curvas de crecimiento OMS
           </h2>
-          <div
-            class="flex flex-wrap gap-2"
-            role="group"
-            aria-label="Indicador de crecimiento"
-          >
-            <UButton
-              v-for="indicator in chartIndicators"
-              :key="indicator"
-              variant="outline"
-              class="min-h-11"
-              :aria-pressed="chartIndicator === indicator"
-              @click="chartIndicator = indicator"
+          <div class="flex flex-wrap items-center gap-3 rounded-xl border border-default bg-default p-3 sm:p-4">
+            <div
+              class="hidden max-w-full gap-0.5 overflow-x-auto rounded-lg bg-elevated p-1 sm:flex"
+              role="group"
+              aria-label="Indicador de crecimiento"
             >
-              {{ labels[indicator] }}
-            </UButton>
+              <UButton
+                v-for="indicator in chartIndicators"
+                :key="indicator"
+                color="neutral"
+                :variant="chartIndicator === indicator ? 'solid' : 'ghost'"
+                class="min-h-11 shrink-0 text-xs"
+                :aria-pressed="chartIndicator === indicator"
+                @click="chartIndicator = indicator"
+              >
+                {{ labels[indicator] }}
+              </UButton>
+            </div>
+            <USelect
+              v-model="chartIndicator"
+              :items="chartIndicators.map(indicator => ({ label: labels[indicator], value: indicator }))"
+              aria-label="Indicador de crecimiento"
+              size="lg"
+              class="min-w-0 flex-1 sm:hidden"
+            />
+            <div class="ml-auto flex flex-wrap items-center gap-2">
+              <UFieldGroup
+                v-if="growth?.charts[chartIndicator]?.xUnit === 'DAY'"
+                size="sm"
+                role="group"
+                aria-label="Rango del gráfico"
+              >
+                <UButton
+                  v-for="range in chartRangeOptions.filter(range => range.value !== 60 || (growth?.charts[chartIndicator]?.curves[0]?.data.at(-1)?.[0] ?? 0) > 2 * 365.25)"
+                  :key="range.value"
+                  color="neutral"
+                  :variant="chartRange === range.value ? 'solid' : 'outline'"
+                  class="min-h-11"
+                  :aria-pressed="chartRange === range.value"
+                  @click="chartRange = range.value"
+                >
+                  {{ range.label }}
+                </UButton>
+              </UFieldGroup>
+              <UFieldGroup
+                size="sm"
+                role="group"
+                aria-label="Vista de crecimiento"
+              >
+                <UButton
+                  color="neutral"
+                  :variant="showGrowthTable ? 'outline' : 'solid'"
+                  class="min-h-11"
+                  :aria-pressed="!showGrowthTable"
+                  @click="showGrowthTable = false"
+                >
+                  Gráfico
+                </UButton>
+                <UButton
+                  color="neutral"
+                  :variant="showGrowthTable ? 'solid' : 'outline'"
+                  class="min-h-11"
+                  :aria-pressed="showGrowthTable"
+                  @click="showGrowthTable = true"
+                >
+                  Tabla
+                </UButton>
+              </UFieldGroup>
+            </div>
           </div>
-          <UButton
-            variant="outline"
-            class="min-h-11"
-            :aria-pressed="showGrowthTable"
-            @click="showGrowthTable = !showGrowthTable"
+          <div
+            v-if="!showGrowthTable"
+            class="grid overflow-hidden rounded-xl border border-default bg-default xl:grid-cols-[minmax(0,1fr)_320px]"
           >
-            {{ showGrowthTable ? 'Ver gráfico' : 'Ver tabla' }}
-          </UButton>
-          <UCard v-if="growth?.charts[chartIndicator]">
-            <GrowthTable
-              v-if="showGrowthTable"
-              :view="growth.charts[chartIndicator]!"
-            />
-            <GrowthChart
-              v-else
-              :view="growth.charts[chartIndicator]!"
-            />
-          </UCard>
-          <UCard v-else>
-            <p class="text-muted">
-              Referencia OMS no disponible.
-            </p>
-          </UCard>
+            <div class="min-w-0 p-3 sm:p-5">
+              <h3 class="mb-3 text-base font-semibold">
+                {{ labels[chartIndicator] }} · {{ data.patient.sex === 'FEMALE' ? 'Niña' : 'Niño' }}
+              </h3>
+              <GrowthChart
+                v-if="growth?.charts[chartIndicator]"
+                :key="chartIndicator"
+                :view="growth.charts[chartIndicator]!"
+                :range-months="chartRange"
+              />
+              <p
+                v-else
+                class="text-muted"
+              >
+                Referencia OMS no disponible.
+              </p>
+            </div>
+            <aside
+              class="space-y-4 border-t border-default p-4 xl:border-t-0 xl:border-l"
+              aria-label="Resumen de la última visita"
+            >
+              <h3 class="font-semibold">
+                Última visita · {{ dateFormat.format(new Date(latest.measuredAt)) }}
+              </h3>
+              <div class="text-sm">
+                <p class="text-muted">
+                  Medición
+                </p>
+                <p class="font-semibold tabular-nums">
+                  {{ weightFormat.format(latest.weightKg) }} kg · {{ lengthFormat.format(latest.lengthHeightCm) }} cm {{ latest.position === 'RECUMBENT' ? 'acostado' : 'de pie' }} · PC {{ lengthFormat.format(latest.headCircumferenceCm) }} cm
+                </p>
+              </div>
+              <div
+                v-if="latest.parentAdvice"
+                class="rounded-lg bg-primary/10 p-3 text-sm"
+              >
+                <p class="mb-1 font-semibold text-primary">
+                  {{ (sharing[latest.id] ?? sharingState?.[latest.id] ?? latest.shareWithFamily) ? 'Visible para la familia' : 'No compartida con la familia' }}
+                </p>
+                <p>{{ latest.parentAdvice }}</p>
+              </div>
+              <div
+                v-if="latest.privateNote"
+                class="rounded-lg border border-dashed border-default p-3 text-sm"
+              >
+                <p class="mb-1 font-semibold text-muted">
+                  Nota clínica privada
+                </p>
+                <p>{{ latest.privateNote }}</p>
+              </div>
+              <UButton
+                variant="outline"
+                color="neutral"
+                class="min-h-11"
+                @click="patientSection = 'visitas'"
+              >
+                Ver todas las visitas
+              </UButton>
+            </aside>
+          </div>
+          <GrowthTable
+            v-if="showGrowthTable && growth?.charts[chartIndicator]"
+            :view="growth.charts[chartIndicator]!"
+          />
+          <p
+            v-else-if="showGrowthTable"
+            class="text-sm text-muted"
+          >
+            Referencia OMS no disponible.
+          </p>
         </section>
-        <section class="space-y-3">
+        <section
+          v-if="patientSection === 'crecimiento' || patientSection === 'visitas'"
+          class="space-y-3"
+        >
           <h2 class="text-lg font-semibold">
             Mediciones
           </h2><UCard>
             <div class="overflow-x-auto">
               <table
-                aria-label="Mediciones"
                 class="w-full min-w-[680px] text-left text-sm"
               >
+                <caption class="p-3 text-left font-semibold">
+                  Mediciones · {{ labels[chartIndicator] }}
+                </caption>
                 <thead>
                   <tr class="border-b border-default text-muted">
                     <th
@@ -640,27 +975,32 @@ const dateFormat = new Intl.DateTimeFormat('es-EC', { day: 'numeric', month: 'sh
                       class="p-3"
                     >
                       Fecha
-                    </th><th
+                    </th>
+                    <th
                       scope="col"
                       class="p-3"
                     >
-                      Peso
-                    </th><th
+                      Edad (base OMS si disponible)
+                    </th>
+                    <th
                       scope="col"
                       class="p-3"
                     >
-                      Longitud/talla
-                    </th><th
+                      Medición
+                    </th>
+                    <th
                       scope="col"
                       class="p-3"
                     >
-                      P. cefálico
-                    </th><th
+                      Resultado
+                    </th>
+                    <th
                       scope="col"
                       class="p-3"
                     >
-                      Z peso/edad · percentil
-                    </th><th
+                      Clasificación OMS
+                    </th>
+                    <th
                       scope="col"
                       class="p-3"
                     >
@@ -670,27 +1010,43 @@ const dateFormat = new Intl.DateTimeFormat('es-EC', { day: 'numeric', month: 'sh
                 </thead>
                 <tbody>
                   <tr
-                    v-for="item in data.visits"
-                    :key="item.id"
+                    v-for="{ visit, result } in selectedVisits"
+                    :key="visit.id"
                     class="border-b border-default last:border-0"
                   >
                     <td class="p-3">
-                      {{ dateFormat.format(new Date(item.measuredAt)) }}
-                    </td><td class="p-3 tabular-nums">
-                      {{ weightFormat.format(item.weightKg) }} kg
-                    </td><td class="p-3 tabular-nums">
-                      {{ lengthFormat.format(item.lengthHeightCm) }} cm
-                    </td><td class="p-3 tabular-nums">
-                      {{ lengthFormat.format(item.headCircumferenceCm) }} cm
-                    </td><td class="p-3 tabular-nums">
-                      <template
-                        v-for="result in item.results.filter(result => result.parentResultId === null)"
-                        :key="result.id"
+                      {{ dateFormat.format(new Date(visit.measuredAt)) }}
+                    </td>
+                    <td class="p-3 tabular-nums">
+                      {{ ageAtVisit(visit.measuredAt, result) }}
+                    </td>
+                    <td class="p-3 tabular-nums">
+                      {{ chartIndicator === WhoIndicator.WEIGHT_FOR_AGE || chartIndicator === WhoIndicator.WEIGHT_FOR_LENGTH || chartIndicator === WhoIndicator.WEIGHT_FOR_HEIGHT ? `${weightFormat.format(visit.weightKg)} kg` : chartIndicator === WhoIndicator.HEIGHT_FOR_AGE ? `${lengthFormat.format(visit.lengthHeightCm)} cm` : chartIndicator === WhoIndicator.HEAD_CIRCUMFERENCE_FOR_AGE ? `${lengthFormat.format(visit.headCircumferenceCm)} cm` : `${lengthFormat.format(visit.bmi)} kg/m²` }}
+                    </td>
+                    <td class="p-3 tabular-nums">
+                      {{ result?.status === 'available' ? formatGrowthValues(result.z, result.percentile) : 'No disponible' }}
+                    </td>
+                    <td class="p-3">
+                      <UBadge
+                        v-if="result?.status === 'available' && result.classification.name"
+                        :color="result.classification.tone === 'neutral' ? 'neutral' : 'warning'"
+                        variant="soft"
+                        class="whitespace-normal"
                       >
-                        <span v-if="result.indicator === WhoIndicator.WEIGHT_FOR_AGE">{{ result.status === 'available' ? formatGrowthValues(result.z, result.percentile) : 'No disponible' }}</span>
-                      </template>
-                    </td><td class="p-3">
-                      {{ item.authorId }}
+                        <UIcon
+                          :name="result.classification.tone === 'flag' ? 'i-lucide-triangle-alert' : 'i-lucide-eye'"
+                          aria-hidden="true"
+                          class="mr-1 size-3.5"
+                        />
+                        {{ result.classification.name }}
+                      </UBadge>
+                      <span
+                        v-else
+                        class="text-muted"
+                      >—</span>
+                    </td>
+                    <td class="p-3 text-muted">
+                      {{ authorName(visit) }}
                     </td>
                   </tr>
                 </tbody>
@@ -699,7 +1055,7 @@ const dateFormat = new Intl.DateTimeFormat('es-EC', { day: 'numeric', month: 'sh
           </UCard>
         </section>
         <UCard
-          v-if="latest.clinicianTrend || latest.parentAdvice || latest.privateNote"
+          v-if="patientSection === 'visitas' && (latest.clinicianTrend || latest.parentAdvice || latest.privateNote)"
           class="space-y-2"
         >
           <h2 class="font-semibold">

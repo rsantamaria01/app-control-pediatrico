@@ -186,7 +186,7 @@ describe('approved report boundary', () => {
     const before = await getDoctorPreviewPdf(doctor, childId, draft.id)
     expect(before.subarray(0, 4).toString()).toBe('%PDF')
     expect((await pdfText(before)).join(' ')).toContain('Recomendación visible antes de aprobar')
-    expect((await pdfText(before)).join(' ')).toContain('Nacimiento: 1 ene 2024')
+    expect((await pdfText(before)).join(' ')).toMatch(/Nacimiento\s+1 ene 2024/)
     expect((await pdfText(before)).join(' ')).not.toContain('PRIVATE_PREVIEW')
     await expect(db.update(familyReport).set({ pdfBase64: 'ALTERED' }).where(eq(familyReport.id, draft.id))).rejects.toBeDefined()
     await expect(renderFamilyReport(guardian, childId, draft.id)).rejects.toMatchObject({ statusCode: 404 })

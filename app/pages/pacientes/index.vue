@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import type { PatientView } from '#shared/types/measurement'
 
-const query = ref('')
+const route = useRoute()
+const query = ref(typeof route.query.q === 'string' ? route.query.q : '')
 const age = (birthDate: string) => {
   const today = new Date()
   const [year, month, day] = birthDate.split('-').map(Number)
@@ -15,34 +16,32 @@ const { data: patients, status, error, refresh } = await useFetch<PatientView[]>
 </script>
 
 <template>
-  <UContainer class="max-w-5xl space-y-6 py-8 pb-24">
-    <div class="flex flex-wrap items-center justify-between gap-4">
-      <div>
-        <p class="text-sm text-muted">
-          Consulta clínica
-        </p>
-        <h1 class="text-2xl font-semibold">
-          Pacientes
-        </h1>
-      </div>
+  <UContainer class="max-w-5xl space-y-4 px-4 py-4 pb-24 sm:px-6 sm:py-6">
+    <div class="flex items-center justify-between gap-3">
+      <h1 class="text-lg font-semibold sm:text-2xl">
+        Pacientes
+      </h1>
       <UButton
         to="/pacientes/nuevo"
         icon="i-lucide-plus"
-        size="lg"
+        class="min-h-11 shrink-0 lg:hidden"
       >
-        Nuevo paciente
+        <span class="sm:hidden">Nuevo</span><span class="hidden sm:inline">Nuevo paciente</span>
       </UButton>
     </div>
     <UFormField
       label="Buscar por nombre o identificación"
       name="search"
+      :ui="{ label: 'sr-only' }"
     >
       <UInput
         v-model="query"
         icon="i-lucide-search"
+        type="search"
         placeholder="Buscar por nombre o identificación"
         class="w-full"
         size="lg"
+        :ui="{ base: 'min-h-11 text-base' }"
       />
     </UFormField>
     <UAlert
@@ -67,41 +66,50 @@ const { data: patients, status, error, refresh } = await useFetch<PatientView[]>
     <UEmpty
       v-else-if="!patients?.length"
       icon="i-lucide-users"
-      title="Aún no hay pacientes"
-      description="Registre un paciente para iniciar su seguimiento."
-      :actions="[{ label: 'Nuevo paciente', to: '/pacientes/nuevo' }]"
+      :title="query.trim() ? 'Sin resultados' : 'Aún no hay pacientes'"
+      :description="query.trim() ? 'Pruebe con otro nombre, apellido o cédula.' : 'Registre un paciente para iniciar su seguimiento.'"
+      :actions="query.trim() ? [] : [{ label: 'Nuevo paciente', to: '/pacientes/nuevo' }]"
     />
-    <UCard v-else>
-      <p class="mb-2 text-sm text-muted">
-        Orden A–Z
+    <section
+      v-else
+      aria-label="Listado de pacientes"
+    >
+      <p class="mb-2 flex items-center justify-between gap-2 text-xs font-semibold uppercase tracking-wide text-muted">
+        <span>{{ query.trim() ? 'Resultados' : 'Pacientes' }} · {{ patients.length }}</span>
+        <span>Orden A–Z</span>
       </p>
-      <ul class="divide-y divide-default">
-        <li
-          v-for="person in patients"
-          :key="person.id"
-        >
-          <NuxtLink
-            :to="`/pacientes/${person.id}`"
-            class="flex min-h-14 items-center gap-3 rounded-md px-2 py-3 hover:bg-elevated focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+      <UCard :ui="{ body: 'p-0 sm:p-0' }">
+        <ul class="divide-y divide-default">
+          <li
+            v-for="person in patients"
+            :key="person.id"
           >
-            <UAvatar
-              :text="person.name.split(' ').map(part => part[0]).slice(0, 2).join('').toUpperCase()"
-              size="md"
-            />
-            <span class="min-w-0 flex-1"><span class="block truncate font-medium">{{ person.name }}</span><span class="block text-sm text-muted">{{ age(person.birthDate) }} · {{ person.lastWeightKg === undefined ? 'Sin peso registrado' : `${weight.format(person.lastWeightKg)} kg` }}</span></span>
-            <UBadge
-              v-if="pendingIds.has(person.id)"
-              color="neutral"
-              variant="soft"
-              size="xs"
-            >Vacunas por revisar</UBadge>
-            <UIcon
-              name="i-lucide-chevron-right"
-              aria-hidden="true"
-            />
-          </NuxtLink>
-        </li>
-      </ul>
-    </UCard>
+            <NuxtLink
+              :to="`/pacientes/${person.id}`"
+              class="flex min-h-16 items-center gap-3 px-3 py-2 hover:bg-elevated focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:px-4"
+            >
+              <UAvatar
+                :text="person.name.split(' ').map(part => part[0]).slice(0, 2).join('').toUpperCase()"
+                size="md"
+                class="shrink-0"
+              />
+              <span class="min-w-0 flex-1"><span class="block font-semibold leading-snug">{{ person.name }}</span><span class="block text-xs text-muted sm:text-sm">{{ age(person.birthDate) }} · {{ person.lastWeightKg === undefined ? 'Sin peso registrado' : `${weight.format(person.lastWeightKg)} kg` }}</span></span>
+              <UBadge
+                v-if="pendingIds.has(person.id)"
+                color="neutral"
+                variant="soft"
+                size="xs"
+                class="hidden shrink-0 sm:inline-flex"
+              >Vacunas por revisar</UBadge>
+              <UIcon
+                name="i-lucide-chevron-right"
+                class="size-4 shrink-0 text-muted"
+                aria-hidden="true"
+              />
+            </NuxtLink>
+          </li>
+        </ul>
+      </UCard>
+    </section>
   </UContainer>
 </template>

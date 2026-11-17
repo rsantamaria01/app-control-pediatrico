@@ -8,20 +8,65 @@ import type { ChartView, FamilyChartView } from '#shared/utils/chart-data'
 import { growthChartOption } from '~/utils/growth-chart-option'
 
 use([CanvasRenderer, LineChart, AriaComponent, DataZoomComponent, GridComponent, TooltipComponent])
-const props = defineProps<{ view: ChartView | FamilyChartView, family?: boolean }>()
+const props = defineProps<{ view: ChartView | FamilyChartView, family?: boolean, rangeMonths?: 6 | 12 | 24 | 60 }>()
 const colorMode = useColorMode()
 const chart = ref<InstanceType<typeof VChart> | null>(null)
-const option = computed(() => growthChartOption(props.view, colorMode.value === 'dark', Boolean(props.family)))
+const compact = ref(false)
+const option = computed(() => growthChartOption(props.view, colorMode.value === 'dark', Boolean(props.family), compact.value))
 const zoom = ref(100)
+let releaseWidth: (() => void) | undefined
 function setZoom(value: number) {
   zoom.value = Math.max(10, Math.min(100, value))
   chart.value?.dispatchAction({ type: 'dataZoom', start: 100 - zoom.value, end: 100 })
 }
+function setRange(months: number) {
+  const start = props.view.curves[0]?.data[0]?.[0] ?? 0
+  const end = props.view.curves[0]?.data.at(-1)?.[0] ?? start
+  const current = props.view.points.at(-1)?.x ?? start
+  const low = months === 60 || months === 24 ? start : Math.max(start, Math.min(current - months * 30.4375 / 2, end - months * 30.4375))
+  const high = months === 60 ? end : Math.min(end, low + months * 30.4375)
+  chart.value?.dispatchAction({ type: 'dataZoom', startValue: low, endValue: high })
+}
+function resetZoom() {
+  if (props.rangeMonths && props.view.xUnit === 'DAY') setRange(props.rangeMonths)
+  else setZoom(100)
+}
+watch(() => props.rangeMonths, (months) => {
+  if (months && props.view.xUnit === 'DAY') nextTick(() => setRange(months))
+})
+onMounted(() => {
+  const width = window.matchMedia('(max-width: 639px)')
+  compact.value = width.matches
+  const update = () => {
+    compact.value = width.matches
+  }
+  width.addEventListener('change', update)
+  releaseWidth = () => width.removeEventListener('change', update)
+  if (props.rangeMonths && props.view.xUnit === 'DAY') nextTick(() => setRange(props.rangeMonths!))
+})
+onUnmounted(() => releaseWidth?.())
 </script>
 
 <template>
   <div>
     <div
+      v-if="!rangeMonths && compact && view.xUnit === 'DAY'"
+      class="mb-2 flex gap-2"
+      role="group"
+      aria-label="Rango del gráfico"
+    >
+      <UButton variant="outline" class="min-h-11" @click="setRange(6)">
+        6 m
+      </UButton>
+      <UButton variant="outline" class="min-h-11" @click="setRange(12)">
+        1 a
+      </UButton>
+      <UButton variant="outline" class="min-h-11" @click="setZoom(100)">
+        Todo
+      </UButton>
+    </div>
+    <div
+      v-if="!rangeMonths && !compact"
       class="mb-2 flex flex-wrap gap-2"
       role="group"
       aria-label="Controles de zoom del gráfico"
@@ -58,5 +103,14 @@ function setZoom(value: number) {
       style="height: 320px"
       aria-label="Gráfico de crecimiento; consulte la tabla para los valores"
     />
+    <UButton
+      v-if="rangeMonths"
+      variant="ghost"
+      color="neutral"
+      class="mt-2 min-h-11"
+      @click="resetZoom"
+    >
+      Restablecer zoom
+    </UButton>
   </div>
 </template>

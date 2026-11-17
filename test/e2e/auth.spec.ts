@@ -141,17 +141,17 @@ test.describe('username/password access on disposable database', () => {
     await page.getByRole('textbox', { name: 'Usuario' }).fill(username)
     await page.getByLabel('Contraseña').fill('unique administrator passphrase')
     await page.getByRole('button', { name: 'Ingresar' }).click()
-    await expect(page).toHaveURL('/')
+    await expect(page).toHaveURL('/admin/clinica')
     const whatsapp = await page.request.get('/api/admin/recordatorios/whatsapp')
     expect(whatsapp.status()).toBe(200)
     const configured = process.env.WHATSAPP_PROVIDER === 'META'
     expect(await whatsapp.json()).toMatchObject(configured ? { source: 'ENV', provider: 'META', configured: true, status: 'READY' } : { configured: false, status: 'NOT_CONFIGURED' })
     await page.goto('/admin/clinica')
-    await expect(page.getByRole('heading', { name: 'WhatsApp · recordatorios' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'WhatsApp', exact: true })).toBeVisible()
     if (configured) {
       await expect(page.getByText('Configuración del servidor: tiene prioridad y no se puede cambiar aquí.')).toBeVisible()
-      await expect(page.getByRole('heading', { name: 'WhatsApp · recordatorios' }).locator('xpath=ancestor::section[1]').getByText('Configurado')).toBeVisible()
-    } else await expect(page.getByRole('heading', { name: 'WhatsApp · recordatorios' }).locator('xpath=ancestor::section[1]').getByText('Sin configurar')).toBeVisible()
+      await expect(page.getByRole('heading', { name: 'WhatsApp', exact: true }).locator('xpath=ancestor::section[1]').getByText('Configurado')).toBeVisible()
+    } else await expect(page.getByRole('heading', { name: 'WhatsApp', exact: true }).locator('xpath=ancestor::section[1]').getByText('Sin configurar')).toBeVisible()
     const email = `${crypto.randomUUID()}@example.test`
     const response = await page.request.post('/api/auth/invite-staff', { data: { name: 'Staff', email, role: 'DOCTOR' } })
     expect(response.status()).toBe(200)
@@ -175,7 +175,7 @@ test.describe('username/password access on disposable database', () => {
     await page.getByRole('textbox', { name: 'Usuario' }).fill(username)
     await page.getByLabel('Contraseña').fill('unique administrator passphrase')
     await page.getByRole('button', { name: 'Ingresar' }).click()
-    await expect(page).toHaveURL('/')
+    await expect(page).toHaveURL('/admin/clinica')
     const email = `${crypto.randomUUID()}@example.test`
     rejectRecipients.add(email)
     try {
@@ -209,7 +209,7 @@ test.describe('username/password access on disposable database', () => {
     await page.getByRole('textbox', { name: 'Usuario' }).fill(username)
     await page.getByLabel('Contraseña').fill('unique administrator passphrase')
     await page.getByRole('button', { name: 'Ingresar' }).click()
-    await expect(page).toHaveURL('/')
+    await expect(page).toHaveURL('/admin/clinica')
     const email = `${crypto.randomUUID()}@example.test`
     const invite = () => page.request.post('/api/auth/invite-staff', { data: { email, name: 'Doctor', role: 'DOCTOR' } })
     expect((await invite()).status()).toBe(200)
@@ -241,7 +241,7 @@ test.describe('username/password access on disposable database', () => {
     await page.getByRole('textbox', { name: 'Usuario' }).fill(username)
     await page.getByLabel('Contraseña').fill('unique administrator passphrase')
     await page.getByRole('button', { name: 'Ingresar' }).click()
-    await expect(page).toHaveURL('/')
+    await expect(page).toHaveURL('/admin/clinica')
     const email = `${crypto.randomUUID()}@example.test`
     const invite = () => page.request.post('/api/auth/invite-staff', { data: { email, name: 'Doctor', role: 'DOCTOR' } })
     expect((await invite()).status()).toBe(200)
@@ -285,7 +285,7 @@ test.describe('username/password access on disposable database', () => {
     await page.getByRole('textbox', { name: 'Usuario' }).fill(username)
     await page.getByLabel('Contraseña').fill('unique administrator passphrase')
     await page.getByRole('button', { name: 'Ingresar' }).click()
-    await expect(page).toHaveURL('/')
+    await expect(page).toHaveURL('/admin/clinica')
     const email = `${crypto.randomUUID()}@example.test`
     const invite = () => page.request.post('/api/auth/invite-staff', { data: { email, name: 'Doctor', role: 'DOCTOR' } })
     expect((await invite()).status()).toBe(200)
@@ -326,7 +326,7 @@ test.describe('username/password access on disposable database', () => {
     await page.getByRole('textbox', { name: 'Usuario' }).fill(username)
     await page.getByLabel('Contraseña').fill('unique administrator passphrase')
     await page.getByRole('button', { name: 'Ingresar' }).click()
-    await expect(page).toHaveURL('/')
+    await expect(page).toHaveURL('/admin/clinica')
     const email = `${crypto.randomUUID()}@example.test`
     const invite = () => page.request.post('/api/auth/invite-staff', { data: { email, name: 'Doctor', role: 'DOCTOR' } })
     expect((await invite()).status()).toBe(200)
@@ -358,7 +358,7 @@ test.describe('username/password access on disposable database', () => {
     await page.getByRole('textbox', { name: 'Usuario' }).fill(username)
     await page.getByLabel('Contraseña').fill('unique administrator passphrase')
     await page.getByRole('button', { name: 'Ingresar' }).click()
-    await expect(page).toHaveURL('/')
+    await expect(page).toHaveURL('/admin/clinica')
     const email = `${crypto.randomUUID()}@example.test`
     holdRecipients.add(email)
     try {
@@ -393,7 +393,7 @@ test.describe('username/password access on disposable database', () => {
     await page.getByRole('textbox', { name: 'Usuario' }).fill(username)
     await page.getByLabel('Contraseña').fill('unique administrator passphrase')
     await page.getByRole('button', { name: 'Ingresar' }).click()
-    await expect(page).toHaveURL('/')
+    await expect(page).toHaveURL('/admin/clinica')
     const email = `${crypto.randomUUID()}@example.test`
     const invite = () => page.request.post('/api/auth/invite-staff', { data: { email, name: 'Doctor', role: 'DOCTOR' } })
     const results = await Promise.all([invite(), invite(), invite()])
@@ -414,7 +414,7 @@ test.describe('username/password access on disposable database', () => {
     await page.getByRole('textbox', { name: 'Usuario' }).fill(username)
     await page.getByLabel('Contraseña').fill('unique administrator passphrase')
     await page.getByRole('button', { name: 'Ingresar' }).click()
-    await expect(page).toHaveURL('/')
+    await expect(page).toHaveURL('/admin/clinica')
     const email = `${crypto.randomUUID()}@example.test`
     const invite = () => page.request.post('/api/auth/invite-staff', { data: { email, name: 'Doctor', role: 'DOCTOR' } })
     expect((await invite()).status()).toBe(200)
@@ -442,7 +442,7 @@ test.describe('username/password access on disposable database', () => {
     await page.getByRole('textbox', { name: 'Usuario' }).fill(username)
     await page.getByLabel('Contraseña').fill('unique administrator passphrase')
     await page.getByRole('button', { name: 'Ingresar' }).click()
-    await expect(page).toHaveURL('/')
+    await expect(page).toHaveURL('/admin/clinica')
     const email = `${crypto.randomUUID()}@example.test`
     const invite = () => page.request.post('/api/auth/invite-staff', { data: { email, name: 'Doctor', role: 'DOCTOR' } })
     expect((await invite()).status()).toBe(200)
@@ -480,7 +480,7 @@ test.describe('username/password access on disposable database', () => {
     await page.getByRole('textbox', { name: 'Usuario' }).fill(username)
     await page.getByLabel('Contraseña').fill('unique administrator passphrase')
     await page.getByRole('button', { name: 'Ingresar' }).click()
-    await expect(page).toHaveURL('/')
+    await expect(page).toHaveURL('/admin/clinica')
     const email = `${crypto.randomUUID()}@example.test`
     const requests = await Promise.all(Array.from({ length: 4 }, () => page.request.post('/api/auth/invite-staff', { data: { email, name: 'Doctor', role: 'DOCTOR' } })))
     expect(requests.map(response => response.status())).toEqual([200, 200, 200, 200])
@@ -510,7 +510,7 @@ test.describe('username/password access on disposable database', () => {
     await page.getByRole('textbox', { name: 'Usuario' }).fill(username)
     await page.getByLabel('Contraseña').fill(password)
     await page.getByRole('button', { name: 'Ingresar' }).click()
-    await expect(page).toHaveURL('/')
+    await expect(page).toHaveURL('/admin/clinica')
     const initial = await page.request.post('/api/auth/recovery', { data: { identity: `doc-${staffId.slice(0, 8)}` } })
     expect(initial.status()).toBe(200)
     await expect.poll(() => messages.filter(message => message.includes(staffEmail)).length).toBe(1)
@@ -555,7 +555,7 @@ test.describe('username/password access on disposable database', () => {
     await page.getByRole('textbox', { name: 'Usuario' }).fill(username)
     await page.getByLabel('Contraseña').fill('unique administrator passphrase')
     await page.getByRole('button', { name: 'Ingresar' }).click()
-    await expect(page).toHaveURL('/')
+    await expect(page).toHaveURL('/admin/clinica')
     const email = `${crypto.randomUUID()}@example.test`
     expect((await page.request.post('/api/auth/invite-staff', { data: { email, name: 'Doctor', role: 'DOCTOR' } })).status()).toBe(200)
     const first = messages.findLast(message => message.includes(email))!.match(/invitacion\/([a-zA-Z0-9_-]{32,})/)?.[1]
@@ -579,7 +579,7 @@ test.describe('username/password access on disposable database', () => {
     await page.getByRole('textbox', { name: 'Usuario' }).fill(username)
     await page.getByLabel('Contraseña').fill('unique assistant passphrase')
     await page.getByRole('button', { name: 'Ingresar' }).click()
-    await expect(page).toHaveURL('/')
+    await expect(page).toHaveURL('/agenda')
     const email = `${crypto.randomUUID()}@example.test`
     const denied = await page.request.post('/api/auth/invite-staff', { data: { email, name: 'False doctor', role: 'DOCTOR' } })
     expect(denied.status()).toBe(403)
@@ -634,7 +634,7 @@ test.describe('username/password access on disposable database', () => {
     await page.getByRole('textbox', { name: 'Usuario' }).fill(username)
     await page.getByLabel('Contraseña').fill('unique health passphrase')
     await page.getByRole('button', { name: 'Ingresar' }).click()
-    await expect(page).toHaveURL('/')
+    await expect(page).toHaveURL('/admin/clinica')
     const health = await page.request.get('/api/auth/email-health')
     expect(health.status()).toBe(200)
     expect(['CONFIGURED', 'FAILING']).toContain((await health.json()).state)
@@ -679,7 +679,7 @@ test.describe('username/password access on disposable database', () => {
     await page.getByRole('textbox', { name: 'Usuario' }).fill(username)
     await page.getByLabel('Contraseña').fill('another long phrase')
     await page.getByRole('button', { name: 'Ingresar' }).click()
-    await expect(page).toHaveURL('/')
+    await expect(page).toHaveURL('/agenda')
     expect((await page.request.get('/api/clinical/access-check')).status()).toBe(403)
     expect((await page.request.get('/api/auth/email-health')).status()).toBe(403)
     expect((await page.request.post('/api/auth/force-reset', { data: { userId: id } })).status()).toBe(403)

@@ -9,6 +9,16 @@ const message = ref('')
 const busy = ref(false)
 const { data: slots, error: slotsError, refresh: refreshSlots } = await useFetch<Slot[]>('/api/reservar/horarios', { query: computed(() => ({ from: form.date, to: form.date })), default: () => [] })
 const dateFormat = new Intl.DateTimeFormat('es-EC', { dateStyle: 'long', timeZone: 'UTC' })
+const monthFormat = new Intl.DateTimeFormat('es-EC', { month: 'long', year: 'numeric', timeZone: 'UTC' })
+const weekdayFormat = new Intl.DateTimeFormat('es-EC', { weekday: 'short', timeZone: 'UTC' })
+const days = computed(() => Array.from({ length: 5 }, (_, index) => {
+  const date = new Date(`${today}T12:00:00Z`)
+  date.setUTCDate(date.getUTCDate() + index)
+  return { value: date.toISOString().slice(0, 10), weekday: weekdayFormat.format(date), number: date.getUTCDate() }
+}))
+watch(() => form.date, () => {
+  form.time = ''
+})
 async function sendCode() {
   message.value = ''
   busy.value = true
@@ -52,54 +62,73 @@ async function submit() {
 </script>
 
 <template>
-  <UContainer class="max-w-lg space-y-5 py-6 pb-16">
-    <div class="flex items-center justify-between gap-2">
-      <h1 class="text-2xl font-semibold">
-        Reservar primera cita
-      </h1>
-      <UButton
-        to="/acceso"
-        variant="link"
-      >
-        Ingresar
-      </UButton>
-    </div>
-    <p class="text-sm text-muted">
-      Solicite un horario para su hijo/a. La cita siempre queda pendiente de aprobación hasta que la clínica la revise. Reservar no crea una cuenta en el portal.
-    </p>
-    <p
+  <UContainer class="max-w-lg px-0 pb-12 sm:px-4 sm:py-8">
+    <div
       v-if="step < 4"
-      class="text-sm font-medium"
-      aria-live="polite"
+      class="sticky top-0 z-10 border-b border-default bg-default px-4 py-3 sm:rounded-t-xl sm:border-x sm:border-t"
     >
-      Paso {{ step + 1 }} de 4
-    </p>
+      <div class="flex items-center justify-between gap-2 text-sm">
+        <h1 class="font-semibold">
+          {{ ['Fecha y horario', 'Datos', 'Consentimiento', 'Verificar email'][step] }}
+        </h1>
+        <span
+          class="text-muted"
+          aria-live="polite"
+        >Paso {{ step + 1 }} de 4</span>
+      </div>
+      <progress
+        :value="step + 1"
+        max="4"
+        aria-label="Progreso de la reserva"
+        class="mt-2 h-1 w-full overflow-hidden rounded-full accent-primary"
+      />
+    </div>
     <p
       v-if="message"
       role="status"
-      class="text-sm"
+      class="mx-4 mt-4 rounded-lg border border-default bg-default p-3 text-sm"
     >
       {{ message }}
     </p>
-    <UCard v-if="step === 0">
-      <h2 class="mb-4 text-lg font-semibold">
-        Fecha y horario
-      </h2>
+    <section
+      v-if="step === 0"
+      class="min-h-[calc(100dvh-7rem)] bg-muted px-4 py-4 sm:rounded-b-xl sm:border sm:border-t-0 sm:border-default"
+    >
       <form
-        class="space-y-4"
+        class="flex min-h-[calc(100dvh-9rem)] flex-col gap-4"
         @submit.prevent="step = 1"
       >
+        <h2 class="text-sm font-medium capitalize text-muted">
+          {{ monthFormat.format(new Date(`${form.date}T12:00:00Z`)) }}
+        </h2>
+        <div
+          class="flex gap-2 overflow-x-auto pb-1"
+          aria-label="Próximos días"
+        >
+          <button
+            v-for="day in days"
+            :key="day.value"
+            type="button"
+            :aria-pressed="form.date === day.value"
+            class="flex min-h-16 min-w-14 flex-col items-center justify-center rounded-lg border border-default bg-default text-sm font-semibold focus-visible:outline-2 focus-visible:outline-primary"
+            :class="form.date === day.value ? 'border-primary bg-primary text-inverted' : ''"
+            @click="form.date = day.value"
+          >
+            <span class="text-xs capitalize">{{ day.weekday }}</span>{{ day.number }}
+          </button>
+        </div>
         <label
           for="public-date"
-          class="block text-sm font-medium"
-        >Fecha</label>
+          class="block text-sm font-medium text-muted"
+        >Fecha seleccionada · primera consulta</label>
         <input
           id="public-date"
           v-model="form.date"
+          name="date"
           type="date"
           :min="today"
           required
-          class="min-h-11 w-full rounded-md border border-default bg-default px-3 focus-visible:outline-2 focus-visible:outline-primary"
+          class="min-h-12 w-full rounded-lg border border-default bg-default px-3 text-base focus-visible:outline-2 focus-visible:outline-primary"
         >
         <UAlert
           v-if="slotsError"
@@ -108,13 +137,13 @@ async function submit() {
           :actions="[{ label: 'Reintentar', onClick: () => refreshSlots() }]"
         />
         <fieldset class="space-y-2">
-          <legend class="text-sm font-medium">
-            Horarios libres
+          <legend class="text-sm font-medium text-muted">
+            {{ dateFormat.format(new Date(`${form.date}T12:00:00Z`)) }} · horarios libres
           </legend><div class="grid grid-cols-3 gap-2">
             <label
               v-for="slot in slots"
               :key="slot.time"
-              class="flex min-h-11 items-center justify-center rounded-md border border-default px-2 focus-within:outline-2 focus-within:outline-primary has-checked:border-primary has-checked:bg-primary/10"
+              class="flex min-h-11 items-center justify-center rounded-lg border border-default bg-default px-2 text-sm font-semibold focus-within:outline-2 focus-within:outline-primary has-checked:border-primary has-checked:bg-primary has-checked:text-inverted"
             ><input
               v-model="form.time"
               type="radio"
@@ -124,24 +153,33 @@ async function submit() {
               class="sr-only"
             >{{ slot.time }}</label>
           </div><p
-            v-if="!slots?.length"
+            v-if="!slots?.length && !slotsError"
             class="text-sm text-muted"
           >
             No hay horarios libres este día.
           </p>
         </fieldset>
-        <UButton
-          type="submit"
-          :disabled="!form.time"
-          class="min-h-11 w-full justify-center"
-        >
-          Continuar
-        </UButton>
+        <p class="text-xs text-muted">
+          Solo se muestran horarios libres según la disponibilidad de la clínica.
+        </p>
+        <div class="mt-auto border-t border-default bg-default px-1 py-3">
+          <UButton
+            type="submit"
+            :disabled="!form.time"
+            class="min-h-12 w-full justify-center"
+          >
+            Continuar
+          </UButton>
+        </div>
       </form>
-    </UCard>
-    <UCard v-else-if="step === 1">
-      <h2 class="mb-4 text-lg font-semibold">
-        Datos del niño/a y representante
+    </section>
+    <UCard
+      v-else-if="step === 1"
+      class="mx-4 mt-4 sm:mx-0"
+      :ui="{ body: 'p-4 sm:p-5' }"
+    >
+      <h2 class="mb-4 text-sm font-bold">
+        Niño/a
       </h2>
       <form
         class="space-y-4"
@@ -171,14 +209,14 @@ async function submit() {
         <fieldset class="space-y-2">
           <legend class="text-sm font-medium">
             Sexo registrado al nacer
-          </legend><div class="flex gap-4">
-            <label class="flex min-h-11 items-center gap-2"><input
+          </legend><div class="flex gap-2">
+            <label class="flex min-h-12 flex-1 items-center gap-2 rounded-lg border border-default px-3 focus-within:outline-2 focus-within:outline-primary has-checked:border-primary has-checked:bg-primary/10"><input
               v-model="form.sex"
               type="radio"
               name="sex"
               value="MALE"
               required
-            > Masculino</label><label class="flex min-h-11 items-center gap-2"><input
+            > Masculino</label><label class="flex min-h-12 flex-1 items-center gap-2 rounded-lg border border-default px-3 focus-within:outline-2 focus-within:outline-primary has-checked:border-primary has-checked:bg-primary/10"><input
               v-model="form.sex"
               type="radio"
               name="sex"
@@ -187,6 +225,9 @@ async function submit() {
             > Femenino</label>
           </div>
         </fieldset>
+        <h3 class="pt-2 text-sm font-bold">
+          Representante
+        </h3>
         <UFormField label="Nombre del representante">
           <UInput
             v-model="form.guardianName"
@@ -238,7 +279,11 @@ async function submit() {
         </div>
       </form>
     </UCard>
-    <UCard v-else-if="step === 2">
+    <UCard
+      v-else-if="step === 2"
+      class="mx-4 mt-4 sm:mx-0"
+      :ui="{ body: 'p-4 sm:p-5' }"
+    >
       <h2 class="mb-4 text-lg font-semibold">
         Consentimiento
       </h2>
@@ -267,12 +312,22 @@ async function submit() {
         </UButton>
       </div>
     </UCard>
-    <UCard v-else-if="step === 3">
-      <h2 class="mb-4 text-lg font-semibold">
-        Verificar correo
+    <UCard
+      v-else-if="step === 3"
+      class="mx-4 mt-4 sm:mx-0"
+      :ui="{ body: 'p-4 sm:p-5' }"
+    >
+      <p class="mb-5 rounded-lg border border-default bg-default p-3 text-sm">
+        Autorizó el tratamiento de los datos para gestionar esta solicitud. <NuxtLink
+          to="/privacidad"
+          class="font-semibold text-primary underline"
+        >Ver privacidad</NuxtLink>
+      </p>
+      <h2 class="text-xl font-bold">
+        Ingrese el código
       </h2>
-      <p class="mb-4 text-sm">
-        Ingrese el código enviado a {{ form.email }}. Puede pegarlo completo; verificar el correo no concede acceso al portal.
+      <p class="mb-5 mt-1 text-sm text-muted">
+        Lo enviamos a <strong class="text-default">{{ form.email }}</strong> para confirmar que el correo es suyo. Puede pegarlo completo; verificar el correo no concede acceso al portal.
       </p>
       <form
         v-if="!token"
@@ -282,6 +337,7 @@ async function submit() {
         <UFormField label="Código de 6 dígitos">
           <UInput
             v-model="form.code"
+            name="code"
             inputmode="numeric"
             autocomplete="one-time-code"
             pattern="[0-9]{6}"
@@ -297,9 +353,14 @@ async function submit() {
           Verificar
         </UButton>
       </form>
-      <p class="mt-4 rounded-lg bg-elevated p-3 text-sm">
-        {{ form.childName }} · {{ dateFormat.format(new Date(`${form.date}T12:00:00Z`)) }} · {{ form.time }}
-      </p>
+      <div class="mt-4 rounded-lg bg-elevated p-3 text-sm">
+        <p class="font-semibold">
+          Resumen
+        </p>
+        <p class="text-muted">
+          {{ form.childName }} · {{ dateFormat.format(new Date(`${form.date}T12:00:00Z`)) }} · {{ form.time }} · Primera consulta
+        </p>
+      </div>
       <UButton
         v-if="token"
         :loading="busy"
@@ -318,23 +379,33 @@ async function submit() {
         Solicitar otro código
       </UButton>
     </UCard>
-    <UCard
+    <section
       v-else
-      class="text-center"
+      class="flex min-h-dvh flex-col items-center justify-center gap-4 bg-default px-6 py-12 text-center"
     >
-      <h2 class="text-2xl font-semibold">
+      <span class="flex size-[72px] items-center justify-center rounded-full bg-success/15 text-success"><UIcon
+        name="i-lucide-send"
+        class="size-9"
+        aria-hidden="true"
+      /></span>
+      <h1 class="text-2xl font-bold">
         Solicitud enviada
-      </h2><p class="mt-3">
-        Su solicitud está pendiente de aprobación. La clínica revisará el horario solicitado.
-      </p><p class="mt-3 text-sm text-muted">
-        Esta pantalla no confirma una cita ni crea acceso al portal. Si necesita consultar el estado, comuníquese con la clínica.
+      </h1><p class="text-muted">
+        La clínica revisará su solicitud para el <strong class="text-default">{{ dateFormat.format(new Date(`${form.date}T12:00:00Z`)) }} a las {{ form.time }}</strong>.
+      </p><p class="flex gap-2 rounded-lg bg-warning/15 p-3 text-left text-sm text-warning">
+        <UIcon
+          name="i-lucide-clock"
+          class="mt-0.5 size-5 shrink-0"
+          aria-hidden="true"
+        />Aún no está confirmada. Comuníquese con la clínica para consultar el estado; esta solicitud no crea acceso al portal.
       </p><UButton
         to="/"
         variant="outline"
-        class="mt-5 min-h-11"
+        color="neutral"
+        class="mt-3 min-h-12 w-full justify-center"
       >
-        Volver al inicio
+        Volver a la página de la clínica
       </UButton>
-    </UCard>
+    </section>
   </UContainer>
 </template>

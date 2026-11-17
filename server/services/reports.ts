@@ -180,7 +180,7 @@ function decimal(value: number, digits: number) {
   return numberFormat(digits).format(value)
 }
 
-async function pdfDocument(build: (doc: PDFKit.PDFDocument) => Promise<void> | void): Promise<Buffer> {
+async function pdfDocument(build: (doc: PDFKit.PDFDocument) => Promise<void> | void, privateNotes = false): Promise<Buffer> {
   const doc = new PDFDocument({ size: 'A4', margin: 48, autoFirstPage: false, bufferPages: true, info: { Title: 'Informe de crecimiento', Author: 'Control Pediátrico' } })
   const chunks: Buffer[] = []
   doc.on('data', chunk => chunks.push(chunk as Buffer))
@@ -194,32 +194,79 @@ async function pdfDocument(build: (doc: PDFKit.PDFDocument) => Promise<void> | v
   const count = doc.bufferedPageRange().count
   for (let i = 0; i < count; i++) {
     doc.switchToPage(i)
-    doc.font('regular').fontSize(8).fillColor('#64748b').text(`Página ${i + 1} de ${count}`, 450, 760, { width: 95, align: 'right', lineBreak: false })
+    doc.moveTo(48, 760).lineTo(547, 760).strokeColor('#e2e8f0').lineWidth(0.7).stroke()
+    if (!privateNotes) doc.font('regular').fontSize(8).fillColor('#64748b').text('No incluye notas clínicas privadas', 48, 771, { width: 300, lineBreak: false })
+    doc.text(`Página ${i + 1} de ${count}`, 440, 771, { width: 107, align: 'right', lineBreak: false })
   }
   doc.end()
   return done
 }
 
-function section(doc: PDFKit.PDFDocument, title: string, primary: string) {
-  if (doc.y > 735) doc.addPage()
-  doc.moveDown(0.5).font('bold').fontSize(14).fillColor(primary).text(title)
-  doc.moveDown(0.4).font('regular').fontSize(10).fillColor('#0f172a')
-}
-
-function paragraph(doc: PDFKit.PDFDocument, text: string) {
-  if (doc.y > 750) doc.addPage()
-  doc.font('regular').fontSize(10).fillColor('#0f172a').text(text, { width: 495 })
-  doc.moveDown(0.45)
-}
-
-function start(doc: PDFKit.PDFDocument, title: string, name: string, primary: string, logo?: Buffer, issuedAt = new Date().toISOString()) {
+function page(doc: PDFKit.PDFDocument, title: string, name: string, primary: string, logo?: Buffer, issuedAt = new Date().toISOString()) {
   doc.addPage()
-  if (logo) doc.image(logo, 48, 44, { fit: [38, 38] })
-  doc.font('bold').fontSize(18).fillColor(primary).text(title, logo ? 96 : 48, 50, { width: logo ? 449 : 497 })
-  doc.font('regular').fontSize(10).fillColor('#64748b').text(name, 48, 87)
-  doc.text(`Emitido el ${date(issuedAt)}`, 48, 105)
-  doc.moveTo(48, 128).lineTo(547, 128).strokeColor(primary).lineWidth(2).stroke()
-  doc.y = 142
+  if (logo) doc.image(logo, 48, 42, { fit: [34, 34] })
+  doc.font('bold').fontSize(12).fillColor('#0f172a').text('Control Pediátrico', logo ? 92 : 48, 48, { width: 190, lineBreak: false })
+  doc.font('bold').fontSize(14).fillColor(primary).text(title, 313, 45, { width: 234, align: 'right', lineBreak: false })
+  doc.font('regular').fontSize(8).fillColor('#64748b').text(`${name} · Emitido el ${date(issuedAt)}`, 290, 68, { width: 257, align: 'right', lineBreak: false })
+  doc.moveTo(48, 94).lineTo(547, 94).strokeColor(primary).lineWidth(1.5).stroke()
+  doc.y = 110
+}
+
+function heading(doc: PDFKit.PDFDocument, title: string, y: number, primary = '#0f172a') {
+  doc.font('bold').fontSize(11).fillColor(primary).text(title, 48, y, { width: 499 })
+}
+
+function textBlock(doc: PDFKit.PDFDocument, text: string, y: number, options: { fill?: string, width?: number, size?: number } = {}): number {
+  doc.font('regular').fontSize(options.size ?? 9).fillColor(options.fill ?? '#0f172a')
+  const width = options.width ?? 499
+  const height = doc.heightOfString(text, { width })
+  doc.text(text, 48, y, { width })
+  return y + height
+}
+
+function flowBlock(doc: PDFKit.PDFDocument, title: string, text: string, primary: string, nextPage: () => void, tint = false) {
+  doc.font('regular').fontSize(9)
+  const height = doc.heightOfString(text, { width: 471 }) + 40
+  if (height > 630) {
+    if (doc.y > 115) nextPage()
+    let remaining = text
+    let continuation = false
+    while (remaining) {
+      const top = doc.y
+      doc.font('bold').fontSize(10).fillColor(primary).text(continuation ? `${title} (continuación)` : title, 48, top, { width: 499 })
+      doc.font('regular').fontSize(9).fillColor('#0f172a')
+      const available = 745 - (top + 18)
+      let end = remaining.length
+      if (doc.heightOfString(remaining, { width: 499 }) > available) {
+        let low = 1
+        let high = remaining.length
+        while (low < high) {
+          const middle = Math.ceil((low + high) / 2)
+          if (doc.heightOfString(remaining.slice(0, middle), { width: 499 }) <= available) low = middle
+          else high = middle - 1
+        }
+        end = low
+        const boundary = Math.max(remaining.lastIndexOf(' ', end - 1), remaining.lastIndexOf('\n', end - 1))
+        if (boundary > 0) end = boundary + 1
+      }
+      const part = remaining.slice(0, end)
+      const partHeight = doc.heightOfString(part, { width: 499 })
+      doc.text(part, 48, top + 18, { width: 499 })
+      remaining = remaining.slice(end)
+      doc.y = top + 18 + partHeight + 12
+      if (remaining) {
+        nextPage()
+        continuation = true
+      }
+    }
+    return
+  }
+  if (doc.y + height > 745) nextPage()
+  const top = doc.y
+  doc.roundedRect(48, top, 499, height, 6).fillAndStroke(tint ? '#f0fdfa' : '#ffffff', tint ? '#f0fdfa' : '#e2e8f0')
+  doc.font('bold').fontSize(10).fillColor(tint ? primary : '#0f172a').text(title, 60, top + 10, { width: 475 })
+  doc.font('regular').fontSize(9).fillColor('#0f172a').text(text, 60, top + 27, { width: 471 })
+  doc.y = top + height + 12
 }
 
 async function branding(): Promise<{ primary: string, logo?: Buffer }> {
@@ -236,69 +283,172 @@ async function branding(): Promise<{ primary: string, logo?: Buffer }> {
   return { primary: colors[brand.primary]!, logo }
 }
 
-function chart(doc: PDFKit.PDFDocument, view: FamilyChartView, title: string, primary: string, doctor = false) {
-  if (doc.y > 510) doc.addPage()
-  section(doc, title, primary)
-  const top = doc.y + 8
-  const width = 485
-  const height = 210
-  const curves = view.curves.flatMap(item => item.data)
-  const values = [...curves, ...view.points.map(item => [item.x, item.y] as [number, number])]
-  if (!values.length || view.curves.length !== 7) return
-  const xs = values.map(item => item[0])
-  const ys = values.map(item => item[1])
+function chart(doc: PDFKit.PDFDocument, view: FamilyChartView, title: string, yTop: number, height = 255, doctor = false): number {
+  const width = 499
+  doc.roundedRect(48, yTop, width, height, 6).strokeColor('#e2e8f0').lineWidth(0.8).stroke()
+  doc.font('bold').fontSize(10).fillColor('#0f172a').text(title, 60, yTop + 12, { width: 450, lineBreak: false })
+  const curves = view.curves
+  const values = [...curves.flatMap(curve => curve.data), ...view.points.map(point => [point.x, point.y] as [number, number])]
+  if (curves.length !== 7 || curves.some(curve => curve.data.length < 2) || !values.length) {
+    doc.font('regular').fontSize(9).fillColor('#64748b').text('Referencia OMS no disponible.', 60, yTop + 45)
+    doc.y = yTop + height
+    return doc.y
+  }
+  const xs = values.map(point => point[0])
+  const ys = values.map(point => point[1])
   const minX = Math.min(...xs)
   const maxX = Math.max(...xs)
   const minY = Math.min(...ys)
   const maxY = Math.max(...ys)
-  if (minX === maxX || minY === maxY) return
-  const x = (n: number) => 55 + (n - minX) / (maxX - minX) * width
-  const y = (n: number) => top + height - (n - minY) / (maxY - minY) * height
-  doc.rect(55, top, width, height).lineWidth(0.5).strokeColor('#94a3b8').stroke()
-  doc.font('regular').fontSize(8).fillColor('#475569')
-  for (const step of [0, 0.5, 1]) {
-    const xValue = minX + (maxX - minX) * step
-    const yValue = minY + (maxY - minY) * step
-    doc.text(decimal(xValue, view.xUnit === 'DAY' ? 0 : 1), x(xValue) - 16, top + height + 2, { width: 32, align: 'center', lineBreak: false })
-    doc.text(decimal(yValue, 1), 15, y(yValue) - 5, { width: 38, align: 'right', lineBreak: false })
+  if (minX === maxX || minY === maxY) {
+    doc.font('regular').fontSize(9).fillColor('#64748b').text('Referencia OMS no disponible.', 60, yTop + 45)
+    doc.y = yTop + height
+    return doc.y
   }
-  for (const [index, curve] of view.curves.entries()) {
-    if (!curve.data.length) continue
+  const left = 91
+  const top = yTop + 39
+  const plotWidth = 415
+  const plotHeight = height - 76
+  const x = (n: number) => left + (n - minX) / (maxX - minX) * plotWidth
+  const y = (n: number) => top + plotHeight - (n - minY) / (maxY - minY) * plotHeight
+  for (let step = 0; step <= 4; step++) {
+    const xValue = minX + (maxX - minX) * step / 4
+    const yValue = minY + (maxY - minY) * step / 4
+    doc.moveTo(x(xValue), top).lineTo(x(xValue), top + plotHeight).strokeColor('#f1f5f9').lineWidth(0.5).stroke()
+    doc.moveTo(left, y(yValue)).lineTo(left + plotWidth, y(yValue)).stroke()
+    doc.font('regular').fontSize(7).fillColor('#64748b').text(decimal(view.xUnit === 'DAY' && doctor ? xValue / 30.4375 : xValue, view.xUnit === 'DAY' ? 0 : 1), x(xValue) - 16, top + plotHeight + 3, { width: 32, align: 'center', lineBreak: false })
+    doc.text(decimal(yValue, 1), 53, y(yValue) - 5, { width: 32, align: 'right', lineBreak: false })
+  }
+  doc.moveTo(left, top).lineTo(left, top + plotHeight).lineTo(left + plotWidth, top + plotHeight).strokeColor('#cbd5e1').lineWidth(0.8).stroke()
+  doc.save()
+  doc.rect(left, top, plotWidth, plotHeight).clip()
+  if (doctor) {
+    const lower = curves[1]!.data
+    const upper = curves[5]!.data
+    doc.moveTo(x(lower[0]![0]), y(lower[0]![1]))
+    for (const point of lower.slice(1)) doc.lineTo(x(point[0]), y(point[1]))
+    for (const point of [...upper].reverse()) doc.lineTo(x(point[0]), y(point[1]))
+    doc.closePath().fill('#f0fdfa')
+  }
+  const colors = doctor ? ['#dc2626', '#ea580c', '#ca8a04', '#334155', '#ca8a04', '#ea580c', '#dc2626'] : Array(7).fill('#94a3b8') as string[]
+  for (const [index, curve] of curves.entries()) {
     doc.moveTo(x(curve.data[0]![0]), y(curve.data[0]![1]))
     for (const point of curve.data.slice(1)) doc.lineTo(x(point[0]), y(point[1]))
-    doc.strokeColor('#94a3b8').lineWidth(0.7).stroke()
-    if (doctor) doc.font('bold').fontSize(8).fillColor('#334155').text(['−3', '−2', '−1', '0', '+1', '+2', '+3'][index]!, 542, y(curve.data.at(-1)![1]) - 5, { width: 22, lineBreak: false })
+    doc.strokeColor(colors[index]!).lineWidth(doctor && index === 3 ? 1.4 : 0.9).stroke()
   }
-  for (const point of view.points) doc.circle(x(point.x), y(point.y), 3).fill('#1d4ed8')
-  doc.y = top + height + 18
-  paragraph(doc, `Eje horizontal: ${view.xUnit === 'DAY' ? 'Edad de referencia (días; corregida cuando corresponda)' : 'Longitud o talla (cm)'}. Eje vertical: ${view.indicator === WhoIndicator.HEIGHT_FOR_AGE || view.indicator === WhoIndicator.HEAD_CIRCUMFERENCE_FOR_AGE ? 'centímetros (cm)' : view.indicator === WhoIndicator.BMI_FOR_AGE ? 'IMC (kg/m²)' : 'peso (kg)'}. Curvas OMS 2006 y mediciones del niño en azul.`)
+  const points = [...view.points].sort((a, b) => a.x - b.x)
+  if (points.length) {
+    doc.moveTo(x(points[0]!.x), y(points[0]!.y))
+    for (const point of points.slice(1)) doc.lineTo(x(point.x), y(point.y))
+    doc.strokeColor('#1d4ed8').lineWidth(1.8).stroke()
+    for (const point of points) doc.circle(x(point.x), y(point.y), 2.8).fillAndStroke('#ffffff', '#1d4ed8')
+  }
+  doc.restore()
+  if (doctor) {
+    for (const [index, curve] of curves.entries()) {
+      const last = curve.data.at(-1)!
+      doc.font('bold').fontSize(7).fillColor(colors[index]!).text(['−3', '−2', '−1', '0', '+1', '+2', '+3'][index]!, 511, y(last[1]) - 4, { width: 24, lineBreak: false })
+    }
+  }
+  doc.font('regular').fontSize(8).fillColor('#64748b').text(view.xUnit === 'DAY' ? doctor ? 'Edad de referencia (meses)' : 'Edad de referencia (días)' : 'Longitud o talla (cm)', 155, yTop + height - 18, { width: 290, align: 'center', lineBreak: false })
+  doc.y = yTop + height
+  return doc.y
 }
 
 async function makeFamilyPdf(content: ReportContent, issuedAt: string, brand: { primary: string, logo?: Buffer }): Promise<Buffer> {
   const { primary, logo } = brand
   return pdfDocument((doc) => {
-    start(doc, 'Informe de crecimiento', content.name, primary, logo, issuedAt)
-    section(doc, 'Paciente y controles compartidos', primary)
-    paragraph(doc, `Nacimiento: ${date(content.birthDate)}.`)
-    for (const item of content.visits) paragraph(doc, `${date(item.measuredAt)} · Peso ${decimal(item.weightKg, 2)} kg · ${item.position === 'RECUMBENT' ? 'Longitud acostada' : 'Talla de pie'} ${decimal(item.lengthHeightCm, 1)} cm · Perímetro cefálico ${decimal(item.headCircumferenceCm, 1)} cm`)
-    doc.addPage()
-    section(doc, 'Curvas de crecimiento OMS', primary)
-    for (const indicator of indicators) {
+    const newPage = () => page(doc, 'Informe de crecimiento', content.name, primary, logo, issuedAt)
+    newPage()
+    doc.roundedRect(48, 112, 499, 85, 6).fill('#f8fafc')
+    summaryCell(doc, 'Paciente', content.name, 60, 122, 250)
+    summaryCell(doc, 'Nacimiento', date(content.birthDate), 322, 122, 210)
+    summaryCell(doc, 'Última medición', date(content.visits[0]!.measuredAt), 60, 159, 250)
+    summaryCell(doc, 'Referencia', content.sources.length ? 'OMS 2006 · curvas verificadas' : 'No disponible', 322, 159, 210)
+    heading(doc, 'Últimos valores compartidos', 215)
+    const latest = content.visits[0]!
+    table(doc, 238, ['Medición', 'Valor'], [
+      ['Peso', `${decimal(latest.weightKg, 2)} kg`],
+      [latest.position === 'RECUMBENT' ? 'Longitud acostada' : 'Talla de pie', `${decimal(latest.lengthHeightCm, 1)} cm`],
+      ['Perímetro cefálico', `${decimal(latest.headCircumferenceCm, 1)} cm`]
+    ], [315, 184])
+    const weight = content.charts[WhoIndicator.WEIGHT_FOR_AGE]
+    if (weight?.length) chart(doc, weight[0]!, 'Peso para la edad · Curvas OMS', 368, 310)
+    else textBlock(doc, 'Referencia OMS no disponible para este indicador.', 395)
+    textBlock(doc, 'Línea azul: mediciones compartidas. Curvas OMS verificadas; edad corregida cuando corresponda.', 714, { fill: '#64748b', size: 8 })
+    for (const panel of weight?.slice(1) ?? []) {
+      newPage()
+      chart(doc, panel, 'Peso para la edad · Otra referencia OMS', 114, 310)
+      textBlock(doc, 'Línea azul: mediciones compartidas. Curvas OMS verificadas; edad corregida cuando corresponda.', 439, { fill: '#64748b', size: 8 })
+    }
+    newPage()
+    heading(doc, 'Curvas de crecimiento OMS', 112)
+    let y = 140
+    doc.y = y
+    for (const indicator of [WhoIndicator.HEIGHT_FOR_AGE, WhoIndicator.HEAD_CIRCUMFERENCE_FOR_AGE]) {
       const panels = content.charts[indicator]
       if (panels?.length) {
-        for (const panel of panels) chart(doc, panel, `${INDICATOR_LABEL[indicator]} · ${indicator === WhoIndicator.HEIGHT_FOR_AGE ? panel.points[0]!.x <= 730 ? 'Longitud acostada' : 'Talla de pie' : 'Mediciones'}`, primary)
-      } else paragraph(doc, `${INDICATOR_LABEL[indicator]}: referencia OMS no disponible.`)
+        if (y + 275 > 745) {
+          newPage()
+          y = 114
+        }
+        y = chart(doc, panels[0]!, indicator === WhoIndicator.HEIGHT_FOR_AGE ? `${panels[0]!.curves[0]!.data[0]![0] <= 730 ? 'Longitud acostada' : 'Talla de pie'} para la edad · Curvas OMS` : `${INDICATOR_LABEL[indicator]} · Curvas OMS`, y, 275) + 14
+        doc.y = y
+        for (const panel of panels.slice(1)) {
+          if (y + 275 > 745) {
+            newPage()
+            y = 114
+          }
+          y = chart(doc, panel, indicator === WhoIndicator.HEIGHT_FOR_AGE ? `${panel.curves[0]!.data[0]![0] <= 730 ? 'Longitud acostada' : 'Talla de pie'} para la edad · Curvas OMS` : `${INDICATOR_LABEL[indicator]} · Otra referencia`, y, 275) + 14
+          doc.y = y
+        }
+      } else {
+        flowBlock(doc, INDICATOR_LABEL[indicator], 'Referencia OMS no disponible para este indicador.', primary, newPage)
+        y = doc.y
+      }
     }
-    doc.addPage()
-    section(doc, 'Indicaciones y próximos controles', primary)
+    if (y < 710) textBlock(doc, 'Línea azul: mediciones compartidas. Curvas OMS verificadas; no se muestran interpretaciones clínicas.', y + 5, { fill: '#64748b', size: 8 })
+    newPage()
+    heading(doc, 'Indicaciones y próximos controles', 116)
+    doc.y = 141
     for (const item of content.visits) {
-      paragraph(doc, `Control del ${date(item.measuredAt)}`)
-      if (item.parentAdvice) paragraph(doc, item.parentAdvice)
-      if (item.nextControlAt) paragraph(doc, `Próximo control: ${dateTimeFormat.format(new Date(item.nextControlAt))}`)
+      flowBlock(doc, `Control del ${date(item.measuredAt)}`, item.parentAdvice || 'No se compartieron indicaciones para este control.', primary, newPage, true)
+      if (item.nextControlAt) flowBlock(doc, 'Próximo control', dateTimeFormat.format(new Date(item.nextControlAt)), primary, newPage)
     }
-    paragraph(doc, content.sources.length ? `Fuente: Patrones de Crecimiento Infantil OMS 2006 · ${content.sources.map(item => item.version).join(', ')}.` : 'Patrones de Crecimiento Infantil OMS 2006: referencia no disponible para este informe.')
-    for (const source of content.sources) paragraph(doc, `Fuente oficial: ${source.sourceUrl}`)
+    if (doc.y + 75 > 745) newPage()
+    heading(doc, 'Fuentes de las curvas', doc.y + 8)
+    doc.y += 29
+    if (!content.sources.length) doc.y = textBlock(doc, 'Referencia OMS no disponible para este informe.', doc.y)
+    for (const source of content.sources) {
+      if (doc.y + 55 > 745) newPage()
+      doc.y = textBlock(doc, `OMS 2006 · ${source.version} · ${source.sourceUrl}`, doc.y, { size: 8, fill: '#475569' }) + 9
+    }
   })
+}
+
+function summaryCell(doc: PDFKit.PDFDocument, label: string, value: string, x: number, y: number, width: number) {
+  doc.font('regular').fontSize(8).fillColor('#64748b').text(label, x, y, { width })
+  doc.font('bold').fontSize(9).fillColor('#0f172a').text(value, x, y + 13, { width, height: 20, ellipsis: true })
+}
+
+function table(doc: PDFKit.PDFDocument, top: number, columns: string[], rows: string[][], widths: number[]) {
+  let x = 48
+  for (const [index, label] of columns.entries()) {
+    doc.font('regular').fontSize(8).fillColor('#64748b').text(label, x + 6, top, { width: widths[index]! - 12, lineBreak: false })
+    x += widths[index]!
+  }
+  let y = top + 21
+  for (const row of rows) {
+    doc.moveTo(48, y - 3).lineTo(547, y - 3).strokeColor('#e2e8f0').lineWidth(0.6).stroke()
+    x = 48
+    for (const [index, cell] of row.entries()) {
+      doc.font('regular').fontSize(8.5).fillColor('#0f172a').text(cell, x + 6, y + 5, { width: widths[index]! - 12, height: 18, ellipsis: true })
+      x += widths[index]!
+    }
+    y += 29
+  }
+  doc.moveTo(48, y - 3).lineTo(547, y - 3).strokeColor('#e2e8f0').lineWidth(0.6).stroke()
+  return y
 }
 
 export async function getDoctorPreviewPdf(actor: Actor, patientId: string, reportId: string): Promise<Buffer> {
@@ -328,34 +478,76 @@ export async function renderDoctorReport(actor: Actor, patientId: string, includ
   const growth = await getDoctorGrowth(actor, patientId)
   const { primary, logo } = await branding()
   const pdf = await pdfDocument((doc) => {
-    start(doc, 'Informe clínico de crecimiento', person.name, primary, logo)
-    section(doc, 'Paciente y resultados', primary)
-    paragraph(doc, `Nacimiento: ${date(person.birthDate)} · ${person.sex === 'FEMALE' ? 'Femenino' : 'Masculino'}. Profesional: ${doctor[0]?.name ?? actor.id}.`)
+    const issuedAt = new Date().toISOString()
+    const newPage = () => page(doc, 'Informe clínico de crecimiento', person.name, primary, logo, issuedAt)
+    const plot = (indicator: WhoIndicator, top: number, height: number) => {
+      const view = growth.charts[indicator]
+      if (!view) {
+        flowBlock(doc, INDICATOR_LABEL[indicator], 'Referencia OMS no disponible para este indicador.', primary, newPage)
+        return doc.y
+      }
+      return chart(doc, { ...view, curves: view.curves.map(curve => ({ data: curve.data })), points: view.points.map(point => ({ ...point, chronologicalAgeDays: point.x })) }, `${INDICATOR_LABEL[indicator]} · Curvas OMS`, top, height, true)
+    }
+    newPage()
+    doc.roundedRect(48, 112, 499, 85, 6).fill('#f8fafc')
+    summaryCell(doc, 'Paciente', person.name, 60, 122, 250)
+    summaryCell(doc, 'Sexo', person.sex === 'FEMALE' ? 'Femenino' : 'Masculino', 322, 122, 210)
+    summaryCell(doc, 'Nacimiento', date(person.birthDate), 60, 159, 250)
+    summaryCell(doc, 'Última medición', visits[0] ? date(visits[0].measuredAt) : 'Sin controles', 322, 159, 210)
+    heading(doc, 'Últimos valores', 210)
+    const latest = visits[0]
+    const latestResults = latest?.results.filter(result => result.parentResultId === null && result.recalculationId === null) ?? []
+    if (latest) {
+      const rows = latestResults.map((result) => {
+        const indicator = result.indicator
+        const value = indicator === WhoIndicator.HEIGHT_FOR_AGE
+          ? `${decimal(latest.lengthHeightCm, 1)} cm`
+          : indicator === WhoIndicator.HEAD_CIRCUMFERENCE_FOR_AGE
+            ? `${decimal(latest.headCircumferenceCm, 1)} cm`
+            : indicator === WhoIndicator.BMI_FOR_AGE
+              ? `${decimal(latest.bmi, 2)} kg/m²`
+              : `${decimal(latest.weightKg, 2)} kg`
+        return [INDICATOR_LABEL[indicator as WhoIndicator], value, result.status === 'available' ? formatGrowthValues(result.z, result.percentile) : 'No disponible']
+      })
+      table(doc, 234, ['Indicador', 'Valor', 'Resultado'], rows.slice(0, 6), [197, 105, 197])
+    } else textBlock(doc, 'Aún no hay mediciones.', 237)
+    const chartTop = latest ? Math.max(445, 255 + Math.min(latestResults.length, 6) * 29) : 290
+    if (growth.charts[WhoIndicator.WEIGHT_FOR_AGE]) plot(WhoIndicator.WEIGHT_FOR_AGE, chartTop, Math.min(264, 725 - chartTop))
+    else textBlock(doc, 'Peso para la edad: referencia OMS no disponible.', chartTop)
+    newPage()
+    let y = 114
+    for (const indicator of [WhoIndicator.HEIGHT_FOR_AGE, WhoIndicator.HEAD_CIRCUMFERENCE_FOR_AGE]) {
+      if (growth.charts[indicator]) y = plot(indicator, y, 275) + 14
+      else {
+        doc.y = y
+        y = plot(indicator, y, 275)
+      }
+      doc.y = y
+    }
+    if (y < 715) textBlock(doc, 'Línea azul: mediciones. Curvas −3 a +3 DE de las referencias OMS verificadas; edad corregida cuando corresponda.', y + 5, { fill: '#64748b', size: 8 })
+    newPage()
+    heading(doc, 'Indicaciones y próximos controles', 116)
+    doc.y = 141
     for (const item of visits) {
-      paragraph(doc, `${date(item.measuredAt)} · Peso ${decimal(item.weightKg, 2)} kg · ${item.position === 'RECUMBENT' ? 'Longitud acostada' : 'Talla de pie'} ${decimal(item.lengthHeightCm, 1)} cm · Perímetro cefálico ${decimal(item.headCircumferenceCm, 1)} cm · IMC ${decimal(item.bmi, 2)}`)
+      flowBlock(doc, `Control del ${date(item.measuredAt)}`, `Peso ${decimal(item.weightKg, 2)} kg · ${item.position === 'RECUMBENT' ? 'Longitud acostada' : 'Talla de pie'} ${decimal(item.lengthHeightCm, 1)} cm · Perímetro cefálico ${decimal(item.headCircumferenceCm, 1)} cm · IMC ${decimal(item.bmi, 2)}`, primary, newPage)
+      if (item.parentAdvice) flowBlock(doc, 'Indicaciones compartidas', item.parentAdvice, primary, newPage, true)
+      if (item.nextControlAt) flowBlock(doc, 'Próximo control', dateTimeFormat.format(new Date(item.nextControlAt)), primary, newPage)
+      if (includePrivateNotes && item.privateNote) flowBlock(doc, 'Nota clínica privada', item.privateNote, primary, newPage)
+      if (includePrivateNotes && item.clinicianTrend) flowBlock(doc, 'Tendencia clínica', item.clinicianTrend, primary, newPage)
       for (const result of item.results) {
-        if (result.status === 'available') paragraph(doc, `${result.recalculationId ? 'Revisión médica · ' : ''}${INDICATOR_LABEL[result.indicator as WhoIndicator]} · ${formatGrowthValues(result.z, result.percentile)} · ${result.classification.name ?? 'Sin nombre OMS'} · ${result.reference.ageBasis === 'CORRECTED' ? 'Edad corregida' : 'Edad cronológica'} ${result.reference.referenceAgeDays} días · OMS ${result.reference.version} · ${result.reference.sourceUrl}`)
-        else paragraph(doc, `${INDICATOR_LABEL[result.indicator as WhoIndicator]} · No disponible`)
+        const detail = result.status === 'available' ? `${formatGrowthValues(result.z, result.percentile)} · ${result.classification.name ?? 'Sin nombre OMS'} · ${result.reference.ageBasis === 'CORRECTED' ? 'Edad corregida' : 'Edad cronológica'} ${result.reference.referenceAgeDays} días · OMS ${result.reference.version} · ${result.reference.sourceUrl}` : 'No disponible'
+        flowBlock(doc, `${result.status === 'available' && result.recalculationId ? 'Revisión médica · ' : ''}${INDICATOR_LABEL[result.indicator as WhoIndicator]}`, detail, primary, newPage)
       }
     }
-    doc.addPage()
-    section(doc, 'Curvas de crecimiento OMS', primary)
-    for (const indicator of [WhoIndicator.WEIGHT_FOR_AGE, WhoIndicator.HEIGHT_FOR_AGE, WhoIndicator.HEAD_CIRCUMFERENCE_FOR_AGE, WhoIndicator.BMI_FOR_AGE, WhoIndicator.WEIGHT_FOR_LENGTH, WhoIndicator.WEIGHT_FOR_HEIGHT]) {
-      const view = growth.charts[indicator]
-      if (view) chart(doc, { ...view, curves: view.curves.map(curve => ({ data: curve.data })), points: view.points.map(point => ({ ...point, chronologicalAgeDays: point.x })) }, INDICATOR_LABEL[indicator], primary, true)
-      else paragraph(doc, `${INDICATOR_LABEL[indicator]}: referencia OMS no disponible.`)
+    if (doc.y + 55 > 745) newPage()
+    doc.y = textBlock(doc, 'Fuente: Patrones de Crecimiento Infantil OMS 2006. Solo se muestran curvas con referencias oficiales selladas.', doc.y + 6, { fill: '#64748b', size: 8 }) + 12
+    for (const indicator of [WhoIndicator.BMI_FOR_AGE, WhoIndicator.WEIGHT_FOR_LENGTH, WhoIndicator.WEIGHT_FOR_HEIGHT]) {
+      if (doc.y + 290 > 745) newPage()
+      if (growth.charts[indicator]) doc.y = plot(indicator, doc.y, 275) + 14
+      else flowBlock(doc, INDICATOR_LABEL[indicator], 'Referencia OMS no disponible para este indicador.', primary, newPage)
     }
-    doc.addPage()
-    section(doc, 'Indicaciones y próximos controles', primary)
-    for (const item of visits) {
-      paragraph(doc, `Control del ${date(item.measuredAt)}`)
-      if (item.parentAdvice) paragraph(doc, `Indicaciones: ${item.parentAdvice}`)
-      if (item.nextControlAt) paragraph(doc, `Próximo control: ${dateTimeFormat.format(new Date(item.nextControlAt))}`)
-      if (includePrivateNotes && item.privateNote) paragraph(doc, `Nota clínica privada: ${item.privateNote}`)
-      if (includePrivateNotes && item.clinicianTrend) paragraph(doc, `Tendencia clínica: ${item.clinicianTrend}`)
-    }
-    paragraph(doc, 'Fuente: Patrones de Crecimiento Infantil OMS 2006. Solo se muestran curvas con referencias oficiales selladas.')
-  })
+    if (doctor[0]?.name && doc.y + 30 < 745) textBlock(doc, `Profesional: ${doctor[0].name}`, doc.y + 12, { fill: '#475569' })
+  }, includePrivateNotes)
   await recordAudit('REPORT_EXPORT', 'ALLOWED', actor.id, patientId)
   return pdf
 }

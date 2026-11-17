@@ -262,8 +262,9 @@ useSeoMeta({
            <template #header>
              <NuxtLink
                :to="isDoctor ? '/' : isAdmin ? '/admin/clinica' : '/agenda'"
-               class="flex items-center gap-2 px-2 py-1 font-semibold text-default"
-               :aria-label="sidebarExpanded ? undefined : clinicName"
+                class="flex w-full min-w-0 items-center gap-2 py-1 font-semibold text-default"
+                :class="sidebarExpanded ? 'px-2' : 'justify-center px-0'"
+                :aria-label="sidebarExpanded ? undefined : clinicName"
              >
               <img
                 :src="brand.logo"

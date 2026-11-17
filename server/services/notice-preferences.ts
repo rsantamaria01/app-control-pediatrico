@@ -8,7 +8,7 @@ import { useDb } from '../utils/db'
 export const noticePreferencesSchema = z.strictObject({ email: z.boolean().optional(), whatsapp: z.boolean().optional() }).refine(input => input.email !== undefined || input.whatsapp !== undefined)
 
 function requireGuardian(actor: Actor) {
-  if (actor.roles.length !== 1 || actor.roles[0] !== 'PATIENT') throw createError({ statusCode: 403, statusMessage: 'Access denied' })
+  if (!actor.roles.includes('PATIENT')) throw createError({ statusCode: 403, statusMessage: 'Access denied' })
 }
 
 export async function getNoticePreferences(actor: Actor): Promise<{ inApp: true, email: boolean, whatsapp: boolean }> {

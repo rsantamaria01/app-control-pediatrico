@@ -287,7 +287,7 @@ export async function setVisitSharing(actor: Actor, patientId: string, visitId: 
 }
 
 function requireParent(actor: Actor) {
-  if (!actor.roles.includes('PATIENT') || actor.roles.some(role => role !== 'PATIENT')) throw createError({ statusCode: 403, statusMessage: 'Access denied' })
+  if (!actor.roles.includes('PATIENT')) throw createError({ statusCode: 403, statusMessage: 'Access denied' })
 }
 
 export async function listShareableChildren(actor: Actor): Promise<FamilyChildSummary[]> {

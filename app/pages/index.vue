@@ -3,8 +3,9 @@ import type { Appointment } from '#shared/types/scheduling'
 import type { FamilyChildSummary } from '../../server/services/invitations'
 
 const { data: navigation } = await useFetch<{ label: string, to: string }[]>('/api/auth/navigation')
+const isAdmin = computed(() => Boolean(navigation.value?.some(item => item.to === '/admin/clinica')))
 const isDoctor = computed(() => Boolean(navigation.value?.some(item => item.to === '/pacientes')))
-const isParent = computed(() => Boolean(navigation.value?.some(item => item.to === '/')) && !isDoctor.value)
+const isParent = computed(() => Boolean(navigation.value?.some(item => item.to === '/')) && !isDoctor.value && !isAdmin.value)
 const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Guayaquil', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
 const { data: appointments, error, refresh } = await useFetch<Appointment[]>('/api/agenda', { query: { from: today, to: today }, immediate: isDoctor.value, default: () => [] })
 const { data: requestsCount, error: requestsError, refresh: refreshRequests } = await useFetch<{ count: number }>('/api/agenda/solicitudes/count', { immediate: isDoctor.value })
@@ -261,6 +262,37 @@ function age(birthDate: string) {
         </UCard>
       </div>
     </template>
+    <div
+      v-else-if="isAdmin"
+      class="space-y-4"
+    >
+      <h1 class="text-2xl font-semibold">
+        Administración
+      </h1>
+      <p class="text-sm text-muted">
+        Configure la clínica y administre las cuentas del equipo.
+      </p>
+      <div class="flex flex-wrap gap-3">
+        <UButton
+          to="/admin/inicio"
+          class="min-h-11"
+        >
+          Configuración inicial
+        </UButton><UButton
+          to="/admin/usuarios"
+          variant="outline"
+          class="min-h-11"
+        >
+          Usuarios
+        </UButton><UButton
+          to="/admin/auditoria"
+          variant="outline"
+          class="min-h-11"
+        >
+          Auditoría
+        </UButton>
+      </div>
+    </div>
     <div
       v-else
       class="space-y-5"

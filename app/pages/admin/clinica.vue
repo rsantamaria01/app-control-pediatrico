@@ -113,6 +113,39 @@ async function sendTest(event: FormSubmitEvent<z.output<typeof smtpTestSchema>>)
         Configure el correo saliente y el proveedor de WhatsApp para los recordatorios de la clínica.
       </p>
     </div>
+    <nav
+      aria-label="Secciones de la clínica"
+      class="flex flex-wrap gap-2"
+    >
+      <UButton
+        to="#marca"
+        variant="outline"
+        class="min-h-11"
+      >
+        Marca y contacto
+      </UButton>
+      <UButton
+        to="#recordatorios"
+        variant="outline"
+        class="min-h-11"
+      >
+        Recordatorios
+      </UButton>
+    </nav>
+    <section
+      id="marca"
+      aria-labelledby="brand-heading"
+    >
+      <UCard>
+        <h2
+          id="brand-heading"
+          class="mb-4 text-lg font-semibold"
+        >
+          Marca y contacto
+        </h2>
+        <AdminClinicIdentityForm />
+      </UCard>
+    </section>
     <UAlert
       v-if="error"
       color="error"

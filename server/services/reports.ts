@@ -20,6 +20,7 @@ import { getVisits } from './visits'
 import { selectReference } from './reference-selection'
 import { getWhoRows } from './who-import'
 import { clinicBrand } from '../../app/utils/clinic-brand'
+import { getClinicReportBrand } from './clinic-settings'
 
 export type FamilyReportVisit = { id: string, measuredAt: string, weightKg: number, lengthHeightCm: number, position: 'RECUMBENT' | 'STANDING', headCircumferenceCm: number, nextControlAt: string | null, parentAdvice: string | null }
 export type ReportContent = { name: string, birthDate: string, visits: FamilyReportVisit[], charts: Partial<Record<WhoIndicator, FamilyChartView[]>>, sources: { version: string, sourceUrl: string }[] }
@@ -222,7 +223,8 @@ function start(doc: PDFKit.PDFDocument, title: string, name: string, primary: st
 }
 
 async function branding(): Promise<{ primary: string, logo?: Buffer }> {
-  const brand = clinicBrand(process.env.NUXT_PUBLIC_CLINIC_PRIMARY ?? 'brand', process.env.NUXT_PUBLIC_CLINIC_LOGO ?? '')
+  const persisted = await getClinicReportBrand()
+  const brand = clinicBrand(persisted.primary, persisted.logo)
   const colors: Record<string, string> = { brand: '#0f766e', teal: '#0d9488', indigo: '#4338ca', violet: '#6d28d9', rose: '#be123c', emerald: '#047857' }
   let logo: Buffer | undefined
   try {
@@ -300,9 +302,14 @@ async function makeFamilyPdf(content: ReportContent, issuedAt: string, brand: { 
 }
 
 export async function getDoctorPreviewPdf(actor: Actor, patientId: string, reportId: string): Promise<Buffer> {
+  if (!actor.roles.includes('DOCTOR')) {
+    await recordAudit('REPORT_EXPORT', 'DENIED', actor.id, patientId)
+    throw createError({ statusCode: 403, statusMessage: 'Access denied' })
+  }
   await authorizeClinical(actor, 'CLINICAL_READ', patientId)
   const [row] = await useDb().select({ pdfBase64: familyReport.pdfBase64 }).from(familyReport).where(and(eq(familyReport.patientId, patientId), eq(familyReport.id, reportId)))
   if (!row?.pdfBase64) throw createError({ statusCode: 404, statusMessage: 'Not found' })
+  await recordAudit('REPORT_EXPORT', 'ALLOWED', actor.id, patientId)
   return Buffer.from(row.pdfBase64, 'base64')
 }
 
@@ -320,7 +327,7 @@ export async function renderDoctorReport(actor: Actor, patientId: string, includ
   const { getDoctorGrowth } = await import('./growth-charts')
   const growth = await getDoctorGrowth(actor, patientId)
   const { primary, logo } = await branding()
-  return pdfDocument((doc) => {
+  const pdf = await pdfDocument((doc) => {
     start(doc, 'Informe clínico de crecimiento', person.name, primary, logo)
     section(doc, 'Paciente y resultados', primary)
     paragraph(doc, `Nacimiento: ${date(person.birthDate)} · ${person.sex === 'FEMALE' ? 'Femenino' : 'Masculino'}. Profesional: ${doctor[0]?.name ?? actor.id}.`)
@@ -349,4 +356,6 @@ export async function renderDoctorReport(actor: Actor, patientId: string, includ
     }
     paragraph(doc, 'Fuente: Patrones de Crecimiento Infantil OMS 2006. Solo se muestran curvas con referencias oficiales selladas.')
   })
+  await recordAudit('REPORT_EXPORT', 'ALLOWED', actor.id, patientId)
+  return pdf
 }

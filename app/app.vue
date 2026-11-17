@@ -54,7 +54,7 @@ onMounted(() => {
   window.addEventListener('online', updateConnection)
   window.addEventListener('offline', updateConnection)
   window.addEventListener('keydown', onShortcut)
-  void fetchSession({ force: true }).then(refreshNavigation)
+  void fetchSession({ force: true }).then(() => refreshNavigation())
 })
 
 onUnmounted(() => {

@@ -94,6 +94,21 @@ test.describe('board fidelity: public access and role-aware shell', () => {
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
   })
 
+  test('guardian can open Mis datos from Perfil and return to the profile', async ({ page }) => {
+    await signIn(page, 'PATIENT')
+    await page.goto('/perfil')
+    await page.getByRole('link', { name: 'Mis datos' }).click()
+    await expect(page).toHaveURL('/perfil/mis-datos')
+    await expect(page.getByRole('heading', { name: 'Mis datos' })).toBeVisible()
+    await page.getByRole('link', { name: 'Privacidad' }).click()
+    await expect(page.getByRole('heading', { name: 'Privacidad' })).toBeVisible()
+    await page.getByRole('link', { name: 'Ir a Mis datos' }).click()
+    await expect(page).toHaveURL('/perfil/mis-datos')
+    await expect(page.getByRole('heading', { name: 'Mis datos' })).toBeVisible()
+    await page.goto('/perfil')
+    await expect(page.getByRole('heading', { name: 'Perfil' })).toBeVisible()
+  })
+
   for (const role of Object.keys(roles) as Array<keyof typeof roles>) {
     for (const width of [1440, 1024, 390] as const) {
       test(`${role} at ${width}px shows its shell immediately after sign-in and never the public landing`, async ({ page }) => {

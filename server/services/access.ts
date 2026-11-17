@@ -19,7 +19,7 @@ const permissions: Record<Capability, Role[]> = {
 
 export async function resolveActor(event: H3Event): Promise<Actor | null> {
   const session = await getUserSession(event)
-  if (!session?.user?.id) return null
+  if (!session?.user?.id || !session.session?.id) return null
   const rows = await useDb().select({ role: userRole.role }).from(userRole).where(eq(userRole.userId, session.user.id))
   if (!rows.length || rows.some(row => !roles.includes(row.role as Role))) return null
   if (process.env.ALLOW_ROLE_EMULATION === 'true') {

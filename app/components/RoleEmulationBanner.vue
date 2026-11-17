@@ -13,7 +13,7 @@ defineExpose({ refresh })
 </script>
 
 <template>
-  <div v-if="state?.active" role="status" class="sticky top-0 z-[90] flex min-h-12 items-center justify-center gap-3 border-b border-warning bg-warning/15 px-4 py-2 text-sm font-semibold text-highlighted">
+  <div v-if="state?.active" role="status" class="fixed inset-x-0 top-0 z-[90] flex min-h-12 items-center justify-center gap-3 border-b border-warning bg-warning/15 px-4 py-2 text-sm font-semibold text-highlighted backdrop-blur">
     <span>Emulando: {{ roles[state.active.role] }}<template v-if="state.active.name"> · {{ state.active.name }}</template></span>
     <UButton color="warning" variant="outline" size="sm" class="min-h-10" @click="stop">Salir de emulación</UButton>
     <span v-if="error" role="alert">{{ error }}</span>

@@ -34,7 +34,7 @@ defineExpose({ refresh })
   <template v-if="state?.available">
     <UButton v-if="state.active" color="warning" variant="ghost" block class="min-h-11 justify-start" @click="exit">Salir de emulación</UButton>
     <UModal v-else v-model:open="open" title="Ver como…" description="Seleccione un rol para revisar los permisos de esa vista.">
-      <UButton color="neutral" variant="ghost" block class="min-h-11 justify-start">Ver como…</UButton>
+      <UButton color="neutral" variant="ghost" block class="min-h-11 justify-start" aria-label="Ver como otro rol">Ver como…</UButton>
       <template #body>
         <div class="space-y-3">
           <p v-if="error" role="alert" class="text-sm text-error">{{ error }}</p>

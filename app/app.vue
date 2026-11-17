@@ -113,7 +113,7 @@ function onSidebarFocusOut(event: FocusEvent) {
   if (!(event.currentTarget as HTMLElement).contains(event.relatedTarget as Node | null)) sidebarFocus.value = false
 }
 function onSidebarEscape(event: KeyboardEvent) {
-  if (event.key !== 'Escape' || pinnedSidebar.value || !sidebarExpanded.value) return
+  if (event.key !== 'Escape' || pinnedSidebar.value || !sidebarExpanded.value || document.querySelector('[role="menu"][data-state="open"]')) return
   sidebarDismissed.value = true
   sidebarHover.value = false
   sidebarFocus.value = false

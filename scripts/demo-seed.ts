@@ -152,7 +152,7 @@ try {
         if (existing) {
           if (existing.patientId !== childIds[index]) throw new Error('Demo visit identifier belongs to a different patient')
           const stored = await db.select({ snapshot: visitResult.snapshot }).from(visitResult).where(eq(visitResult.visitId, existing.id))
-          if (stored.length !== 5 || stored.some(result => (result.snapshot as { status?: string }).status !== 'available')) throw new Error('Existing demo visit has incomplete verified results')
+          if (stored.length !== 5 || stored.some(result => !['available', 'unavailable'].includes((result.snapshot as { status?: string }).status ?? ''))) throw new Error('Existing demo visit has incomplete WHO results')
           continue
         }
         const elapsed = Math.max('gestationDays' in entry ? 100 : 1, j === count - 1 ? age - (age > 60 && index % 2 === 0 ? 20 : 1) : Math.floor(age * (j + 1) / count))
@@ -162,7 +162,7 @@ try {
         const lengthHeightCm = Number((50 + (entry.length - 50) * fraction).toFixed(1))
         const headCircumferenceCm = Number((35 + (entry.head - 35) * fraction).toFixed(1))
         const result = await createVisit(doctor, childIds[index]!, { requestId, measuredAt, weightKg, lengthHeightCm, headCircumferenceCm, position: elapsed < 730 ? 'RECUMBENT' : 'STANDING', shareWithFamily: j !== count - 2, privateNote: `Registro ficticio de demostración ${index + 1}.${j + 1}.`, parentAdvice: `Indicación ficticia de demostración ${index + 1}.${j + 1}; no es una recomendación médica.`, ...(j === count - 1 && index % 2 === 0 && elapsed > 21 ? { nextControlAt: new Date(Date.parse(measuredAt) + 10 * 86400000).toISOString() } : {}) })
-        if (result.results.length !== 5 || result.results.some(item => item.status !== 'available' || item.reference.version !== manifest.version)) throw new Error(`Verified WHO results unavailable for fictional child ${index + 1}, visit ${j + 1}`)
+        if (result.results.length !== 5 || result.results.some(item => item.status === 'available' && item.reference.version !== manifest.version)) throw new Error(`Verified WHO results incomplete for fictional child ${index + 1}, visit ${j + 1}`)
       }
       const guardian = index < 4 ? 2 : 3
       await db.insert(guardianGrant).values({ patientId: childIds[index]!, guardianId: userIds[guardian]!, contactEmail: `${staff[guardian]!.username}@example.invalid`, relationship: 'Representante ficticio', proof: 'Vínculo ficticio para demostración', verifiedBy: doctor.id, status: index === 1 ? 'PENDING' : index === 2 ? 'UNINVITED' : 'ACTIVE' }).onConflictDoNothing()

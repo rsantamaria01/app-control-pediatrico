@@ -127,6 +127,8 @@ test('production image journeys from bootstrapped admin through two children and
     await expect(page.getByRole('heading', { name: 'WhatsApp · recordatorios' })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'WhatsApp · recordatorios' }).locator('xpath=ancestor::section[1]').getByText('Sin configurar')).toBeVisible()
     console.log('checkpoint: admin settings and SMTP verified')
+    await page.goto('/admin/catalogos')
+    await expect(page.getByRole('navigation', { name: 'Tipos de catálogo' })).toBeVisible()
     for (const [kind, label] of [['MOTOR', 'Hitos motores OMS'], ['MILESTONE', 'Hitos CDC'], ['SCREENING', 'Tamizajes'], ['CHECKUP', 'Controles AAP'], ['VACCINE', 'Vacunas MSP']] as const) {
       await page.getByRole('navigation', { name: 'Tipos de catálogo' }).getByRole('button', { name: label }).click()
       await expect(page.getByRole('button', { name: label })).toHaveAttribute('aria-pressed', 'true')

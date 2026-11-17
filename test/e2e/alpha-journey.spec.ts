@@ -126,6 +126,7 @@ test('production image journeys from bootstrapped admin through two children and
     await page.goto('/admin/clinica')
     await expect(page.getByRole('heading', { name: 'WhatsApp · recordatorios' })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'WhatsApp · recordatorios' }).locator('xpath=ancestor::section[1]').getByText('Sin configurar')).toBeVisible()
+    console.log('checkpoint: admin settings and SMTP verified')
     for (const [kind, label] of [['MOTOR', 'Hitos motores OMS'], ['MILESTONE', 'Hitos CDC'], ['SCREENING', 'Tamizajes'], ['CHECKUP', 'Controles AAP'], ['VACCINE', 'Vacunas MSP']] as const) {
       await page.getByRole('navigation', { name: 'Tipos de catálogo' }).getByRole('button', { name: label }).click()
       await expect(page.getByRole('button', { name: label })).toHaveAttribute('aria-pressed', 'true')
@@ -279,6 +280,7 @@ test('production image journeys from bootstrapped admin through two children and
     await expect(page.getByRole('heading', { name: 'Controles pendientes' })).toBeVisible()
     await expect(page.getByRole('link', { name: 'Luz Prueba' })).toHaveAttribute('href', `/pacientes/${first}`)
     await expect(page.getByText(`${dueReason} · ${dueDate}`)).toBeVisible()
+    console.log('checkpoint: doctor controls verified')
     const assistantControls = await assistantContext!.request.get('/api/clinical/controles-pendientes')
     expect(assistantControls.status()).toBe(403)
     expect(assistantControls.headers()['cache-control']).toContain('no-store')
@@ -383,6 +385,7 @@ test('production image journeys from bootstrapped admin through two children and
     otherGuardianContext = await browser.newContext({ baseURL: origin, ignoreHTTPSErrors: true, storageState: await context.storageState() })
     await context.clearCookies()
     await signIn('journey-family', 'unique guardian setup phrase')
+    console.log('checkpoint: guardian signed in')
     await page.goto('/perfil')
     await expect(page.getByRole('heading', { name: 'Preferencias de avisos' })).toBeVisible()
     await expect(page.getByRole('checkbox', { name: 'Recibir recordatorios por correo electrónico' })).not.toBeChecked()
@@ -392,6 +395,7 @@ test('production image journeys from bootstrapped admin through two children and
     expect(await context.request.get('/api/avisos/preferencias').then(response => response.json())).toMatchObject({ inApp: true, email: false, whatsapp: true })
     await whatsappOptIn.uncheck()
     await expect(whatsappOptIn).not.toBeChecked()
+    console.log('checkpoint: guardian preferences verified')
     await expect.poll(async () => {
       const response = await context.request.get('/api/avisos')
       expect(response.status()).toBe(200)
@@ -415,6 +419,7 @@ test('production image journeys from bootstrapped admin through two children and
     await page.goto('/avisos')
     await expect(page.getByRole('heading', { name: 'Avisos' })).toBeVisible()
     await expect(page.getByText('Recordatorio de control indicado por su médico')).toBeVisible()
+    console.log('checkpoint: guardian notice verified')
     expect(await page.locator('main').innerText()).not.toMatch(/PRIVATE_NEVER_SHOW|HIDDEN_ADVICE|PRIVATE_OTHER_FAMILY|ONLY_OTHER_FAMILY|encryptedPassword|SMTP_CONFIG_KEY|SMTP_PASS|Otra Familia/)
     expect((await context.request.get('/api/admin/catalogos/MOTOR')).status()).toBe(403)
     expect((await context.request.get('/api/catalogos/VACCINE')).status()).toBe(403)
@@ -501,6 +506,7 @@ test('production image journeys from bootstrapped admin through two children and
     expect(await familyPdf.body()).toEqual(frozen)
     expect(await pdfText(frozen)).toContain('Regresar en febrero')
     expect(await pdfText(frozen)).not.toMatch(/PRIVATE_NEVER_SHOW|HIDDEN_ADVICE|PRIVATE_PREVENTIVE_LOT|PRIVATE_PREVENTIVE_NOTE|percentil|puntuación Z/i)
+    console.log('checkpoint: family PDF and offline verified')
     expect((await context.request.get(`/api/hijos/${randomUUID()}`)).status()).toBe(404)
     expect((await context.request.get(`/api/pacientes/${first}`)).status()).toBe(403)
     await context.clearCookies()
@@ -513,9 +519,6 @@ test('production image journeys from bootstrapped admin through two children and
     expect(await revokedView.text()).not.toContain('Regresar en febrero')
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true)
   } finally {
-    await otherGuardianContext?.close()
-    await adminContext?.close()
-    await assistantContext?.close()
-    await context.close()
+    await Promise.allSettled([otherGuardianContext?.close(), adminContext?.close(), assistantContext?.close(), context.close()])
   }
 })

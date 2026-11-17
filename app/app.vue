@@ -3,6 +3,10 @@ import { es } from '@nuxt/ui/locale'
 import { clinicBrand } from './utils/clinic-brand'
 
 const locale = extendLocale(es, { code: 'es-EC' })
+const colorMode = useColorMode()
+function toggleTheme() {
+  colorMode.preference = colorMode.value === 'dark' ? 'light' : 'dark'
+}
 const config = useRuntimeConfig()
 const { data: savedBrand } = await useFetch<{ name: string, primary: string, logo: string | null }>('/api/public/clinica-brand', { key: 'clinic-brand' })
 const brand = computed(() => clinicBrand(savedBrand.value?.primary ?? config.public.clinicPrimary, savedBrand.value ? savedBrand.value.logo ?? '' : config.public.clinicLogo))
@@ -32,9 +36,14 @@ const { user, loggedIn, fetchSession, signOut } = useUserSession()
 const { data: navigation, refresh: refreshNavigation } = await useFetch<{ label: string, to: string }[]>('/api/auth/navigation', { default: () => [] })
 const publicPage = computed(() => /^\/(acceso|recuperar|restablecer|invitacion|reservar|privacidad|sin-conexion|sesion-expirada|403)(\/|$)/.test(route.path))
 const isDoctor = computed(() => navigation.value.some(item => item.to === '/pacientes'))
-const isParent = computed(() => navigation.value.some(item => item.to === '/citas'))
+const isStaff = computed(() => navigation.value.some(item => ['/pacientes', '/agenda'].includes(item.to) || item.to.startsWith('/admin/')))
+const isParent = computed(() => navigation.value.some(item => item.to === '/citas') && !isStaff.value)
+const hasFamily = computed(() => navigation.value.some(item => item.to === '/citas'))
 const isAdmin = computed(() => navigation.value.some(item => item.to.startsWith('/admin/')))
-const staffItems = computed(() => navigation.value.filter(item => !item.to.startsWith('/admin/')))
+const staffItems = computed(() => {
+  const staff = navigation.value.filter(item => !item.to.startsWith('/admin/') && item.to !== '/citas')
+  return isDoctor.value ? staff.filter(item => item.to !== '/agenda/horarios') : navigation.value.some(item => item.to === '/agenda') ? staff.filter(item => item.to !== '/') : []
+})
 const adminItems = computed(() => isAdmin.value
   ? [
       { label: 'Configuración inicial', to: '/admin/inicio' },
@@ -58,13 +67,14 @@ const mobileMoreItems = computed(() => isAdmin.value && !isParent.value
 const icons: Record<string, string> = { '/': 'i-lucide-house', '/pacientes': 'i-lucide-users-round', '/agenda': 'i-lucide-calendar-days', '/agenda/horarios': 'i-lucide-clock', '/avisos': 'i-lucide-bell', '/perfil': 'i-lucide-user-round', '/citas': 'i-lucide-calendar-days', '/admin/inicio': 'i-lucide-house', '/admin/usuarios': 'i-lucide-users-round', '/admin/clinica': 'i-lucide-settings', '/admin/catalogos': 'i-lucide-book-open', '/admin/auditoria': 'i-lucide-scroll-text' }
 const navItems = computed(() => visibleItems.value.map(item => ({ ...item, icon: icons[item.to], active: route.path === item.to || (item.to !== '/' && route.path.startsWith(`${item.to}/`)) })))
 const adminNavItems = computed(() => adminItems.value.map(item => ({ ...item, icon: icons[item.to], active: route.path === item.to })))
-const pageTitle = computed(() => ({ '/': 'Inicio', '/pacientes': 'Pacientes', '/pacientes/nuevo': 'Nuevo paciente', '/agenda': 'Agenda', '/agenda/horarios': 'Horarios', '/agenda/solicitudes': 'Solicitudes', '/avisos': 'Avisos', '/perfil': 'Perfil', '/admin/inicio': 'Configuración inicial', '/admin/usuarios': 'Usuarios', '/admin/clinica': 'Clínica', '/admin/catalogos': 'Catálogos', '/admin/auditoria': 'Auditoría' })[route.path] ?? (route.path.startsWith('/pacientes/') ? 'Ficha del paciente' : 'Control Pediátrico'))
-const search = ref('')
-const searchInput = ref<{ inputRef?: HTMLInputElement } | null>(null)
-const collapsed = ref(false)
-const narrowSidebar = ref(false)
-let releaseSidebarWidth: (() => void) | undefined
-const pageAction = computed(() => route.path === '/' || route.path === '/pacientes' ? { label: 'Nuevo paciente', to: '/pacientes/nuevo' } : null)
+const pageTitle = computed(() => route.query.vista === 'familiar' && route.path === '/' && hasFamily.value ? 'Vista familiar' : ({ '/': 'Inicio', '/pacientes': 'Pacientes', '/pacientes/nuevo': 'Nuevo paciente', '/agenda': 'Agenda', '/agenda/horarios': 'Horarios', '/agenda/solicitudes': 'Solicitudes', '/avisos': 'Avisos', '/perfil': 'Perfil', '/admin/inicio': 'Configuración inicial', '/admin/usuarios': 'Usuarios', '/admin/clinica': 'Ajustes de la clínica', '/admin/catalogos': 'Catálogos', '/admin/auditoria': 'Auditoría' })[route.path] ?? (route.path.startsWith('/pacientes/') ? 'Ficha del paciente' : 'Control Pediátrico'))
+const pinnedSidebar = ref(false)
+const sidebarHover = ref(false)
+const sidebarFocus = ref(false)
+const sidebarDismissed = ref(false)
+const sidebarExpanded = computed(() => pinnedSidebar.value || (!sidebarDismissed.value && (sidebarHover.value || sidebarFocus.value)))
+const sidebarMenu = computed(() => hasFamily.value && isStaff.value ? [{ label: 'Vista familiar', icon: 'i-lucide-house', to: '/?vista=familiar' }] : [])
+const pageAction = computed(() => isDoctor.value && (route.path === '/' && route.query.vista !== 'familiar' || route.path === '/pacientes') ? { label: 'Nuevo paciente', to: '/pacientes/nuevo' } : null)
 const clinicName = computed(() => savedBrand.value?.name ?? 'Pediatría')
 
 watch(loggedIn, async () => {
@@ -79,15 +89,27 @@ async function logout() {
     await navigateTo('/acceso')
   } })
 }
-function searchPatients() {
-  if (search.value.trim()) navigateTo({ path: '/pacientes', query: { q: search.value.trim() } })
+function setSidebarPinned() {
+  pinnedSidebar.value = !pinnedSidebar.value
+  try {
+    if (user.value?.id) localStorage.setItem(`sidebar-pinned:${user.value.id}`, pinnedSidebar.value ? 'yes' : 'no')
+  } catch {}
 }
-function onShortcut(event: KeyboardEvent) {
-  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k' && isDoctor.value) {
-    event.preventDefault()
-    searchInput.value?.inputRef?.focus()
-  }
+function onSidebarFocusOut(event: FocusEvent) {
+  if (!(event.currentTarget as HTMLElement).contains(event.relatedTarget as Node | null)) sidebarFocus.value = false
 }
+function onSidebarEscape(event: KeyboardEvent) {
+  if (event.key !== 'Escape' || pinnedSidebar.value) return
+  sidebarDismissed.value = true
+  sidebarHover.value = false
+  sidebarFocus.value = false
+}
+watch(() => user.value?.id, (id) => {
+  if (!import.meta.client || !id) return
+  try {
+    pinnedSidebar.value = localStorage.getItem(`sidebar-pinned:${id}`) === 'yes'
+  } catch { pinnedSidebar.value = false }
+}, { immediate: true })
 
 const updateConnection = () => {
   online.value = navigator.onLine
@@ -95,28 +117,18 @@ const updateConnection = () => {
 
 onMounted(() => {
   updateConnection()
-  const tablet = window.matchMedia('(min-width: 1024px) and (max-width: 1199px)')
-  const resizeSidebar = () => {
-    narrowSidebar.value = tablet.matches
-  }
-  resizeSidebar()
-  tablet.addEventListener('change', resizeSidebar)
-  releaseSidebarWidth = () => tablet.removeEventListener('change', resizeSidebar)
   installDismissed.value = sessionStorage.getItem('install-dismissed') === 'yes'
   iosInstall.value = !installDismissed.value && /iP(hone|ad|od)/.test(navigator.userAgent) && !window.matchMedia('(display-mode: standalone)').matches && loggedIn.value
   window.addEventListener('beforeinstallprompt', onBeforeInstall)
   window.addEventListener('online', updateConnection)
   window.addEventListener('offline', updateConnection)
-  window.addEventListener('keydown', onShortcut)
   void fetchSession({ force: true }).then(() => refreshNavigation())
 })
 
 onUnmounted(() => {
-  releaseSidebarWidth?.()
   window.removeEventListener('beforeinstallprompt', onBeforeInstall)
   window.removeEventListener('online', updateConnection)
   window.removeEventListener('offline', updateConnection)
-  window.removeEventListener('keydown', onShortcut)
 })
 
 useHead({
@@ -190,6 +202,7 @@ useSeoMeta({
             </span>
           </template>
           <template #right>
+            <ShellCommandSearch shortcuts />
             <UNavigationMenu :items="navItems" />
             <UColorModeButton aria-label="Cambiar tema" />
             <UButton
@@ -212,91 +225,95 @@ useSeoMeta({
               class="size-7"
               aria-hidden="true"
             >
-            {{ clinicName }}
-          </header>
-          <component :is="Component" />
+            <span class="flex-1">{{ clinicName }}</span>
+            <ShellCommandSearch compact shortcuts />
+           </header>
+           <component :is="Component" />
         </main>
       </template>
-      <UDashboardGroup
-        v-else-if="navigation?.length"
-        storage-key="clinical-dashboard"
-      >
+        <UDashboardGroup
+          v-else-if="navigation?.length"
+          storage-key="clinical-dashboard"
+          unit="px"
+          :persistent="false"
+        >
         <UDashboardSidebar
-          :collapsed="narrowSidebar || collapsed"
+          :collapsed="!pinnedSidebar"
+          :collapsed-size="64"
+          :default-size="256"
           collapsible
           :resizable="false"
-          class="hidden lg:flex"
-          :ui="{ root: narrowSidebar || collapsed ? 'lg:w-16' : 'lg:w-64', footer: 'border-t border-default' }"
+          class="staff-sidebar hidden lg:flex"
+          :class="{ 'staff-sidebar--open': sidebarExpanded, 'staff-sidebar--pinned': pinnedSidebar }"
+          :ui="{ root: 'lg:w-(--width)', header: 'px-2', body: 'px-2', footer: 'border-t border-default px-2' }"
+          @mouseenter="sidebarHover = true"
+          @mouseleave="sidebarHover = false; sidebarDismissed = false"
+          @focusin="sidebarFocus = true"
+          @focusout="onSidebarFocusOut"
+          @keydown="onSidebarEscape"
         >
-          <template #header="{ collapsed: isCollapsed }">
-            <NuxtLink
-              to="/"
-              class="flex items-center gap-2 px-2 py-1 font-semibold text-default"
-            >
+           <template #header>
+             <NuxtLink
+               :to="isDoctor ? '/' : isAdmin ? '/admin/clinica' : '/agenda'"
+               class="flex items-center gap-2 px-2 py-1 font-semibold text-default"
+               :aria-label="sidebarExpanded ? undefined : clinicName"
+             >
               <img
                 :src="brand.logo"
                 alt="Logo de la clínica"
                 class="size-8 shrink-0"
               >
               <span
-                v-if="!isCollapsed"
-                class="min-w-0 text-sm"
+                 v-if="sidebarExpanded"
+                 class="min-w-0 text-sm"
               >{{ clinicName }}<span class="block text-xs font-normal text-muted">Control Pediátrico</span></span>
             </NuxtLink>
           </template>
-          <template #default="{ collapsed: isCollapsed }">
+           <template #default>
             <UNavigationMenu
               v-if="staffItems.length"
               :items="navItems"
-              :collapsed="isCollapsed"
-              orientation="vertical"
-              aria-label="Navegación principal"
+               :collapsed="!sidebarExpanded"
+               :tooltip="!sidebarExpanded"
+               orientation="vertical"
+               aria-label="Navegación principal"
             />
             <div
               v-if="adminItems.length"
               class="mt-auto border-t border-default pt-3"
             >
               <p
-                v-if="!isCollapsed"
-                class="px-3 pb-2 text-xs font-semibold uppercase tracking-wide text-muted"
+                 v-if="sidebarExpanded"
+                 class="px-3 pb-2 text-xs font-semibold uppercase tracking-wide text-muted"
               >
                 Administración
               </p>
               <UNavigationMenu
                 :items="adminNavItems"
-                :collapsed="isCollapsed"
-                orientation="vertical"
-                aria-label="Administración"
+                 :collapsed="!sidebarExpanded"
+                 :tooltip="!sidebarExpanded"
+                 orientation="vertical"
+                 aria-label="Administración"
               />
             </div>
           </template>
-          <template #footer="{ collapsed: isCollapsed }">
-            <div
-              v-if="!isCollapsed"
-              class="flex items-center gap-2 px-2 py-2"
-            >
-              <UAvatar
-                :text="user?.name?.slice(0, 2).toUpperCase() || 'CP'"
-                size="sm"
-              />
-              <div class="min-w-0 flex-1">
-                <p class="truncate text-sm font-semibold">
-                  {{ user?.name || 'Personal de la clínica' }}
-                </p>
-                <p class="text-xs text-muted">
-                  {{ isDoctor ? 'Pediatra' : isAdmin ? 'Administración' : 'Asistente' }}
-                </p>
-              </div>
-              <UColorModeButton aria-label="Cambiar tema" />
-              <UButton
-                icon="i-lucide-log-out"
-                variant="ghost"
-                color="neutral"
-                aria-label="Cerrar sesión"
-                @click="logout"
-              />
-            </div>
-          </template>
+           <template #footer>
+              <UDropdownMenu :items="[...sidebarMenu, { label: 'Cambiar tema', icon: 'i-lucide-moon', onSelect: toggleTheme }, { label: 'Cerrar sesión', icon: 'i-lucide-log-out', onSelect: logout }]">
+               <UButton
+                 color="neutral"
+                 variant="ghost"
+                 class="w-full min-h-11 justify-start"
+                 :class="sidebarExpanded ? 'px-2' : 'justify-center px-0'"
+                 :aria-label="sidebarExpanded ? undefined : 'Menú de usuario'"
+               >
+                 <UAvatar :text="user?.name?.slice(0, 2).toUpperCase() || 'CP'" size="sm" />
+                 <span v-if="sidebarExpanded" class="min-w-0 flex-1 text-left">
+                   <span class="block truncate text-sm font-semibold">{{ user?.name || 'Personal de la clínica' }}</span>
+                   <span class="block text-xs text-muted">{{ isDoctor ? 'Pediatra' : isAdmin ? 'Administración' : 'Asistente' }}</span>
+                 </span>
+               </UButton>
+             </UDropdownMenu>
+           </template>
         </UDashboardSidebar>
         <UDashboardPanel class="min-w-0 bg-muted">
           <template #header>
@@ -307,29 +324,18 @@ useSeoMeta({
               :ui="{ root: 'bg-default' }"
             >
               <template #leading>
-                <UDashboardSidebarCollapse />
+                 <UButton
+                   :icon="pinnedSidebar ? 'i-lucide-panel-left-close' : 'i-lucide-panel-left-open'"
+                   variant="ghost"
+                   color="neutral"
+                   :aria-label="pinnedSidebar ? 'Contraer menú lateral' : 'Fijar menú lateral abierto'"
+                   :aria-pressed="pinnedSidebar"
+                   class="min-h-11 min-w-11"
+                   @click="setSidebarPinned"
+                 />
               </template>
               <template #right>
-                <form
-                  v-if="isDoctor"
-                  role="search"
-                  class="hidden w-80 xl:block"
-                  @submit.prevent="searchPatients"
-                >
-                  <UInput
-                    ref="searchInput"
-                    v-model="search"
-                    icon="i-lucide-search"
-                    placeholder="Buscar paciente por nombre o cédula"
-                    aria-label="Buscar paciente por nombre o cédula"
-                    class="w-full"
-                    :ui="{ base: 'min-h-10 pr-16', trailing: 'pr-2' }"
-                  >
-                    <template #trailing>
-                      <UKbd>Ctrl K</UKbd>
-                    </template>
-                  </UInput>
-                </form>
+                 <ShellCommandSearch shortcuts />
                 <UButton
                   v-if="navigation.some(item => item.to === '/avisos')"
                   to="/avisos"
@@ -361,14 +367,7 @@ useSeoMeta({
                     aria-hidden="true"
                   >{{ clinicName }}
                 </span>
-                <UButton
-                  to="/pacientes"
-                  icon="i-lucide-search"
-                  variant="ghost"
-                  color="neutral"
-                  aria-label="Buscar pacientes"
-                  class="min-h-11 min-w-11"
-                />
+                 <ShellCommandSearch compact shortcuts />
               </header>
               <component :is="Component" />
             </main>

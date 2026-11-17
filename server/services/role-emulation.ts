@@ -57,6 +57,10 @@ export async function setEmulation(event: H3Event, role: Role | null, guardianId
   await useDb().transaction(async (tx) => {
     const [current] = await tx.select().from(session).where(and(eq(session.id, row.id), eq(session.userId, adminId))).for('update')
     if (!current || current.expiresAt <= new Date() || (role && current.emulatedRole)) throw createError({ statusCode: 409, statusMessage: 'Emulación ya activa o sesión vencida' })
+    if (guardianId) {
+      const [active] = await tx.select({ id: guardianGrant.guardianId }).from(guardianGrant).where(and(eq(guardianGrant.guardianId, guardianId), eq(guardianGrant.status, 'ACTIVE'))).limit(1)
+      if (!active) throw createError({ statusCode: 409, statusMessage: 'Representante sin acceso activo' })
+    }
     await tx.update(session).set({ emulatedRole: role, emulatedUserId: guardianId ?? null }).where(eq(session.id, row.id))
     await tx.insert(auditEvent).values({ id: crypto.randomUUID(), actorId: adminId, action: role ? 'ROLE_EMULATION_START' : 'ROLE_EMULATION_STOP', outcome: 'ALLOWED', subjectId: guardianId ?? adminId, emulatedRole: role ?? current.emulatedRole, emulatedUserId: guardianId ?? current.emulatedUserId })
   })

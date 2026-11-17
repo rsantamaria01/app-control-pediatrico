@@ -24,7 +24,7 @@ const { data: vaccineReview, error: vaccineError, refresh: refreshVaccines } = a
 const { data: controlsReview, error: controlsError, refresh: refreshControls } = await useFetch<{ id: string, name: string, reason: string, date: string }[]>('/api/clinical/controles-pendientes', { immediate: isDoctor.value, default: () => [] })
 const active = computed(() => appointments.value?.filter(item => item.status !== 'CANCELLED') ?? [])
 const formattedToday = new Intl.DateTimeFormat('es-EC', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'America/Guayaquil' }).format(new Date(`${today}T12:00:00-05:00`))
-const todayLabel = formattedToday
+const todayLabel = formattedToday.charAt(0).toLocaleUpperCase('es-EC') + formattedToday.slice(1)
 const reviewQueues = computed(() => [
   { title: 'Vacunación por revisar', to: '/pacientes/vacunacion-por-revisar', icon: 'i-lucide-syringe', error: vaccineError.value, retry: refreshVaccines, rows: (vaccineReview.value ?? []).map(person => ({ id: person.id, name: person.name, detail: person.pending[0]?.label ?? 'Vacunas por revisar', status: 'Por revisar' })) },
   { title: 'Crecimiento por revisar', to: '/pacientes/crecimiento-por-revisar', icon: 'i-lucide-chart-no-axes-combined', error: growthError.value, retry: refreshGrowth, rows: (growthReview.value ?? []).map(person => ({ id: person.id, name: person.name, detail: `${person.indicators.length} indicadores por revisar`, status: 'Por revisar' })) },

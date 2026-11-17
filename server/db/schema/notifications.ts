@@ -1,4 +1,4 @@
-import { boolean, check, index, integer, pgTable, primaryKey, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core'
+import { boolean, check, index, integer, pgTable, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
 import { user } from '../schema.ts'
 
@@ -60,12 +60,6 @@ export const notificationPreference = pgTable('notification_preference', {
   channel: text('channel').notNull(),
   enabled: boolean('enabled').notNull().default(false)
 }, table => [uniqueIndex('notification_preference_user_channel_idx').on(table.userId, table.channel), check('notification_preference_channel_ck', sql`${table.channel} IN ('EMAIL', 'WHATSAPP', 'IN_APP')`)])
-
-export const staffNoticeRead = pgTable('staff_notice_read', {
-  userId: text('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
-  noticeId: text('notice_id').notNull(),
-  readAt: timestamp('read_at', { withTimezone: true }).notNull().defaultNow()
-}, table => [primaryKey({ columns: [table.userId, table.noticeId] })])
 
 export const inAppNotice = pgTable('in_app_notice', {
   id: text('id').primaryKey(),

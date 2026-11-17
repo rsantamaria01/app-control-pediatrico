@@ -38,8 +38,15 @@ const route = useRoute()
 const { user, loggedIn, fetchSession, signOut } = useUserSession()
 const { data: navigation, refresh: refreshNavigation } = await useFetch<{ label: string, to: string }[]>('/api/auth/navigation', { default: () => [] })
 const staffAccess = computed(() => navigation.value.some(item => ['/pacientes', '/agenda'].includes(item.to) || item.to.startsWith('/admin/')))
-const { data: staffNotices, refresh: refreshStaffNotices } = await useFetch<{ readAt?: string }[]>('/api/avisos/personal', { enabled: staffAccess, default: () => [] })
-const staffUnread = computed(() => staffNotices.value.filter(notice => !notice.readAt).length)
+const { data: staffNotices, refresh: refreshStaffNotices } = await useFetch<{ id: string }[]>('/api/avisos/personal', { enabled: staffAccess, default: () => [] })
+const readStaffIds = useState<string[]>('read-staff-notices', () => [])
+onMounted(() => {
+  watch(() => user.value?.id, id => {
+    if (!id) return
+    try { readStaffIds.value = JSON.parse(localStorage.getItem(`staff-notice-read:${id}`) ?? '[]') } catch { readStaffIds.value = [] }
+  }, { immediate: true })
+})
+const staffUnread = computed(() => staffNotices.value.filter(notice => !readStaffIds.value.includes(notice.id)).length)
 const publicPage = computed(() => /^\/(acceso|recuperar|restablecer|invitacion|reservar|privacidad|sin-conexion|sesion-expirada|403)(\/|$)/.test(route.path))
 const isDoctor = computed(() => navigation.value.some(item => item.to === '/pacientes'))
 const isStaff = staffAccess

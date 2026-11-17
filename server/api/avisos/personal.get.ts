@@ -1,6 +1,6 @@
 import { and, desc, eq, gte, inArray, lt } from 'drizzle-orm'
 import { createError, defineEventHandler } from 'h3'
-import { appointment, bookingRequest, guardianGrant, notificationOutbox, patient, setupToken, staffNoticeRead } from '../../db/schema'
+import { appointment, bookingRequest, guardianGrant, notificationOutbox, patient, setupToken } from '../../db/schema'
 import { localDate } from '../../services/availability'
 import { resolveActor } from '../../services/access'
 import { listPendingControls } from '../../services/controls-review'
@@ -8,7 +8,7 @@ import { listGrowthReview } from '../../services/growth-review'
 import { listVaccinationReview } from '../../services/vaccination'
 import { useDb } from '../../utils/db'
 
-type StaffNotice = { id: string, title: string, context: string, icon: string, to: string, createdAt: string, readAt?: string }
+type StaffNotice = { id: string, title: string, context: string, icon: string, to: string, createdAt: string }
 
 export default defineEventHandler(async (event): Promise<StaffNotice[]> => {
   const actor = await resolveActor(event)
@@ -40,7 +40,5 @@ export default defineEventHandler(async (event): Promise<StaffNotice[]> => {
     const failures = await db.select({ id: notificationOutbox.id, channel: notificationOutbox.channel, state: notificationOutbox.state, createdAt: notificationOutbox.createdAt }).from(notificationOutbox).where(and(inArray(notificationOutbox.channel, ['EMAIL', 'WHATSAPP']), inArray(notificationOutbox.state, ['FAILED', 'NOT_CONFIGURED']))).orderBy(desc(notificationOutbox.createdAt)).limit(20)
     notices.push(...failures.map(row => ({ id: `delivery:${row.id}`, title: row.state === 'FAILED' ? 'Entrega fallida' : 'Canal no configurado', context: row.channel === 'EMAIL' ? 'Correo electrónico' : 'WhatsApp', icon: 'i-lucide-mail-warning', to: '/admin/clinica#recordatorios', createdAt: row.createdAt.toISOString() })))
   }
-  const seen = await db.select({ noticeId: staffNoticeRead.noticeId, readAt: staffNoticeRead.readAt }).from(staffNoticeRead).where(eq(staffNoticeRead.userId, actor.id))
-  const read = new Map(seen.map(row => [row.noticeId, row.readAt.toISOString()]))
-  return notices.toSorted((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 80).map(notice => ({ ...notice, readAt: read.get(notice.id) }))
+  return notices.toSorted((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 80)
 })

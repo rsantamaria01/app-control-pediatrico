@@ -1,6 +1,13 @@
 <script setup lang="ts">
-const { data, error, refresh } = await useFetch<{ id: string, eventKind: string, subjectId: string, dueDate: string | null, readAt: string | null, createdAt: string }[]>('/api/avisos', { default: () => [] })
-if (import.meta.server && (error.value?.statusCode === 401 || error.value?.statusCode === 403)) throw createError({ statusCode: error.value.statusCode, statusMessage: 'Acceso denegado' })
+const { data: navigation, error: navigationError, refresh: refreshNavigation } = await useFetch<{ to: string }[]>('/api/auth/navigation', { default: () => [] })
+const isStaff = computed(() => navigation.value.some(item => item.to === '/pacientes' || item.to === '/agenda' || item.to.startsWith('/admin/')))
+const isParent = computed(() => !navigationError.value && !isStaff.value && navigation.value.some(item => item.to === '/citas'))
+const { data, error, refresh } = await useFetch<{ id: string, eventKind: string, subjectId: string, dueDate: string | null, readAt: string | null, createdAt: string }[]>('/api/avisos', { default: () => [], enabled: isParent })
+const accessError = navigationError.value?.statusCode ?? error.value?.statusCode
+if (import.meta.server && (accessError === 401 || accessError === 403)) throw createError({ statusCode: accessError, statusMessage: 'Acceso denegado' })
+watch(isParent, async (allowed) => {
+  if (allowed) await refresh()
+})
 const dates = new Intl.DateTimeFormat('es-EC', { dateStyle: 'medium', timeZone: 'America/Guayaquil' })
 const calendarDay = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Guayaquil', year: 'numeric', month: '2-digit', day: '2-digit' })
 const filter = ref<'all' | 'unread'>('all')
@@ -13,6 +20,7 @@ const titles: Record<string, string> = { CHECKUP_DUE: 'Recordatorio de control',
 const icons: Record<string, string> = { CHECKUP_DUE: 'i-lucide-clock', VISIT_RECORDED: 'i-lucide-message-square', BOOKING_APPROVED: 'i-lucide-check', BOOKING_PENDING: 'i-lucide-calendar-days', BOOKING_DECLINED: 'i-lucide-calendar-x', BOOKING_RESCHEDULED: 'i-lucide-calendar-days', BOOKING_CANCELLED: 'i-lucide-calendar-x' }
 const reading = ref(false)
 async function markAllRead() {
+  if (!isParent.value) return
   reading.value = true
   try {
     for (const notice of visible.value.filter(item => !item.readAt)) await markRead(notice.id)
@@ -21,6 +29,7 @@ async function markAllRead() {
   }
 }
 async function markRead(id: string) {
+  if (!isParent.value) return
   try {
     await $fetch(`/api/avisos/${encodeURIComponent(id)}/leer`, { method: 'POST' })
   } finally {
@@ -36,7 +45,7 @@ async function markRead(id: string) {
         Avisos
       </h1>
       <UButton
-        v-if="unreadCount"
+        v-if="isParent && unreadCount"
         variant="ghost"
         color="neutral"
         :loading="reading"
@@ -47,6 +56,7 @@ async function markRead(id: string) {
       </UButton>
     </header>
     <nav
+      v-if="isParent && !navigationError"
       aria-label="Filtrar avisos"
       class="m-4 flex rounded-lg bg-elevated p-1 text-sm"
     >
@@ -70,19 +80,37 @@ async function markRead(id: string) {
       </button>
     </nav>
     <div class="px-4">
+      <UEmpty
+        v-if="isStaff && !navigationError"
+        icon="i-lucide-bell-off"
+        title="Avisos no disponibles para el personal"
+        description="Los avisos del portal son solo para representantes. Esta sección no muestra información de familias."
+      />
       <UAlert
-        v-if="error"
+        v-else-if="navigationError"
+        color="error"
+        variant="soft"
+        title="No se pudo verificar el acceso"
+        :actions="[{ label: 'Reintentar', onClick: () => refreshNavigation() }]"
+      />
+      <UAlert
+        v-else-if="isParent && error"
         color="error"
         variant="soft"
         title="No se pudieron cargar los avisos"
         :actions="[{ label: 'Reintentar', onClick: () => refresh() }]"
       />
       <UEmpty
-        v-else-if="!visible.length"
+        v-else-if="isParent && !visible.length"
         :title="filter === 'unread' ? 'No hay avisos sin leer' : 'Aún no hay avisos'"
       />
+      <UEmpty
+        v-else-if="!navigation?.length"
+        title="No hay avisos disponibles"
+        description="Inicie sesión para consultar sus avisos."
+      />
     </div>
-    <template v-if="!error && visible.length">
+    <template v-if="isParent && !error && !navigationError && visible.length">
       <section
         v-for="group in [{ label: 'HOY', items: todayNotices }, { label: 'ANTERIORES', items: olderNotices }]"
         :key="group.label"
@@ -143,6 +171,7 @@ async function markRead(id: string) {
       </section>
     </template>
     <UButton
+      v-if="isParent && !navigationError"
       to="/perfil"
       variant="outline"
       class="mx-4 mt-5 min-h-11"

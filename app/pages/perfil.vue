@@ -1,12 +1,33 @@
 <script setup lang="ts">
 type NoticePreferences = { inApp: true, email: boolean, whatsapp: boolean }
-const { data, error, status, refresh } = await useFetch<NoticePreferences>('/api/avisos/preferencias')
-if (import.meta.server && (error.value?.statusCode === 401 || error.value?.statusCode === 403)) throw createError({ statusCode: error.value.statusCode, statusMessage: 'Acceso denegado' })
+const { data: navigation, error: navigationError, refresh: refreshNavigation } = await useFetch<{ to: string }[]>('/api/auth/navigation', { default: () => [] })
+const isStaff = computed(() => navigation.value.some(item => item.to === '/pacientes' || item.to === '/agenda' || item.to.startsWith('/admin/')))
+const isParent = computed(() => !navigationError.value && !isStaff.value && navigation.value.some(item => item.to === '/citas'))
+const { data, error, status, refresh } = await useFetch<NoticePreferences>('/api/avisos/preferencias', { enabled: isParent })
+const accessError = navigationError.value?.statusCode ?? error.value?.statusCode
+if (import.meta.server && (accessError === 401 || accessError === 403)) throw createError({ statusCode: accessError, statusMessage: 'Acceso denegado' })
+watch(isParent, async (allowed) => {
+  if (allowed) await refresh()
+})
+const { signOut } = useUserSession()
+const loggingOut = ref(false)
+async function logout() {
+  loggingOut.value = true
+  try {
+    await signOut({ onSuccess: async () => {
+      await refreshNavigation()
+      await navigateTo('/acceso')
+    } })
+  } finally {
+    loggingOut.value = false
+  }
+}
 const saving = ref(false)
 const saveError = ref(false)
 const saved = ref(false)
 const colorMode = useColorMode()
 async function updatePreference(channel: 'email' | 'whatsapp', event: Event) {
+  if (!isParent.value) return
   const input = event.target as HTMLInputElement
   const value = input.checked
   saving.value = true
@@ -33,19 +54,26 @@ async function updatePreference(channel: 'email' | 'whatsapp', event: Event) {
     </header>
     <div class="space-y-4 px-4 pt-4">
       <UAlert
-        v-if="error"
+        v-if="navigationError"
+        color="error"
+        variant="soft"
+        title="No se pudo verificar el acceso"
+        :actions="[{ label: 'Reintentar', onClick: () => refreshNavigation() }]"
+      />
+      <UAlert
+        v-else-if="isParent && error"
         color="error"
         variant="soft"
         title="No se pudieron cargar las preferencias"
         :actions="[{ label: 'Reintentar', onClick: () => refresh() }]"
       />
       <div
-        v-else-if="status === 'pending' || !data"
+        v-else-if="isParent && (status === 'pending' || !data)"
         aria-label="Cargando preferencias de avisos"
       >
         <USkeleton class="h-48 w-full" />
       </div>
-      <template v-else>
+      <template v-if="isParent && data && !error && !navigationError">
         <UAlert
           v-if="saveError"
           color="error"
@@ -97,30 +125,50 @@ async function updatePreference(channel: 'email' | 'whatsapp', event: Event) {
             </div>
           </fieldset>
         </section>
-        <section class="rounded-xl border border-default bg-default p-4">
-          <h2 class="mb-2 text-sm font-bold">
-            Apariencia
-          </h2>
-          <div
-            class="flex rounded-lg bg-elevated p-1"
-            role="group"
-            aria-label="Tema"
-          >
-            <button
-              v-for="option in [{ value: 'light', label: 'Claro' }, { value: 'dark', label: 'Oscuro' }, { value: 'system', label: 'Sistema' }]"
-              :key="option.value"
-              type="button"
-              :aria-pressed="colorMode.preference === option.value"
-              class="min-h-10 flex-1 rounded-md text-sm focus-visible:outline-2 focus-visible:outline-primary"
-              :class="colorMode.preference === option.value ? 'bg-default font-semibold shadow-sm' : 'text-muted'"
-              @click="colorMode.preference = option.value"
-            >
-              {{ option.label }}
-            </button>
-          </div>
-        </section>
       </template>
+      <UEmpty
+        v-if="isStaff && !navigationError"
+        icon="i-lucide-bell-off"
+        title="Notificaciones no disponibles"
+        description="Los recordatorios del portal son solo para representantes. Las preferencias de avisos del personal aún no están disponibles."
+      />
+      <section
+        v-if="!navigationError && ((isParent && data && !error) || isStaff)"
+        class="rounded-xl border border-default bg-default p-4"
+      >
+        <h2 class="mb-2 text-sm font-bold">
+          Apariencia
+        </h2>
+        <div
+          class="flex rounded-lg bg-elevated p-1"
+          role="group"
+          aria-label="Tema"
+        >
+          <button
+            v-for="option in [{ value: 'light', label: 'Claro' }, { value: 'dark', label: 'Oscuro' }, { value: 'system', label: 'Sistema' }]"
+            :key="option.value"
+            type="button"
+            :aria-pressed="colorMode.preference === option.value"
+            class="min-h-10 flex-1 rounded-md text-sm focus-visible:outline-2 focus-visible:outline-primary"
+            :class="colorMode.preference === option.value ? 'bg-default font-semibold shadow-sm' : 'text-muted'"
+            @click="colorMode.preference = option.value"
+          >
+            {{ option.label }}
+          </button>
+        </div>
+      </section>
       <UButton
+        v-if="isStaff && !navigationError"
+        variant="ghost"
+        color="neutral"
+        :loading="loggingOut"
+        class="min-h-11"
+        @click="logout"
+      >
+        Cerrar sesión
+      </UButton>
+      <UButton
+        v-if="isParent && !navigationError"
         to="/avisos"
         variant="outline"
         class="min-h-11"

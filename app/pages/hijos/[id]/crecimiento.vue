@@ -7,7 +7,10 @@ const { data, error, refresh } = await useFetch<{ name: string, charts: Partial<
 if (import.meta.server && error.value) throw createError({ statusCode: error.value.statusCode === 404 ? 404 : 503, statusMessage: 'No disponible' })
 const indicators = [WhoIndicator.HEIGHT_FOR_AGE, WhoIndicator.WEIGHT_FOR_AGE, WhoIndicator.HEAD_CIRCUMFERENCE_FOR_AGE]
 const selectedIndicator = ref(WhoIndicator.WEIGHT_FOR_AGE)
-const showTable = ref(false)
+const tableSection = ref<HTMLElement | null>(null)
+function goToTable() {
+  tableSection.value?.scrollIntoView({ block: 'nearest' })
+}
 </script>
 
 <template>
@@ -71,10 +74,9 @@ const showTable = ref(false)
           variant="outline"
           color="neutral"
           class="min-h-11"
-          :aria-pressed="showTable"
-          @click="showTable = !showTable"
-        >
-          {{ showTable ? 'Ver gráfico' : 'Ver tabla' }}
+           @click="goToTable"
+         >
+           Ver tabla
         </UButton>
       </div>
       <div
@@ -99,13 +101,13 @@ const showTable = ref(false)
           {{ INDICATOR_LABEL[selectedIndicator] }}
         </h2>
         <template v-if="data.charts[selectedIndicator]">
-          <GrowthTable v-if="showTable" :view="data.charts[selectedIndicator]!" family />
-          <GrowthChart v-else :view="data.charts[selectedIndicator]!" family />
-          <p v-if="!showTable" class="flex items-center gap-2 text-xs text-muted">
+           <GrowthChart :view="data.charts[selectedIndicator]!" family />
+           <p class="flex items-center gap-2 text-xs text-muted">
             <span class="h-1 w-4 rounded bg-(--color-patient)" />{{ data.name }}<span class="ml-2 h-1 w-4 rounded border-t border-dashed border-muted" />Referencia OMS
-          </p>
-        </template>
-        <p v-else class="text-muted">
+           </p>
+           <div ref="tableSection" class="min-w-0" aria-label="Mediciones compartidas"><GrowthTable :view="data.charts[selectedIndicator]!" family /></div>
+         </template>
+         <p v-else class="text-muted">
           Referencia OMS no disponible.
         </p>
       </UCard>

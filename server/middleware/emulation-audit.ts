@@ -9,5 +9,5 @@ export default defineEventHandler(async (event) => {
   const state = await emulationState(event)
   if (!state) return
   event.context.emulatedWrite = { adminId: state.adminId, role: state.role, userId: state.userId, method, path }
-  if (path.startsWith('/api/auth/') && path !== '/api/auth/sign-out') throw createError({ statusCode: 403, statusMessage: 'Salir de emulación para cambiar la cuenta' })
+  if (path.startsWith('/api/auth/') && !/\/sign-out(?:\/|$)/.test(path)) throw createError({ statusCode: 403, statusMessage: 'Salir de emulación para cambiar la cuenta' })
 })

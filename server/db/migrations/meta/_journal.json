@@ -281,6 +281,48 @@
       "when": 1794825072917,
       "tag": "0039_dry_invisible_woman",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1794837053027,
+      "tag": "0040_serious_revanche",
+      "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1794837567926,
+      "tag": "0041_adorable_dragon_lord",
+      "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1794838430933,
+      "tag": "0042_lyrical_valkyrie",
+      "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1794839786021,
+      "tag": "0043_omniscient_winter_soldier",
+      "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1794852402985,
+      "tag": "0044_narrow_gladiator",
+      "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1794852402986,
+      "tag": "0045_whatsapp_settings",
+      "breakpoints": true
     }
   ]
 }

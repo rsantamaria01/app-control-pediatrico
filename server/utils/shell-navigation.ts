@@ -20,7 +20,7 @@ const entries: Record<Role, Item[]> = {
     { label: 'Inicio', to: '/' },
     { label: 'Citas', to: '/citas' }
   ],
-  ADMIN: [{ label: 'Usuarios', to: '/admin/usuarios' }, { label: 'Catálogos', to: '/admin/catalogos' }]
+  ADMIN: [{ label: 'Usuarios', to: '/admin/usuarios' }, { label: 'Catálogos', to: '/admin/catalogos' }, { label: 'Clínica', to: '/admin/clinica' }]
 }
 
 export function shellNavigation(actor: Actor | null, availableRoutes: readonly string[]): Item[] {

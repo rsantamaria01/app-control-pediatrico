@@ -9,11 +9,12 @@ import type { Gender } from '../../shared/utils/enums'
 import { WhoIndicator } from '../../shared/utils/enums'
 import { calculateGrowth } from '../../shared/utils/growth-result'
 import { bmi } from '../../shared/utils/zscore'
-import { patient, visit, visitResult, visitText } from '../db/schema'
+import { guardianGrant, patient, visit, visitResult, visitText } from '../db/schema'
 import { useDb } from '../utils/db'
 import { recordAudit } from './audit'
 import { authorizeClinical } from './patients'
 import { selectReference } from './reference-selection'
+import { queueNotification } from './outbox'
 
 const indicators = [WhoIndicator.HEIGHT_FOR_AGE, WhoIndicator.WEIGHT_FOR_AGE, WhoIndicator.HEAD_CIRCUMFERENCE_FOR_AGE, WhoIndicator.BMI_FOR_AGE] as const
 
@@ -135,6 +136,10 @@ export async function createVisit(actor: Actor, patientId: string, input: Measur
     const reviewed = reviewPlausibility(results)
     for (const result of reviewed) await tx.insert(visitResult).values({ id: result.id, visitId: id, indicator: result.indicator, snapshot: result.status === 'available' ? { status: result.status, indicator: result.indicator, sex: result.sex, z: result.z, percentile: result.percentile, classification: result.classification, reference: result.reference } : { status: result.status, reason: result.reason }, calculatedBy: actor.id })
     await tx.insert(visitText).values({ visitId: id, privateNote: values.privateNote, parentAdvice: values.parentAdvice, clinicianTrend: values.clinicianTrend })
+    if (values.shareWithFamily) {
+      const recipients = await tx.select({ guardianId: guardianGrant.guardianId }).from(guardianGrant).where(and(eq(guardianGrant.patientId, patientId), eq(guardianGrant.status, 'ACTIVE')))
+      for (const recipient of recipients) await queueNotification(tx, { kind: 'VISIT_RECORDED', subjectId: id }, { channel: 'IN_APP', userId: recipient.guardianId })
+    }
     return hydrate(inserted, reviewed.map(result => ({ id: result.id, visitId: id, indicator: result.indicator, snapshot: result, parentResultId: null, recalculationId: null, calculatedBy: actor.id, createdAt: new Date() })), { visitId: id, privateNote: values.privateNote ?? null, parentAdvice: values.parentAdvice ?? null, clinicianTrend: values.clinicianTrend ?? null })
   })
 }

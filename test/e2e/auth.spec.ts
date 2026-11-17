@@ -142,6 +142,16 @@ test.describe('username/password access on disposable database', () => {
     await page.getByLabel('Contraseña').fill('unique administrator passphrase')
     await page.getByRole('button', { name: 'Ingresar' }).click()
     await expect(page).toHaveURL('/')
+    const whatsapp = await page.request.get('/api/admin/recordatorios/whatsapp')
+    expect(whatsapp.status()).toBe(200)
+    const configured = process.env.WHATSAPP_PROVIDER === 'META'
+    expect(await whatsapp.json()).toMatchObject(configured ? { source: 'ENV', provider: 'META', configured: true, status: 'READY' } : { configured: false, status: 'NOT_CONFIGURED' })
+    await page.goto('/admin/clinica')
+    await expect(page.getByRole('heading', { name: 'WhatsApp · recordatorios' })).toBeVisible()
+    if (configured) {
+      await expect(page.getByText('Configuración del servidor: tiene prioridad y no se puede cambiar aquí.')).toBeVisible()
+      await expect(page.getByRole('heading', { name: 'WhatsApp · recordatorios' }).locator('xpath=ancestor::section[1]').getByText('Configurado')).toBeVisible()
+    } else await expect(page.getByRole('heading', { name: 'WhatsApp · recordatorios' }).locator('xpath=ancestor::section[1]').getByText('Sin configurar')).toBeVisible()
     const email = `${crypto.randomUUID()}@example.test`
     const response = await page.request.post('/api/auth/invite-staff', { data: { name: 'Staff', email, role: 'DOCTOR' } })
     expect(response.status()).toBe(200)

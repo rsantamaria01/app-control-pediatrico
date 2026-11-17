@@ -150,9 +150,10 @@ describe('username/password access', () => {
     expect(unchanged?.username).toBe(username)
   })
 
-  it('expires recovery links after ten minutes and records failed transport in persistent health', async () => {
+  it('expires recovery links after ten minutes when SMTP is not configured', async () => {
     const { requestRecovery } = await import('../../server/services/recovery')
-    const { setupToken, emailHealth } = await import('../../server/db/schema')
+    const { emailProviderHealth } = await import('../../server/services/email')
+    const { setupToken } = await import('../../server/db/schema')
     const id = crypto.randomUUID()
     const username = `failure-${id.slice(0, 8)}`
     await db.insert(user).values({ id, name: 'Unavailable', email: `${id}@example.test`, username })
@@ -163,8 +164,7 @@ describe('username/password access', () => {
     try {
       expect(await requestRecovery(username)).toEqual({ message: 'Si la cuenta existe, enviaremos instrucciones al correo registrado' })
       await (await import('../../server/services/recovery')).processRecoveryJobs()
-      const [health] = await db.select().from(emailHealth).where(eq(emailHealth.id, 'smtp'))
-      expect(health?.state).toBe('FAILING')
+      expect(await emailProviderHealth()).toBe('NOT_CONFIGURED')
       const [entry] = await db.select().from(setupToken).where(eq(setupToken.userId, id))
       expect(entry!.expiresAt.getTime() - Date.now()).toBeLessThanOrEqual(600000)
       expect(entry!.usedAt).not.toBeNull()
@@ -496,7 +496,8 @@ describe('username/password access', () => {
 
   it('marks an interrupted SENDING job unknown at startup, invalidates its token and never resends', async () => {
     const { requestRecovery, processRecoveryJobs, reconcileRecoveryJobs } = await import('../../server/services/recovery')
-    const { recoveryJob, setupToken, emailHealth } = await import('../../server/db/schema')
+    const { recoveryJob, setupToken } = await import('../../server/db/schema')
+    const { emailProviderHealth } = await import('../../server/services/email')
     const id = crypto.randomUUID()
     const username = `crashed-${id.slice(0, 8)}`
     await db.insert(user).values({ id, name: 'Crashed', email: `${id}@example.test`, username })
@@ -516,7 +517,7 @@ describe('username/password access', () => {
     expect(interrupted?.payload).toBe('')
     expect(interrupted?.deliveryPayload).toBeNull()
     expect((await db.select().from(setupToken).where(eq(setupToken.id, tokenId)))[0]?.usedAt).not.toBeNull()
-    expect((await db.select().from(emailHealth).where(eq(emailHealth.id, 'smtp')))[0]?.state).toBe('FAILING')
+    expect(await emailProviderHealth()).toBe('FAILING')
     expect(await db.select().from(auditEvent).where(eq(auditEvent.action, 'RECOVERY_DELIVERY_FAILED'))).toEqual(expect.arrayContaining([expect.objectContaining({ actorId: null, subjectId: null })]))
     expect(await processRecoveryJobs()).toBe(0)
     expect(await reconcileRecoveryJobs()).toBe(0)
@@ -694,7 +695,7 @@ describe('username/password access', () => {
 
   it('keeps the same recovery acknowledgment on SMTP connection refusal and persists failure', async () => {
     const { requestRecovery } = await import('../../server/services/recovery')
-    const { emailHealth } = await import('../../server/db/schema')
+    const { emailProviderHealth } = await import('../../server/services/email')
     const id = crypto.randomUUID()
     const username = `refused-${id.slice(0, 8)}`
     await db.insert(user).values({ id, name: 'Refused', email: `${id}@example.test`, username })
@@ -715,8 +716,7 @@ describe('username/password access', () => {
       await client.quit()
       expect(await requestRecovery(username)).toEqual(await requestRecovery(`missing-${crypto.randomUUID().slice(0, 8)}`))
       await (await import('../../server/services/recovery')).processRecoveryJobs()
-      const [health] = await db.select().from(emailHealth).where(eq(emailHealth.id, 'smtp'))
-      expect(health?.state).toBe('FAILING')
+      expect(await emailProviderHealth()).toBe('FAILING')
     } finally {
       process.env.SMTP_PORT = port
     }

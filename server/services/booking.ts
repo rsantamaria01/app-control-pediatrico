@@ -8,6 +8,7 @@ import { useDb } from '../utils/db'
 import { availableSlots, instant, localDate, localTime, requireSchedule, zone } from './availability'
 import { sendBookingCode } from './email'
 import { consumeAccessLimit } from './otp-rate-limit'
+import { queueNotification } from './outbox'
 
 const digest = (value: string) => createHash('sha256').update(value).digest('hex')
 const unavailable = () => createError({ statusCode: 403, statusMessage: 'Verificación no válida' })
@@ -74,6 +75,7 @@ export async function submitBookingRequest(input: VerifiedBookingInput): Promise
     const id = randomUUID()
     await tx.insert(bookingRequest).values({ id, source: 'PUBLIC', childName: values.childName, birthDate: values.birthDate, sex: values.sex, guardianName: values.guardianName, relationship: values.relationship, email: values.email, phone: values.phone, startsAt, consentVersion: values.consentVersion })
     await tx.insert(bookingNotice).values(notice(id, 'PENDING'))
+    await queueNotification(tx, { kind: 'BOOKING_PENDING', subjectId: id }, { channel: 'EMAIL', address: values.email })
     return pending(id, startsAt)
   })
 }
@@ -94,6 +96,7 @@ export async function submitParentBooking(actor: Actor, input: unknown): Promise
     const id = randomUUID()
     await tx.insert(bookingRequest).values({ id, source: 'PARENT', patientId: values.patientId, guardianId: actor.id, childName: owned.name, guardianName: owned.guardianName, email: owned.email, startsAt, consentVersion: values.consentVersion })
     await tx.insert(bookingNotice).values(notice(id, 'PENDING'))
+    await queueNotification(tx, { kind: 'BOOKING_PENDING', subjectId: id }, { channel: 'IN_APP', userId: actor.id })
     return pending(id, startsAt)
   })
 }
@@ -134,6 +137,7 @@ export async function decideBookingRequest(actor: Actor, requestId: string, deci
     await tx.update(bookingRequest).set({ status, appointmentId, decidedBy: actor.id, decidedAt: new Date() }).where(eq(bookingRequest.id, requestId))
     await tx.insert(auditEvent).values(audit(actor, requestId, `BOOKING_${decision}`))
     await tx.insert(bookingNotice).values(notice(requestId, status))
+    await queueNotification(tx, { kind: decision === 'APPROVE' ? 'BOOKING_APPROVED' : 'BOOKING_DECLINED', subjectId: requestId }, row.guardianId ? { channel: 'IN_APP', userId: row.guardianId } : { channel: 'EMAIL', address: row.email })
     return { requestId, status, ...(appointmentId ? { appointmentId } : {}) }
   })
 }
@@ -151,6 +155,10 @@ export async function listParentAppointments(actor: Actor): Promise<ParentAppoin
 }
 
 export async function recordBookingAppointmentChange(tx: Parameters<Parameters<ReturnType<typeof useDb>['transaction']>[0]>[0], appointmentId: string, status: 'RESCHEDULED' | 'CANCELLED') {
-  const [row] = await tx.select({ id: bookingRequest.id }).from(bookingRequest).where(eq(bookingRequest.appointmentId, appointmentId))
-  if (row) await tx.insert(bookingNotice).values(notice(row.id, status))
+  const [row] = await tx.select({ id: bookingRequest.id, guardianId: bookingRequest.guardianId, email: bookingRequest.email }).from(bookingRequest).where(eq(bookingRequest.appointmentId, appointmentId))
+  if (row) {
+    const change = notice(row.id, status)
+    await tx.insert(bookingNotice).values(change)
+    await queueNotification(tx, { kind: status === 'RESCHEDULED' ? 'BOOKING_RESCHEDULED' : 'BOOKING_CANCELLED', subjectId: row.id, occurrenceId: change.id }, row.guardianId ? { channel: 'IN_APP', userId: row.guardianId } : { channel: 'EMAIL', address: row.email })
+  }
 }

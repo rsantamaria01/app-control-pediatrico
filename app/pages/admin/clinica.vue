@@ -123,9 +123,9 @@ async function sendTest(event: FormSubmitEvent<z.output<typeof smtpTestSchema>>)
 
 <template>
   <div class="min-h-full bg-muted">
-    <header class="bg-default pt-4">
+    <header class="bg-default pt-4 lg:pt-0">
       <UContainer class="max-w-7xl">
-        <h1 class="text-xl font-bold text-default">
+        <h1 class="text-xl font-bold text-default lg:sr-only">
           Ajustes de la clínica
         </h1>
       </UContainer>

@@ -96,6 +96,8 @@ export async function deactivateStaff(actor: Actor, targetId: string) {
     if (!target) throw createError({ statusCode: 404, statusMessage: 'Not found' })
     const current = await tx.select({ role: userRole.role }).from(userRole).where(eq(userRole.userId, targetId))
     if (!current.length || current.some(row => row.role === 'PATIENT')) throw createError({ statusCode: 409, statusMessage: 'Not an active staff account' })
+    const [credential] = await tx.select({ id: account.id }).from(account).where(and(eq(account.userId, targetId), eq(account.providerId, 'credential'), sql`${account.password} IS NOT NULL`)).limit(1)
+    if (!credential) throw createError({ statusCode: 409, statusMessage: 'Pending activation' })
     if (current.some(row => row.role === 'ADMIN')) {
       const [other] = await tx.select({ id: userRole.userId }).from(userRole).innerJoin(account, and(eq(account.userId, userRole.userId), eq(account.providerId, 'credential'), sql`${account.password} IS NOT NULL`)).where(and(eq(userRole.role, 'ADMIN'), sql`${userRole.userId} <> ${targetId}`)).limit(1)
       if (!other) throw createError({ statusCode: 409, statusMessage: 'Last administrator' })

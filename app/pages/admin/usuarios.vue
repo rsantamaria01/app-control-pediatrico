@@ -208,7 +208,7 @@ async function deactivate() {
                 </UBadge>
               </td><td class="p-3">
                 <div class="flex flex-wrap gap-2">
-                  <template v-if="user.roles.length">
+                  <template v-if="user.active">
                     <UButton
                       variant="outline"
                       color="neutral"
@@ -228,7 +228,7 @@ async function deactivate() {
                     </UButton>
                   </template>
                   <UButton
-                    v-else
+                    v-else-if="!user.roles.length"
                     variant="outline"
                     color="primary"
                     class="min-h-11"

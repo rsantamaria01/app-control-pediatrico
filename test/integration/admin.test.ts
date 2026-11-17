@@ -157,6 +157,8 @@ it('does not count an invited administrator without credentials as a functioning
   await db.insert(user).values({ id: invited, name: 'Invited', email: `${invited}@example.test` })
   await db.insert(userRole).values({ userId: invited, role: 'ADMIN' })
   expect((await listStaff(admin)).find(row => row.id === invited)).toMatchObject({ roles: ['ADMIN'], active: false })
+  await expect(deactivateStaff(admin, invited)).rejects.toMatchObject({ statusCode: 409 })
+  expect(await db.select().from(userRole).where(eq(userRole.userId, invited))).toMatchObject([{ role: 'ADMIN' }])
   await expect(deactivateStaff(admin, admin.id)).rejects.toMatchObject({ statusCode: 409 })
   await expect(assignStaffRoles(admin, admin.id, ['DOCTOR'])).rejects.toMatchObject({ statusCode: 409 })
   expect(await db.select().from(userRole).where(eq(userRole.userId, admin.id))).toMatchObject([{ role: 'ADMIN' }])
@@ -258,6 +260,7 @@ it('paginates a redacted audit whitelist and exports CSV without clinical data',
 })
 
 it('rejects unassigned actors for data requests and staff operations after deactivation', async () => {
+  await db.insert(account).values({ id: randomUUID(), userId: doctor.id, accountId: doctor.id, providerId: 'credential', password: 'hashed' })
   await deactivateStaff(admin, doctor.id)
   await expect(requestDataAction(doctor, 'VIEW')).rejects.toMatchObject({ statusCode: 403 })
   await expect(assignStaffRoles(admin, doctor.id, ['DOCTOR'])).rejects.toMatchObject({ statusCode: 409 })

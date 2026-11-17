@@ -44,6 +44,7 @@ export async function searchCommands(actor: Actor, query: string): Promise<Comma
       : []),
     ...(doctor || assistant
       ? [
+          { id: 'action:appointment', label: 'Nueva cita', icon: 'i-lucide-calendar-plus', to: '/agenda' },
           { id: 'action:invite', label: 'Invitar representante', icon: 'i-lucide-user-plus', to: '/representantes/invitar' },
           { id: 'action:requests', label: 'Solicitudes de citas', icon: 'i-lucide-calendar-check', to: '/agenda/solicitudes' }
         ]

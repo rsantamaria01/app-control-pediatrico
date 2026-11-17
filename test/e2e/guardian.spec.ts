@@ -335,7 +335,7 @@ test.describe('verified guardian invitation and isolated portal', () => {
       await inspectCanvas(page, 'main')
       await inspectVisual(page, 'task8-parent', width, 'dark')
       await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'no-preference' })
-      await expect(page.getByRole('navigation', { name: 'Navegación principal' }).getByRole('link', { name: 'Inicio' })).toBeVisible()
+      await expect(width >= 1024 ? page.locator('header[data-slot="root"] nav').getByRole('link', { name: 'Inicio' }) : page.getByRole('navigation', { name: 'Navegación principal' }).getByRole('link', { name: 'Inicio' })).toBeVisible()
       await page.getByRole('button', { name: 'Ver tabla' }).focus()
       await page.keyboard.press('Enter')
       await expect(page.getByRole('table', { name: 'Mediciones y referencias de crecimiento' }).first()).toContainText('9')

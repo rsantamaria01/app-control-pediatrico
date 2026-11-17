@@ -14,7 +14,7 @@ const latest = computed(() => data.value?.visits[0])
 const { data: growth } = await useFetch<{ charts: Partial<Record<WhoIndicator, ChartView>> }>(`/api/pacientes/${encodeURIComponent(id)}/crecimiento`, { immediate: isDoctor.value })
 const chartIndicator = ref<WhoIndicator>(WhoIndicator.WEIGHT_FOR_AGE)
 const showGrowthTable = ref(false)
-const chartRange = ref<6 | 12 | 24 | 60>(24)
+const chartRange = ref<6 | 12 | 24 | 60>(60)
 const chartIndicators = [WhoIndicator.WEIGHT_FOR_AGE, WhoIndicator.HEIGHT_FOR_AGE, WhoIndicator.HEAD_CIRCUMFERENCE_FOR_AGE, WhoIndicator.BMI_FOR_AGE, WhoIndicator.WEIGHT_FOR_LENGTH, WhoIndicator.WEIGHT_FOR_HEIGHT]
 const sharing = reactive<Record<string, boolean>>({})
 const { data: sharingState } = await useFetch<Record<string, boolean>>(`/api/pacientes/${encodeURIComponent(id)}/visitas/compartir`, { immediate: isDoctor.value })
@@ -157,11 +157,15 @@ const zFormat = new Intl.NumberFormat('es-EC', { minimumFractionDigits: 2, maxim
 function zLabel(z: number) {
   return `Z ${z < 0 ? '−' : '+'}${zFormat.format(Math.abs(z))}`
 }
-function ageAtVisit(measuredAt: string) {
+function ageAtVisit(measuredAt: string, result: VisitSnapshot['results'][number] | undefined) {
+  if (result?.status === 'available') {
+    const days = result.reference.referenceAgeDays
+    return `${days} días · ${result.reference.ageBasis === 'CORRECTED' ? 'corregida' : 'cronológica'}`
+  }
   const [year, month, day] = data.value!.patient.birthDate.split('-').map(Number)
   const [visitYear, visitMonth, visitDay] = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Guayaquil', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(measuredAt)).split('-').map(Number)
   const months = Math.max(0, (visitYear! - year!) * 12 + visitMonth! - month! - (visitDay! < day! ? 1 : 0))
-  return months < 12 ? `${months} m` : `${Math.floor(months / 12)} a ${months % 12} m`
+  return `${months < 12 ? `${months} m` : `${Math.floor(months / 12)} a ${months % 12} m`} · cronológica`
 }
 function authorName(visit: VisitSnapshot) {
   return (visit as VisitSnapshot & { authorName?: string }).authorName || '—'
@@ -976,7 +980,7 @@ function authorName(visit: VisitSnapshot) {
                       scope="col"
                       class="p-3"
                     >
-                      Edad
+                      Edad (base OMS si disponible)
                     </th>
                     <th
                       scope="col"
@@ -1014,7 +1018,7 @@ function authorName(visit: VisitSnapshot) {
                       {{ dateFormat.format(new Date(visit.measuredAt)) }}
                     </td>
                     <td class="p-3 tabular-nums">
-                      {{ ageAtVisit(visit.measuredAt) }}
+                      {{ ageAtVisit(visit.measuredAt, result) }}
                     </td>
                     <td class="p-3 tabular-nums">
                       {{ chartIndicator === WhoIndicator.WEIGHT_FOR_AGE || chartIndicator === WhoIndicator.WEIGHT_FOR_LENGTH || chartIndicator === WhoIndicator.WEIGHT_FOR_HEIGHT ? `${weightFormat.format(visit.weightKg)} kg` : chartIndicator === WhoIndicator.HEIGHT_FOR_AGE ? `${lengthFormat.format(visit.lengthHeightCm)} cm` : chartIndicator === WhoIndicator.HEAD_CIRCUMFERENCE_FOR_AGE ? `${lengthFormat.format(visit.headCircumferenceCm)} cm` : `${lengthFormat.format(visit.bmi)} kg/m²` }}

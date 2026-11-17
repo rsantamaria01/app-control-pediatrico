@@ -189,6 +189,7 @@ useSeoMeta({
         </template>
         <template #default="{ collapsed: isCollapsed }">
           <UNavigationMenu
+            v-if="staffItems.length"
             :items="navItems"
             :collapsed="isCollapsed"
             orientation="vertical"

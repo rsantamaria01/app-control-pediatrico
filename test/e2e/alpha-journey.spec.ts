@@ -197,7 +197,7 @@ test('production image journeys from bootstrapped admin through two children and
     const bookingPhone = '0991234567'
     await page.goto('/reservar')
     await page.waitForLoadState('networkidle')
-    await page.getByLabel('Fecha', { exact: true }).fill(bookingDay)
+    await page.getByLabel('Fecha seleccionada · primera consulta').fill(bookingDay)
     await expect(page.getByText('09:00', { exact: true })).toBeVisible()
     await page.getByText('09:00', { exact: true }).click()
     await page.getByRole('button', { name: 'Continuar' }).click()

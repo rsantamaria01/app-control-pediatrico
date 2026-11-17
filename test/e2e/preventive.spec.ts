@@ -87,7 +87,7 @@ test.describe('preventive main flow on isolated database', () => {
     await expect(page.getByText('Recordatorios no disponibles: no hay catálogo de tamizajes importado con procedencia.', { exact: false })).toBeVisible()
     await expect(page.getByText('Sin hitos de referencia validados')).toHaveCount(0)
     await page.getByRole('navigation', { name: 'Secciones del paciente' }).getByRole('button', { name: 'Controles' }).click()
-    await expect(page.getByText('Fechas derivadas de las edades AAP en borrador', { exact: false })).toBeVisible()
+    await expect(page.getByText('Fechas derivadas de edades AAP en borrador', { exact: false })).toBeVisible()
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(376)
     await context.clearCookies()
     await page.goto('/acceso')

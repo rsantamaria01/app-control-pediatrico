@@ -124,7 +124,7 @@ try {
     if (datasets.length !== manifest.files.length || datasets.some(row => !row.sealed || row.publisher !== 'WHO' || row.standard !== manifest.standard || row.version !== manifest.version || !manifest.files.some(file => file.indicator === row.indicator && file.sex === row.sex && file.sha256 === row.sha256 && file.url === row.sourceUrl))) throw new Error('Verified official WHO dataset required')
     const [referenceCount] = await pool.query('SELECT count(*)::int AS total FROM who_reference_row').then(result => result.rows)
     if (referenceCount?.total !== 17260) throw new Error('Complete verified WHO reference rows required')
-    const credentials: { username: string, password: string }[] = []
+    let createdAccounts = 0
     for (const [index, entry] of staff.entries()) {
       const [existing] = await db.select().from(user).where(eq(user.id, userIds[index]!))
       if (!existing) {
@@ -134,7 +134,8 @@ try {
           await tx.insert(userRole).values({ userId: userIds[index]!, role: entry.role })
           await tx.insert(account).values({ id: id('account', index), userId: userIds[index]!, accountId: userIds[index]!, providerId: 'credential', password: await hashPassword(password) })
         })
-        credentials.push({ username: entry.username, password })
+        process.stdout.write(`${entry.username}: ${password}\n`)
+        createdAccounts++
       }
     }
     for (const [index, entry] of children.entries()) {
@@ -183,9 +184,8 @@ try {
     }
     await db.insert(clinicSchedule).values({ id: 'demo', durationMinutes: 30 }).onConflictDoNothing()
     await db.insert(clinicSettings).values({ id: 'clinic', name: 'Clínica de Demostración Ficticia', contactEmail: 'clinica.demo@example.invalid', primary: 'brand', updatedBy: doctor.id }).onConflictDoNothing()
+    if (!createdAccounts) process.stdout.write('Demo accounts already exist; passwords were not changed or reprinted.\n')
     process.stdout.write('Fictional preview data seeded; WHO results computed from verified references.\n')
-    if (credentials.length) process.stdout.write(`New demo credentials (shown once):\n${credentials.map(item => `${item.username}: ${item.password}`).join('\n')}\n`)
-    else process.stdout.write('Demo accounts already exist; passwords were not changed or reprinted.\n')
   }
 } finally {
   await pool.end()

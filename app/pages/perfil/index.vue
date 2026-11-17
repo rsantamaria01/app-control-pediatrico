@@ -46,13 +46,13 @@ async function updatePreference(channel: 'email' | 'whatsapp', event: Event) {
 </script>
 
 <template>
-  <UContainer class="max-w-3xl px-0 pb-24 sm:px-4 sm:py-6">
-    <header class="flex min-h-14 items-center border-b border-default bg-default px-4 sm:rounded-t-xl sm:border-x sm:border-t">
-      <h1 class="text-base font-semibold">
+  <UContainer class="max-w-3xl space-y-4 px-4 py-5 pb-24 sm:px-6">
+    <header class="flex min-h-11 items-center">
+      <h1 class="text-xl font-semibold">
         Perfil
       </h1>
     </header>
-    <div class="space-y-4 px-4 pt-4">
+    <div class="space-y-4">
       <UAlert
         v-if="navigationError"
         color="error"

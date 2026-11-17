@@ -2,12 +2,18 @@
 import type { Appointment } from '#shared/types/scheduling'
 import type { FamilyChildSummary } from '../../server/services/invitations'
 
+const route = useRoute()
 const { user } = useUserSession()
 const { data: navigation } = await useFetch<{ label: string, to: string }[]>('/api/auth/navigation')
 const isAdmin = computed(() => Boolean(navigation.value?.some(item => item.to === '/admin/clinica')))
-const isDoctor = computed(() => Boolean(navigation.value?.some(item => item.to === '/pacientes')))
-const isParent = computed(() => Boolean(navigation.value?.some(item => item.to === '/citas')) && !isDoctor.value)
-if (user.value && !isDoctor.value && !isParent.value) {
+const hasDoctorRole = computed(() => Boolean(navigation.value?.some(item => item.to === '/pacientes')))
+const hasStaffRole = computed(() => hasDoctorRole.value || Boolean(navigation.value?.some(item => item.to === '/agenda' || item.to.startsWith('/admin/'))))
+const isFamilyView = computed(() => route.query.vista === 'familiar' && Boolean(navigation.value?.some(item => item.to === '/citas')))
+const isDoctor = computed(() => hasDoctorRole.value && !isFamilyView.value)
+const isParent = computed(() => Boolean(navigation.value?.some(item => item.to === '/citas')) && (!hasStaffRole.value || isFamilyView.value))
+if (!user.value) {
+  await navigateTo('/acceso')
+} else if (!isDoctor.value && !isParent.value) {
   await navigateTo(navigation.value?.some(item => item.to === '/agenda') ? '/agenda' : isAdmin.value ? '/admin/inicio' : '/acceso')
 }
 const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Guayaquil', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
@@ -349,20 +355,5 @@ function age(birthDate: string) {
         </NuxtLink>
       </div>
     </template>
-    <div
-      v-else-if="!user"
-      class="space-y-5"
-    >
-      <UPageHero
-        title="Control Pediátrico"
-        description="Registro de medidas y curvas de crecimiento según los Patrones de Crecimiento Infantil de la OMS."
-      />
-      <UButton
-        to="/reservar"
-        class="min-h-11"
-      >
-        Solicitar cita
-      </UButton>
-    </div>
   </UContainer>
 </template>

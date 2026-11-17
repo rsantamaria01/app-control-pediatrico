@@ -100,10 +100,13 @@ function onSidebarFocusOut(event: FocusEvent) {
   if (!(event.currentTarget as HTMLElement).contains(event.relatedTarget as Node | null)) sidebarFocus.value = false
 }
 function onSidebarEscape(event: KeyboardEvent) {
-  if (event.key !== 'Escape' || pinnedSidebar.value) return
+  if (event.key !== 'Escape' || pinnedSidebar.value || !sidebarExpanded.value) return
   sidebarDismissed.value = true
   sidebarHover.value = false
   sidebarFocus.value = false
+}
+function onGlobalEscape(event: KeyboardEvent) {
+  if (event.key === 'Escape') onSidebarEscape(event)
 }
 onMounted(() => {
   watch(() => user.value?.id, async (id) => {
@@ -124,6 +127,7 @@ onMounted(() => {
   window.addEventListener('beforeinstallprompt', onBeforeInstall)
   window.addEventListener('online', updateConnection)
   window.addEventListener('offline', updateConnection)
+  window.addEventListener('keydown', onGlobalEscape)
   void fetchSession({ force: true }).then(() => refreshNavigation())
 })
 
@@ -131,6 +135,7 @@ onUnmounted(() => {
   window.removeEventListener('beforeinstallprompt', onBeforeInstall)
   window.removeEventListener('online', updateConnection)
   window.removeEventListener('offline', updateConnection)
+  window.removeEventListener('keydown', onGlobalEscape)
 })
 
 useHead({

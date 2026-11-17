@@ -444,7 +444,7 @@ test('production image journeys from bootstrapped admin through two children and
     expect((await context.request.get(`/api/hijos/${otherChild}/vacunas`)).status()).toBe(404)
     expect((await context.request.get('/admin/catalogos')).status()).toBe(403)
     await page.goto('/')
-    await expect(page.getByRole('heading', { name: 'Mis hijos' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: /Hola/ })).toBeVisible()
     const children = await context.request.get('/api/hijos')
     const visibleChildren = (await children.json()).map((item: { id: string }) => item.id)
     expect(visibleChildren).toEqual(expect.arrayContaining([first, second]))
@@ -456,7 +456,8 @@ test('production image journeys from bootstrapped admin through two children and
       expect(denied.headers()['cache-control'], path).toContain('no-store')
     }
     await page.goto(`/hijos/${second}`)
-    await expect(page.getByRole('heading', { name: 'Indicaciones de Sol Prueba' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Sol Prueba' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Indicaciones de tu pediatra' })).toBeVisible()
     await page.goto(`/hijos/${first}`)
     await expect(page.getByRole('heading', { name: 'Vacunas aplicadas' })).toBeVisible()
     expect(await page.locator('main').innerText()).not.toMatch(/PRIVATE_PREVENTIVE_LOT|PRIVATE_PREVENTIVE_NOTE|Complementaria fixture del médico/)

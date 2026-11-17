@@ -1,6 +1,6 @@
-import { and, asc, eq, ilike, or, sql } from 'drizzle-orm'
+import { asc, ilike, or, sql } from 'drizzle-orm'
 import type { Actor } from '../../shared/types/access'
-import { guardianGrant, patient } from '../db/schema'
+import { patient } from '../db/schema'
 import { useDb } from '../utils/db'
 import { shellNavigation } from '../utils/shell-navigation'
 
@@ -53,7 +53,7 @@ export async function searchCommands(actor: Actor, query: string): Promise<Comma
     ...(actor.roles.includes('ADMIN') ? [{ id: 'action:users', label: 'Usuarios', icon: 'i-lucide-users-round', to: '/admin/usuarios' }] : [])
   ].filter(item => mode !== 'patients' && match(item.label))
 
-  if (mode === 'actions' || term.length < 2 || (!doctor && !assistant && !guardian)) return { patients: [], screens, actions }
+  if (mode === 'actions' || term.length < 2 || (!doctor && !assistant)) return { patients: [], screens, actions }
   const db = useDb()
   const escaped = term.replace(/[\\%_]/g, '\\$&')
   let patients: CommandResult[] = []
@@ -67,12 +67,6 @@ export async function searchCommands(actor: Actor, query: string): Promise<Comma
       .where(ilike(sql`unaccent(${patient.name})`, `%${escaped}%`))
       .orderBy(asc(sql`unaccent(${patient.name})`), asc(patient.id)).limit(12)
     patients = rows.map(row => ({ id: `patient:${row.id}`, label: row.name, description: 'Contacto familiar', icon: 'i-lucide-user-round', to: `/representantes/invitar?patient=${encodeURIComponent(row.id)}` }))
-  } else if (guardian) {
-    const rows = await db.select({ id: patient.id, name: patient.name }).from(guardianGrant)
-      .innerJoin(patient, eq(guardianGrant.patientId, patient.id))
-      .where(and(eq(guardianGrant.guardianId, actor.id), eq(guardianGrant.status, 'ACTIVE'), ilike(sql`unaccent(${patient.name})`, `%${escaped}%`)))
-      .orderBy(asc(sql`unaccent(${patient.name})`), asc(patient.id)).limit(12)
-    patients = rows.map(row => ({ id: `child:${row.id}`, label: row.name, description: 'Mi hijo o hija', icon: 'i-lucide-user-round', to: `/hijos/${encodeURIComponent(row.id)}` }))
   }
   return { patients, screens, actions }
 }

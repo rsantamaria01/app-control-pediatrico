@@ -7,6 +7,25 @@ const config = useRuntimeConfig()
 const brand = clinicBrand(config.public.clinicPrimary, config.public.clinicLogo)
 updateAppConfig({ ui: { colors: { primary: brand.primary } } })
 const online = ref(true)
+const showInstall = ref(false)
+const installDismissed = ref(false)
+const iosInstall = ref(false)
+let installEvent: Event | undefined
+function onBeforeInstall(event: Event) {
+  event.preventDefault()
+  installEvent = event
+  showInstall.value = !installDismissed.value
+}
+async function installApp() {
+  if (installEvent && 'prompt' in installEvent) await (installEvent as Event & { prompt: () => Promise<void> }).prompt()
+  showInstall.value = false
+}
+function dismissInstall() {
+  installDismissed.value = true
+  showInstall.value = false
+  iosInstall.value = false
+  sessionStorage.setItem('install-dismissed', 'yes')
+}
 const route = useRoute()
 const { user, loggedIn, fetchSession, signOut } = useUserSession()
 const { data: navigation, refresh: refreshNavigation } = await useFetch<{ label: string, to: string }[]>('/api/auth/navigation', { default: () => [] })
@@ -55,6 +74,9 @@ const updateConnection = () => {
 
 onMounted(() => {
   updateConnection()
+  installDismissed.value = sessionStorage.getItem('install-dismissed') === 'yes'
+  iosInstall.value = !installDismissed.value && /iP(hone|ad|od)/.test(navigator.userAgent) && !window.matchMedia('(display-mode: standalone)').matches && loggedIn.value
+  window.addEventListener('beforeinstallprompt', onBeforeInstall)
   window.addEventListener('online', updateConnection)
   window.addEventListener('offline', updateConnection)
   window.addEventListener('keydown', onShortcut)
@@ -62,6 +84,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  window.removeEventListener('beforeinstallprompt', onBeforeInstall)
   window.removeEventListener('online', updateConnection)
   window.removeEventListener('offline', updateConnection)
   window.removeEventListener('keydown', onShortcut)
@@ -272,6 +295,10 @@ useSeoMeta({
         </template>
         <template #body>
           <main class="min-h-full bg-muted pb-24 lg:pb-0">
+            <header v-if="route.path === '/'" class="flex h-14 items-center justify-between border-b border-default bg-default px-4 lg:hidden">
+              <span class="flex items-center gap-2 font-semibold"><img :src="brand.logo" alt="" class="size-7" aria-hidden="true">{{ clinicName }}</span>
+              <UButton to="/pacientes" icon="i-lucide-search" variant="ghost" color="neutral" aria-label="Buscar pacientes" class="min-h-11 min-w-11" />
+            </header>
             <NuxtPage />
           </main>
         </template>
@@ -283,6 +310,22 @@ useSeoMeta({
     >
       <NuxtPage />
     </main>
+    <div v-if="online && !publicPage && showInstall && !installDismissed" class="fixed inset-x-0 top-0 z-50 flex items-center gap-2 bg-primary px-4 py-2 text-sm font-semibold text-white lg:hidden">
+      <UIcon name="i-lucide-download" class="size-5" aria-hidden="true" />
+      <span class="min-w-0 flex-1">Instale la app en su teléfono</span>
+      <UButton color="neutral" variant="solid" size="sm" class="min-h-9" @click="installApp">Instalar</UButton>
+      <UButton icon="i-lucide-x" variant="ghost" color="neutral" aria-label="Cerrar aviso" class="min-h-9 min-w-9" @click="dismissInstall" />
+    </div>
+    <UModal v-model:open="iosInstall" title="Agregar a la pantalla de inicio" :ui="{ content: 'sm:max-w-sm' }">
+      <template #body>
+        <ol class="space-y-4 text-sm">
+          <li class="flex gap-3"><span class="font-bold text-primary">1</span>Toque Compartir en la barra de Safari.</li>
+          <li class="flex gap-3"><span class="font-bold text-primary">2</span>Elija Agregar a inicio.</li>
+          <li class="flex gap-3"><span class="font-bold text-primary">3</span>Toque Agregar. La app aparecerá con el ícono de la clínica.</li>
+        </ol>
+        <UButton block variant="outline" color="neutral" class="mt-5 min-h-11" @click="dismissInstall">Entendido</UButton>
+      </template>
+    </UModal>
     <nav
       v-if="online && !publicPage && visibleItems.length"
       aria-label="Navegación principal"

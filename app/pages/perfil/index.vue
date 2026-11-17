@@ -11,7 +11,8 @@ watch(isParent, async (allowed) => {
 })
 const { user, signOut } = useUserSession()
 const auth = useAuthClient()
-const roles = computed(() => [navigation.value.some(item => item.to === '/admin/clinica') && 'Administración', navigation.value.some(item => item.to === '/pacientes') && 'Pediatra', navigation.value.some(item => item.to === '/agenda' && !navigation.value.some(link => link.to === '/pacientes')) && 'Asistente'].filter(Boolean).join(' · '))
+const { data: identity } = await useFetch<{ name: string, email: string, username: string | null, roles: string[] }>('/api/perfil', { enabled: isStaff })
+const roles = computed(() => identity.value?.roles.map(role => ({ ADMIN: 'Administración', DOCTOR: 'Pediatra', ASSISTANT: 'Asistente', PATIENT: 'Representante' })[role as 'ADMIN' | 'DOCTOR' | 'ASSISTANT' | 'PATIENT'] ?? role).join(' · ') ?? '')
 const passwordOpen = ref(false)
 const currentPassword = ref('')
 const newPassword = ref('')
@@ -85,7 +86,7 @@ async function updatePreference(channel: 'email' | 'whatsapp', event: Event) {
           <div class="min-w-0"><h2 class="text-lg font-semibold">{{ user?.name }}</h2><p class="text-sm text-muted">{{ roles }}</p></div>
         </div>
         <dl class="mt-4 grid gap-3 border-t border-default pt-4 text-sm sm:grid-cols-2">
-          <div><dt class="text-muted">Usuario</dt><dd class="font-medium">{{ user?.username || '—' }}</dd></div>
+          <div><dt class="text-muted">Usuario</dt><dd class="font-medium">{{ identity?.username || '—' }}</dd></div>
           <div><dt class="text-muted">Correo electrónico</dt><dd class="break-all font-medium">{{ user?.email || '—' }}</dd></div>
         </dl>
       </section>

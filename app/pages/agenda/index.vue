@@ -256,7 +256,7 @@ function openDetail(item: Appointment) {
                 :class="day === selected ? 'border-primary' : day === today ? 'bg-primary/5' : ''"
                 @click="selected = day; navigateTo({ query: { vista: 'dia', fecha: day } })"
               >
-                <strong>{{ Number(day.slice(8)) }}</strong><span class="text-xs font-semibold text-primary">{{ appointmentsFor(day).length || '' }}<span class="hidden sm:inline"> {{ appointmentsFor(day).length === 1 ? 'cita' : 'citas' }}</span></span>
+                <strong>{{ Number(day.slice(8)) }}</strong><span class="text-xs font-semibold text-primary"><template v-if="appointmentsFor(day).length">{{ appointmentsFor(day).length }}<span class="hidden sm:inline"> {{ appointmentsFor(day).length === 1 ? 'cita' : 'citas' }}</span></template></span>
               </button>
             </div>
           </div>

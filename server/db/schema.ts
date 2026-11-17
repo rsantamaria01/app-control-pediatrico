@@ -2,8 +2,9 @@ import { bigint, boolean, check, index, integer, jsonb, numeric, pgTable, primar
 import { sql } from 'drizzle-orm'
 
 export { appointment, blockedHour, bookingNotice, bookingProof, bookingRequest, clinicSchedule, openingHour } from './schema/scheduling.ts'
-export { notificationOutbox, notificationAttempt, notificationPreference, inAppNotice } from './schema/notifications.ts'
+export { notificationOutbox, notificationAttempt, notificationPreference, inAppNotice, whatsappSettings, whatsappHealth } from './schema/notifications.ts'
 export { smtpSettings } from './schema/smtp.ts'
+export { clinicSettings, dataRequest } from './schema/admin.ts'
 export { catalogItem, catalogRelease, doctorCatalogEntry } from './schema/catalogs.ts'
 export { vaccineDose, vaccineDoseClaim, complementaryVaccine, milestoneAssessment, screeningApplication, individualCheckup, completedCheckup } from './schema/preventive.ts'
 

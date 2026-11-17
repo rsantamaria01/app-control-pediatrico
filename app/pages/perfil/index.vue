@@ -157,6 +157,25 @@ async function updatePreference(channel: 'email' | 'whatsapp', event: Event) {
           </button>
         </div>
       </section>
+      <div
+        v-if="!navigationError && ((isParent && data && !error) || isStaff)"
+        class="flex flex-wrap gap-3"
+      >
+        <UButton
+          to="/perfil/mis-datos"
+          variant="outline"
+          class="min-h-11"
+        >
+          Mis datos
+        </UButton>
+        <UButton
+          to="/privacidad"
+          variant="outline"
+          class="min-h-11"
+        >
+          Privacidad
+        </UButton>
+      </div>
       <UButton
         v-if="isStaff && !navigationError"
         variant="ghost"

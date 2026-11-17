@@ -6,9 +6,10 @@ import { clinicBrand } from '../utils/clinic-brand'
 const auth = useAuthClient()
 const { fetchSession } = useUserSession()
 const config = useRuntimeConfig()
-const brand = clinicBrand(config.public.clinicPrimary, config.public.clinicLogo)
+const { data: savedBrand } = await useFetch<{ primary: string, logo: string | null }>('/api/public/clinica-brand', { key: 'clinic-brand' })
+const brand = computed(() => clinicBrand(savedBrand.value?.primary ?? config.public.clinicPrimary, savedBrand.value ? savedBrand.value.logo ?? '' : config.public.clinicLogo))
 const { data: navigation, refresh: refreshNavigation } = await useFetch<{ to: string }[]>('/api/auth/navigation', { default: () => [] })
-if (navigation.value.length) await navigateTo(navigation.value.some(item => item.to === '/') ? '/' : navigation.value.some(item => item.to === '/agenda') ? '/agenda' : '/admin/clinica')
+if (navigation.value.length) await navigateTo(navigation.value.some(item => item.to === '/') ? '/' : navigation.value.some(item => item.to === '/agenda') ? '/agenda' : '/admin/inicio')
 const state = reactive({ username: '', password: '' })
 const pending = ref(false)
 const error = ref('')
@@ -23,7 +24,7 @@ async function signIn(event: FormSubmitEvent<{ username: string, password: strin
     if (response.error) throw response.error
     await fetchSession({ force: true })
     await refreshNavigation()
-    const destination = navigation.value.some(item => item.to === '/') ? '/' : navigation.value.some(item => item.to === '/agenda') ? '/agenda' : '/admin/clinica'
+    const destination = navigation.value.some(item => item.to === '/') ? '/' : navigation.value.some(item => item.to === '/agenda') ? '/agenda' : '/admin/inicio'
     await navigateTo(destination)
   } catch {
     error.value = 'Usuario o contraseña incorrectos'

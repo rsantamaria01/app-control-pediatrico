@@ -21,6 +21,7 @@
   },
   "model": "omniroute/models-high",
   "small_model": "omniroute/models-fast",
+  "permission": { "external_directory": { "/tmp/*": "allow", "/tmp/**": "allow" } },
   "mcp": {
     "hindsight": {
       "type": "remote",

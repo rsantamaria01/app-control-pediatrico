@@ -13,7 +13,7 @@ const password = 'unique fidelity test passphrase'
 const roles = {
   DOCTOR: { destination: '/', desktop: [['Inicio', '/'], ['Pacientes', '/pacientes'], ['Agenda', '/agenda'], ['Avisos', '/avisos'], ['Perfil', '/perfil']], mobile: [['Inicio', '/'], ['Pacientes', '/pacientes'], ['Agenda', '/agenda'], ['Avisos', '/avisos'], ['Perfil', '/perfil']] },
   ASSISTANT: { destination: '/agenda', desktop: [['Agenda', '/agenda'], ['Horarios', '/agenda/horarios'], ['Avisos', '/avisos'], ['Perfil', '/perfil']], mobile: [['Agenda', '/agenda'], ['Horarios', '/agenda/horarios'], ['Avisos', '/avisos'], ['Perfil', '/perfil']] },
-  ADMIN: { destination: '/admin/clinica', desktop: [['Clínica', '/admin/clinica'], ['Catálogos', '/admin/catalogos']], mobile: [['Clínica', '/admin/clinica'], ['Catálogos', '/admin/catalogos']] },
+  ADMIN: { destination: '/admin/inicio', desktop: [['Configuración inicial', '/admin/inicio'], ['Usuarios', '/admin/usuarios'], ['Clínica', '/admin/clinica'], ['Catálogos', '/admin/catalogos'], ['Auditoría', '/admin/auditoria']], mobile: [['Clínica', '/admin/clinica'], ['Catálogos', '/admin/catalogos']] },
   PATIENT: { destination: '/', desktop: [['Inicio', '/'], ['Citas', '/citas'], ['Avisos', '/avisos'], ['Perfil', '/perfil']], mobile: [['Inicio', '/'], ['Citas', '/citas'], ['Avisos', '/avisos'], ['Perfil', '/perfil']] }
 } as const
 
@@ -94,6 +94,21 @@ test.describe('board fidelity: public access and role-aware shell', () => {
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
   })
 
+  test('guardian can open Mis datos from Perfil and return to the profile', async ({ page }) => {
+    await signIn(page, 'PATIENT')
+    await page.goto('/perfil')
+    await page.getByRole('link', { name: 'Mis datos' }).click()
+    await expect(page).toHaveURL('/perfil/mis-datos')
+    await expect(page.getByRole('heading', { name: 'Mis datos' })).toBeVisible()
+    await page.getByRole('link', { name: 'Privacidad' }).click()
+    await expect(page.getByRole('heading', { name: 'Privacidad' })).toBeVisible()
+    await page.getByRole('link', { name: 'Ir a Mis datos' }).click()
+    await expect(page).toHaveURL('/perfil/mis-datos')
+    await expect(page.getByRole('heading', { name: 'Mis datos' })).toBeVisible()
+    await page.goto('/perfil')
+    await expect(page.getByRole('heading', { name: 'Perfil' })).toBeVisible()
+  })
+
   for (const role of Object.keys(roles) as Array<keyof typeof roles>) {
     for (const width of [1440, 1024, 390] as const) {
       test(`${role} at ${width}px shows its shell immediately after sign-in and never the public landing`, async ({ page }) => {
@@ -129,7 +144,7 @@ test.describe('board fidelity: public access and role-aware shell', () => {
           await expectLinks(page, `nav[aria-label="${label}"]`, roles[role].desktop, width === 1024)
           if (role !== 'ADMIN') await expect(page.getByRole('navigation', { name: 'Administración' })).toHaveCount(0)
           else await expect(page.getByRole('navigation', { name: 'Navegación principal' })).toHaveCount(0)
-          const title = role === 'DOCTOR' ? 'Inicio' : role === 'ASSISTANT' ? 'Agenda' : 'Clínica'
+          const title = role === 'DOCTOR' ? 'Inicio' : role === 'ASSISTANT' ? 'Agenda' : 'Configuración inicial'
           const topbar = page.locator('h1[data-slot="title"]').filter({ hasText: title }).locator('xpath=../..')
           await expect(topbar).toBeVisible()
           await expect(topbar.getByRole('heading', { name: title, exact: true })).toBeVisible()

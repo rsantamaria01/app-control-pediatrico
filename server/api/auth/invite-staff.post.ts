@@ -1,5 +1,6 @@
 import { defineEventHandler, readBody } from 'h3'
 import { z } from 'zod'
+import { staffInviteSchema } from '../../../shared/types/admin'
 import { randomBytes, randomUUID, createHash } from 'node:crypto'
 import { Client } from 'pg'
 import { and, eq, isNull, sql } from 'drizzle-orm'
@@ -11,7 +12,13 @@ import { recordAudit } from '../../services/audit'
 
 export default defineEventHandler(async (event) => {
   const actor = await requireCapability(event, 'ADMINISTER')
-  const body = z.object({ email: z.string().trim().pipe(z.email()), name: z.string().min(1), role: z.enum(['DOCTOR', 'ASSISTANT']) }).parse(await readBody(event))
+  const input = await readBody(event)
+  let body
+  if (input && typeof input === 'object' && 'roles' in input) body = staffInviteSchema.parse(input)
+  else {
+    const { role, ...legacy } = z.object({ email: z.string(), name: z.string(), role: z.enum(['DOCTOR', 'ASSISTANT']) }).parse(input)
+    body = staffInviteSchema.parse({ ...legacy, roles: [role] })
+  }
   const email = body.email.trim().toLowerCase()
   const token = randomBytes(32).toString('base64url')
   const digest = createHash('sha256').update(token).digest('hex')
@@ -30,12 +37,12 @@ export default defineEventHandler(async (event) => {
       let target = existing?.id
       if (existing) {
         const [credential] = await tx.select({ id: account.id }).from(account).where(and(eq(account.userId, existing.id), eq(account.providerId, 'credential')))
-        const [role] = await tx.select({ role: userRole.role }).from(userRole).where(eq(userRole.userId, existing.id))
-        if (credential || role?.role !== body.role) return null
+        const assigned = await tx.select({ role: userRole.role }).from(userRole).where(eq(userRole.userId, existing.id))
+        if (credential || assigned.length !== body.roles.length || assigned.some(row => !body.roles.includes(row.role as typeof body.roles[number]))) return null
       } else {
         target = randomUUID()
         await tx.insert(user).values({ id: target, email, name: body.name })
-        await tx.insert(userRole).values({ userId: target, role: body.role })
+        await tx.insert(userRole).values(body.roles.map(role => ({ userId: target!, role })))
       }
       targetId = target
       return target!

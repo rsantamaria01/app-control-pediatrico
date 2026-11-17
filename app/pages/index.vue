@@ -4,10 +4,11 @@ import type { FamilyChildSummary } from '../../server/services/invitations'
 
 const { user } = useUserSession()
 const { data: navigation } = await useFetch<{ label: string, to: string }[]>('/api/auth/navigation')
+const isAdmin = computed(() => Boolean(navigation.value?.some(item => item.to === '/admin/clinica')))
 const isDoctor = computed(() => Boolean(navigation.value?.some(item => item.to === '/pacientes')))
 const isParent = computed(() => Boolean(navigation.value?.some(item => item.to === '/citas')) && !isDoctor.value)
-if (!isDoctor.value && !isParent.value) {
-  await navigateTo(navigation.value?.some(item => item.to === '/agenda') ? '/agenda' : navigation.value?.some(item => item.to.startsWith('/admin/')) ? '/admin/clinica' : '/acceso')
+if (user.value && !isDoctor.value && !isParent.value) {
+  await navigateTo(navigation.value?.some(item => item.to === '/agenda') ? '/agenda' : isAdmin.value ? '/admin/inicio' : '/acceso')
 }
 const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Guayaquil', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
 const { data: appointments, error, refresh } = await useFetch<Appointment[]>('/api/agenda', { query: { from: today, to: today }, immediate: isDoctor.value, default: () => [] })
@@ -348,5 +349,20 @@ function age(birthDate: string) {
         </NuxtLink>
       </div>
     </template>
+    <div
+      v-else-if="!user"
+      class="space-y-5"
+    >
+      <UPageHero
+        title="Control Pediátrico"
+        description="Registro de medidas y curvas de crecimiento según los Patrones de Crecimiento Infantil de la OMS."
+      />
+      <UButton
+        to="/reservar"
+        class="min-h-11"
+      >
+        Solicitar cita
+      </UButton>
+    </div>
   </UContainer>
 </template>

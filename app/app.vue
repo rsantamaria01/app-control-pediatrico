@@ -4,8 +4,9 @@ import { clinicBrand } from './utils/clinic-brand'
 
 const locale = extendLocale(es, { code: 'es-EC' })
 const config = useRuntimeConfig()
-const brand = clinicBrand(config.public.clinicPrimary, config.public.clinicLogo)
-updateAppConfig({ ui: { colors: { primary: brand.primary } } })
+const { data: savedBrand } = await useFetch<{ name: string, primary: string, logo: string | null }>('/api/public/clinica-brand', { key: 'clinic-brand' })
+const brand = computed(() => clinicBrand(savedBrand.value?.primary ?? config.public.clinicPrimary, savedBrand.value ? savedBrand.value.logo ?? '' : config.public.clinicLogo))
+watch(() => brand.value.primary, primary => updateAppConfig({ ui: { colors: { primary } } }), { immediate: true })
 const online = ref(true)
 const showInstall = ref(false)
 const installDismissed = ref(false)
@@ -34,19 +35,37 @@ const isDoctor = computed(() => navigation.value.some(item => item.to === '/paci
 const isParent = computed(() => navigation.value.some(item => item.to === '/citas'))
 const isAdmin = computed(() => navigation.value.some(item => item.to.startsWith('/admin/')))
 const staffItems = computed(() => navigation.value.filter(item => !item.to.startsWith('/admin/')))
-const adminItems = computed(() => navigation.value.filter(item => item.to.startsWith('/admin/')))
+const adminItems = computed(() => isAdmin.value
+  ? [
+      { label: 'Configuración inicial', to: '/admin/inicio' },
+      { label: 'Usuarios', to: '/admin/usuarios' },
+      ...navigation.value.filter(item => item.to.startsWith('/admin/')),
+      { label: 'Auditoría', to: '/admin/auditoria' }
+    ]
+  : [])
 const visibleItems = computed(() => isParent.value ? navigation.value.filter(item => ['/', '/citas', '/avisos', '/perfil'].includes(item.to)) : staffItems.value.length ? staffItems.value : adminItems.value)
-const icons: Record<string, string> = { '/': 'i-lucide-house', '/pacientes': 'i-lucide-users-round', '/agenda': 'i-lucide-calendar-days', '/agenda/horarios': 'i-lucide-clock', '/avisos': 'i-lucide-bell', '/perfil': 'i-lucide-user-round', '/citas': 'i-lucide-calendar-days', '/admin/clinica': 'i-lucide-settings', '/admin/catalogos': 'i-lucide-book-open' }
+const mobileItems = computed(() => isAdmin.value && !staffItems.value.length
+  ? adminItems.value.filter(item => ['/admin/clinica', '/admin/catalogos'].includes(item.to))
+  : isAdmin.value && !isParent.value
+    ? visibleItems.value.filter(item => item.to !== '/perfil')
+    : visibleItems.value)
+const mobileMoreItems = computed(() => isAdmin.value && !isParent.value
+  ? [
+      ...navigation.value.filter(item => item.to === '/perfil' && !mobileItems.value.some(mobile => mobile.to === item.to)),
+      ...adminItems.value.filter(item => !mobileItems.value.some(mobile => mobile.to === item.to))
+    ].map(item => ({ ...item, icon: icons[item.to] }))
+  : [])
+const icons: Record<string, string> = { '/': 'i-lucide-house', '/pacientes': 'i-lucide-users-round', '/agenda': 'i-lucide-calendar-days', '/agenda/horarios': 'i-lucide-clock', '/avisos': 'i-lucide-bell', '/perfil': 'i-lucide-user-round', '/citas': 'i-lucide-calendar-days', '/admin/inicio': 'i-lucide-house', '/admin/usuarios': 'i-lucide-users-round', '/admin/clinica': 'i-lucide-settings', '/admin/catalogos': 'i-lucide-book-open', '/admin/auditoria': 'i-lucide-scroll-text' }
 const navItems = computed(() => visibleItems.value.map(item => ({ ...item, icon: icons[item.to], active: route.path === item.to || (item.to !== '/' && route.path.startsWith(`${item.to}/`)) })))
 const adminNavItems = computed(() => adminItems.value.map(item => ({ ...item, icon: icons[item.to], active: route.path === item.to })))
-const pageTitle = computed(() => ({ '/': 'Inicio', '/pacientes': 'Pacientes', '/pacientes/nuevo': 'Nuevo paciente', '/agenda': 'Agenda', '/agenda/horarios': 'Horarios', '/agenda/solicitudes': 'Solicitudes', '/avisos': 'Avisos', '/perfil': 'Perfil', '/admin/clinica': 'Clínica', '/admin/catalogos': 'Catálogos' })[route.path] ?? (route.path.startsWith('/pacientes/') ? 'Ficha del paciente' : 'Control Pediátrico'))
+const pageTitle = computed(() => ({ '/': 'Inicio', '/pacientes': 'Pacientes', '/pacientes/nuevo': 'Nuevo paciente', '/agenda': 'Agenda', '/agenda/horarios': 'Horarios', '/agenda/solicitudes': 'Solicitudes', '/avisos': 'Avisos', '/perfil': 'Perfil', '/admin/inicio': 'Configuración inicial', '/admin/usuarios': 'Usuarios', '/admin/clinica': 'Clínica', '/admin/catalogos': 'Catálogos', '/admin/auditoria': 'Auditoría' })[route.path] ?? (route.path.startsWith('/pacientes/') ? 'Ficha del paciente' : 'Control Pediátrico'))
 const search = ref('')
 const searchInput = ref<{ inputRef?: HTMLInputElement } | null>(null)
 const collapsed = ref(false)
 const narrowSidebar = ref(false)
 let releaseSidebarWidth: (() => void) | undefined
 const pageAction = computed(() => route.path === '/' || route.path === '/pacientes' ? { label: 'Nuevo paciente', to: '/pacientes/nuevo' } : null)
-const clinicName = 'Pediatría'
+const clinicName = computed(() => savedBrand.value?.name ?? 'Pediatría')
 
 watch(loggedIn, async () => {
   await refreshNavigation()
@@ -364,7 +383,7 @@ useSeoMeta({
       </main>
     </NuxtPage>
     <div
-      v-if="online && !publicPage && showInstall && !installDismissed"
+      v-if="online && !publicPage && navigation.length && showInstall && !installDismissed"
       class="fixed inset-x-0 top-0 z-50 flex items-center gap-2 bg-primary px-4 py-2 text-sm font-semibold text-white lg:hidden"
     >
       <UIcon
@@ -420,12 +439,12 @@ useSeoMeta({
       </template>
     </UModal>
     <nav
-      v-if="online && !publicPage && visibleItems.length"
+      v-if="online && !publicPage && mobileItems.length"
       aria-label="Navegación principal"
       class="fixed inset-x-0 bottom-0 z-40 grid grid-flow-col border-t border-default bg-default pb-[env(safe-area-inset-bottom)] lg:hidden"
     >
       <NuxtLink
-        v-for="item in visibleItems"
+        v-for="item in mobileItems"
         :key="item.to"
         :to="item.to"
         :aria-current="route.path === item.to ? 'page' : undefined"
@@ -438,6 +457,19 @@ useSeoMeta({
           aria-hidden="true"
         />{{ item.label }}
       </NuxtLink>
+      <UDropdownMenu
+        v-if="mobileMoreItems.length"
+        :items="mobileMoreItems"
+        :content="{ align: 'end', side: 'top' }"
+      >
+        <UButton
+          label="Más"
+          icon="i-lucide-menu"
+          color="neutral"
+          variant="ghost"
+          class="min-h-16 min-w-0 flex-col justify-center gap-0.5 text-[11px]"
+        />
+      </UDropdownMenu>
     </nav>
   </UApp>
 </template>

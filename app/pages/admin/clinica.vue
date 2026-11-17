@@ -114,17 +114,19 @@ async function sendTest(event: FormSubmitEvent<z.output<typeof smtpTestSchema>>)
           class="mt-3 flex min-h-11 items-center gap-1 border-b border-default text-sm font-medium text-muted"
           aria-label="Secciones de la clínica"
         >
-          <span class="px-3 py-3">Marca</span>
-          <span class="px-3 py-3">Contacto</span>
-          <span
-            class="border-b-2 border-primary px-3 py-3 font-semibold text-primary"
-            aria-current="page"
-          >Recordatorios</span>
+          <a
+            href="#marca"
+            class="px-3 py-3 focus-visible:outline-2 focus-visible:outline-primary"
+          >Marca y contacto</a>
+          <a
+            href="#recordatorios"
+            class="border-b-2 border-primary px-3 py-3 font-semibold text-primary focus-visible:outline-2 focus-visible:outline-primary"
+          >Recordatorios</a>
         </div>
       </div>
     </header>
 
-    <UContainer class="max-w-7xl py-6">
+    <UContainer class="max-w-7xl space-y-5 py-6">
       <div class="grid items-start gap-5 xl:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]">
         <div class="min-w-0 space-y-5">
           <section
@@ -613,6 +615,19 @@ async function sendTest(event: FormSubmitEvent<z.output<typeof smtpTestSchema>>)
             <p class="mt-1 text-sm text-muted">
               Las reglas y horarios de envío todavía no se administran desde esta pantalla. La configuración de proveedores no activa recordatorios por sí sola.
             </p>
+          </section>
+          <section
+            id="marca"
+            aria-labelledby="brand-heading"
+            class="rounded-xl border border-default bg-default p-4"
+          >
+            <h2
+              id="brand-heading"
+              class="mb-4 text-lg font-semibold text-default"
+            >
+              Marca y contacto
+            </h2>
+            <AdminClinicIdentityForm />
           </section>
         </div>
 

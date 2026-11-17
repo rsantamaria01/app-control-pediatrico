@@ -131,7 +131,7 @@ test.describe('doctor clinical journey with isolated auth and WHO database', () 
       await page.getByRole('textbox', { name: 'Usuario' }).fill(username)
       await page.getByLabel('Contraseña').fill(password)
       await page.getByRole('button', { name: 'Ingresar' }).click()
-      await expect(page).toHaveURL(role === 'ADMIN' ? '/admin/clinica' : role === 'ASSISTANT' ? '/agenda' : '/')
+      await expect(page).toHaveURL(role === 'ADMIN' ? '/admin/inicio' : role === 'ASSISTANT' ? '/agenda' : '/')
       for (const path of ['/api/pacientes', `/api/pacientes/${patientId}`, `/api/pacientes/${patientId}/identidad`]) {
         const response = await context.request.get(path)
         expect(response.status()).toBe(403)

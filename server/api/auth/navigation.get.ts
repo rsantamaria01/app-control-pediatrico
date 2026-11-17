@@ -4,5 +4,5 @@ import { shellNavigation } from '../../utils/shell-navigation'
 
 export default defineEventHandler(async (event) => {
   const actor = await resolveActor(event)
-  return shellNavigation(actor, ['/', '/pacientes', '/representantes/invitar', '/agenda', '/agenda/solicitudes', '/agenda/horarios', '/citas', '/catalogos', '/admin/catalogos', '/admin/clinica'])
+  return shellNavigation(actor, ['/', '/pacientes', '/agenda', '/agenda/horarios', '/citas', '/avisos', '/perfil', '/admin/catalogos', '/admin/clinica'])
 })

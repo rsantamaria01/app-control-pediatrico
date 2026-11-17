@@ -6,21 +6,23 @@ const entries: Record<Role, Item[]> = {
   DOCTOR: [
     { label: 'Inicio', to: '/' },
     { label: 'Pacientes', to: '/pacientes' },
-    { label: 'Catálogos', to: '/catalogos' },
     { label: 'Agenda', to: '/agenda' },
-    { label: 'Solicitudes', to: '/agenda/solicitudes' }
+    { label: 'Avisos', to: '/avisos' },
+    { label: 'Perfil', to: '/perfil' }
   ],
   ASSISTANT: [
-    { label: 'Invitaciones', to: '/representantes/invitar' },
     { label: 'Agenda', to: '/agenda' },
-    { label: 'Solicitudes', to: '/agenda/solicitudes' },
-    { label: 'Horarios', to: '/agenda/horarios' }
+    { label: 'Horarios', to: '/agenda/horarios' },
+    { label: 'Avisos', to: '/avisos' },
+    { label: 'Perfil', to: '/perfil' }
   ],
   PATIENT: [
     { label: 'Inicio', to: '/' },
-    { label: 'Citas', to: '/citas' }
+    { label: 'Citas', to: '/citas' },
+    { label: 'Avisos', to: '/avisos' },
+    { label: 'Perfil', to: '/perfil' }
   ],
-  ADMIN: [{ label: 'Usuarios', to: '/admin/usuarios' }, { label: 'Catálogos', to: '/admin/catalogos' }, { label: 'Clínica', to: '/admin/clinica' }]
+  ADMIN: [{ label: 'Clínica', to: '/admin/clinica' }, { label: 'Catálogos', to: '/admin/catalogos' }]
 }
 
 export function shellNavigation(actor: Actor | null, availableRoutes: readonly string[]): Item[] {

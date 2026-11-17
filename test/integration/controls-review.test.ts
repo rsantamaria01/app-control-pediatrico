@@ -51,14 +51,14 @@ it('includes overdue individual control without an appointment and displays auth
   expect(await listPendingControls(doctor, new Date('2026-02-01T12:00:00Z'))).toMatchObject([{ id, name: 'Niña pendiente', reason: 'Revisión indicada por médico' }])
 })
 
-it('hides an active appointment without marking the control complete, and completion clears it', async () => {
+it('keeps a booked control pending until completion is recorded', async () => {
   const id = randomUUID()
   const individualId = randomUUID()
   await db.insert(patient).values({ id, name: 'Niño con cita', birthDate: '2024-01-01', sex: 'MALE', createdBy: doctor.id })
   await db.insert(individualCheckup).values({ id: individualId, patientId: id, date: '2026-01-01', reason: 'Control individual', authorId: doctor.id })
   const appointmentId = randomUUID()
   await db.insert(appointment).values({ id: appointmentId, patientId: id, name: 'Niño con cita', contact: 'example@test.invalid', reason: '', startsAt: new Date('2026-02-10T12:00:00Z'), endsAt: new Date('2026-02-10T12:30:00Z'), status: 'CONFIRMED', createdBy: doctor.id })
-  expect((await listPendingControls(doctor, new Date('2026-02-01T12:00:00Z'))).some(row => row.id === id)).toBe(false)
+  expect((await listPendingControls(doctor, new Date('2026-02-01T12:00:00Z'))).some(row => row.id === id)).toBe(true)
   await db.update(appointment).set({ status: 'CANCELLED' }).where(eq(appointment.id, appointmentId))
   expect((await listPendingControls(doctor, new Date('2026-02-01T12:00:00Z'))).some(row => row.id === id)).toBe(true)
   await db.insert(completedCheckup).values({ id: randomUUID(), patientId: id, individualId, completedAt: '2026-02-01', authorId: doctor.id })

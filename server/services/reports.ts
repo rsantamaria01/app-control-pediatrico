@@ -180,7 +180,7 @@ function decimal(value: number, digits: number) {
   return numberFormat(digits).format(value)
 }
 
-async function pdfDocument(build: (doc: PDFKit.PDFDocument) => Promise<void> | void, privateNotes = false): Promise<Buffer> {
+async function pdfDocument(build: (doc: PDFKit.PDFDocument) => Promise<void> | void): Promise<Buffer> {
   const doc = new PDFDocument({ size: 'A4', margin: 48, autoFirstPage: false, bufferPages: true, info: { Title: 'Informe de crecimiento', Author: 'Control Pediátrico' } })
   const chunks: Buffer[] = []
   doc.on('data', chunk => chunks.push(chunk as Buffer))
@@ -195,7 +195,7 @@ async function pdfDocument(build: (doc: PDFKit.PDFDocument) => Promise<void> | v
   for (let i = 0; i < count; i++) {
     doc.switchToPage(i)
     doc.moveTo(48, 760).lineTo(547, 760).strokeColor('#e2e8f0').lineWidth(0.7).stroke()
-    if (!privateNotes) doc.font('regular').fontSize(8).fillColor('#64748b').text('No incluye notas clínicas privadas', 48, 771, { width: 300, lineBreak: false })
+    doc.font('regular').fontSize(8).fillColor('#64748b').text('No incluye notas clínicas privadas', 48, 771, { width: 300, lineBreak: false })
     doc.text(`Página ${i + 1} de ${count}`, 440, 771, { width: 107, align: 'right', lineBreak: false })
   }
   doc.end()
@@ -470,7 +470,7 @@ export async function renderFamilyReport(actor: Actor, patientId: string, report
   return Buffer.from(row.pdfBase64, 'base64')
 }
 
-export async function renderDoctorReport(actor: Actor, patientId: string, includePrivateNotes: boolean): Promise<Buffer> {
+export async function renderDoctorReport(actor: Actor, patientId: string): Promise<Buffer> {
   const person = await getPatient(actor, patientId)
   const visits = await getVisits(actor, patientId)
   const doctor = await useDb().select({ name: user.name }).from(user).where(eq(user.id, actor.id)).limit(1)
@@ -532,8 +532,6 @@ export async function renderDoctorReport(actor: Actor, patientId: string, includ
       flowBlock(doc, `Control del ${date(item.measuredAt)}`, `Peso ${decimal(item.weightKg, 2)} kg · ${item.position === 'RECUMBENT' ? 'Longitud acostada' : 'Talla de pie'} ${decimal(item.lengthHeightCm, 1)} cm · Perímetro cefálico ${decimal(item.headCircumferenceCm, 1)} cm · IMC ${decimal(item.bmi, 2)}`, primary, newPage)
       if (item.parentAdvice) flowBlock(doc, 'Indicaciones compartidas', item.parentAdvice, primary, newPage, true)
       if (item.nextControlAt) flowBlock(doc, 'Próximo control', dateTimeFormat.format(new Date(item.nextControlAt)), primary, newPage)
-      if (includePrivateNotes && item.privateNote) flowBlock(doc, 'Nota clínica privada', item.privateNote, primary, newPage)
-      if (includePrivateNotes && item.clinicianTrend) flowBlock(doc, 'Tendencia clínica', item.clinicianTrend, primary, newPage)
       for (const result of item.results) {
         const detail = result.status === 'available' ? `${formatGrowthValues(result.z, result.percentile)} · ${result.classification.name ?? 'Sin nombre OMS'} · ${result.reference.ageBasis === 'CORRECTED' ? 'Edad corregida' : 'Edad cronológica'} ${result.reference.referenceAgeDays} días · OMS ${result.reference.version} · ${result.reference.sourceUrl}` : 'No disponible'
         flowBlock(doc, `${result.status === 'available' && result.recalculationId ? 'Revisión médica · ' : ''}${INDICATOR_LABEL[result.indicator as WhoIndicator]}`, detail, primary, newPage)
@@ -547,7 +545,7 @@ export async function renderDoctorReport(actor: Actor, patientId: string, includ
       else flowBlock(doc, INDICATOR_LABEL[indicator], 'Referencia OMS no disponible para este indicador.', primary, newPage)
     }
     if (doctor[0]?.name && doc.y + 30 < 745) textBlock(doc, `Profesional: ${doctor[0].name}`, doc.y + 12, { fill: '#475569' })
-  }, includePrivateNotes)
+  })
   await recordAudit('REPORT_EXPORT', 'ALLOWED', actor.id, patientId)
   return pdf
 }

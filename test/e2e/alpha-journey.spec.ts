@@ -429,7 +429,7 @@ test('production image journeys from bootstrapped admin through two children and
     await page.goto(`/pacientes/${first}/informe`)
     const doctorPdf = await context.request.get(`/api/pacientes/${first}/informes/medico?includePrivateNotes=true`)
     expect(doctorPdf.status()).toBe(200)
-    expect(await pdfText(await doctorPdf.body())).toMatch(/PRIVATE_NEVER_SHOW/)
+    expect(await pdfText(await doctorPdf.body())).not.toMatch(/PRIVATE_NEVER_SHOW/)
     expect((await adminContext!.request.get(`/api/pacientes/${first}/informes/medico`)).status()).toBe(403)
     const audit = await adminContext!.request.get('/api/admin/auditoria?action=REPORT_EXPORT&page=1&pageSize=25')
     expect(audit.status()).toBe(200)

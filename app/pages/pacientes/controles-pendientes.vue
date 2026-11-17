@@ -21,7 +21,7 @@ if (import.meta.server && (error.value?.statusCode === 401 || error.value?.statu
       </h1>
     </div>
     <p class="text-sm text-muted">
-      Controles vencidos sin cita; sujetos a revisión médica. Una reserva no registra un control completado.
+      Controles vencidos sin control completado; sujetos a revisión médica. Una reserva no registra un control completado.
     </p>
     <UAlert
       v-if="error"

@@ -1,8 +1,8 @@
-import { and, desc, eq, gt, inArray } from 'drizzle-orm'
+import { and, desc, eq } from 'drizzle-orm'
 import { createError } from 'nuxt/server'
 import type { Actor } from '../../shared/types/access'
 import { draftBadge, draftStatus } from '../../shared/types/catalog'
-import { appointment, catalogItem, catalogRelease, completedCheckup, individualCheckup, patient, visit } from '../db/schema'
+import { catalogItem, catalogRelease, completedCheckup, individualCheckup, patient, visit } from '../db/schema'
 import { useDb } from '../utils/db'
 import { recordAudit } from './audit'
 
@@ -65,8 +65,7 @@ export async function listPendingControls(actor: Actor, now = new Date()): Promi
       return priority(a) - priority(b) || a.date.localeCompare(b.date)
     })[0]
     if (!earliest) continue
-    const booked = await db.select({ id: appointment.id }).from(appointment).where(and(eq(appointment.patientId, person.id), inArray(appointment.status, ['PENDING', 'CONFIRMED']), gt(appointment.startsAt, now))).limit(1)
-    if (!booked.length) result.push({ id: person.id, name: person.name, ...earliest })
+    result.push({ id: person.id, name: person.name, ...earliest })
   }
   return result
 }

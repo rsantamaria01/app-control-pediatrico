@@ -244,7 +244,7 @@ describe('approved report boundary', () => {
     await db.insert(patient).values({ id: clinicalPatient, name: 'Niña de curvas', birthDate: '2024-01-01', sex: 'FEMALE', createdBy: doctor.id })
     const { createVisit } = await import('../../server/services/visits')
     await createVisit(doctor, clinicalPatient, { requestId: randomUUID(), measuredAt: '2025-01-01T12:00:00Z', weightKg: 9, lengthHeightCm: 75, position: 'RECUMBENT', headCircumferenceCm: 45 })
-    const clinical = await pdfText(await renderDoctorReport(doctor, clinicalPatient, false))
+    const clinical = await pdfText(await renderDoctorReport(doctor, clinicalPatient))
     const draft = await previewFamilyReport(doctor, clinicalPatient)
     expect(draft.content.charts.HEIGHT_FOR_AGE).toHaveLength(1)
     const family = await pdfText(await getDoctorPreviewPdf(doctor, clinicalPatient, draft.id))
@@ -267,14 +267,12 @@ describe('approved report boundary', () => {
     expect(pages.every((page, index) => page.includes(`Página ${index + 1} de ${pages.length}`))).toBe(true)
   })
 
-  it('doctor PDF includes private notes only with explicit option and family PDF never includes them', async () => {
+  it('excludes private notes from doctor and family PDFs', async () => {
     const { renderDoctorReport, renderFamilyReport, previewFamilyReport, approveFamilyReport } = await import('../../server/services/reports')
     await db.update(guardianGrant).set({ status: 'ACTIVE' }).where(eq(guardianGrant.patientId, childId))
-    const pdf = await renderDoctorReport(doctor, childId, false)
-    const privatePdf = await renderDoctorReport(doctor, childId, true)
+    const pdf = await renderDoctorReport(doctor, childId)
     expect(pdf.subarray(0, 4).toString()).toBe('%PDF')
-    expect((await pdfText(pdf)).join(' ')).not.toContain('PRIVATE_SECRET')
-    expect((await pdfText(privatePdf)).join(' ')).toContain('PRIVATE_SECRET')
+    expect((await pdfText(pdf)).join(' ')).not.toMatch(/PRIVATE_SECRET|PRIVATE_TREND|PRIVATE_ARCHIVE/)
     const draft = await previewFamilyReport(doctor, childId)
     const approved = await approveFamilyReport(doctor, draft.id)
     const familyPdf = await renderFamilyReport(guardian, childId, approved.id)

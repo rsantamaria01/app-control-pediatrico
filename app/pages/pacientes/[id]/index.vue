@@ -14,10 +14,15 @@ const latest = computed(() => data.value?.visits[0])
 const { data: growth } = await useFetch<{ charts: Partial<Record<WhoIndicator, ChartView>> }>(`/api/pacientes/${encodeURIComponent(id)}/crecimiento`, { immediate: isDoctor.value })
 const chartIndicator = ref<WhoIndicator>(WhoIndicator.WEIGHT_FOR_AGE)
 const showGrowthTable = ref(false)
+const chartReference = ref<HTMLElement | null>(null)
 const tableReference = ref<HTMLElement | null>(null)
 function showTable() {
   showGrowthTable.value = true
   nextTick(() => tableReference.value?.scrollIntoView({ block: 'nearest' }))
+}
+function showChart() {
+  showGrowthTable.value = false
+  nextTick(() => chartReference.value?.scrollIntoView({ block: 'nearest' }))
 }
 const chartRange = ref<6 | 12 | 24 | 60>(60)
 const chartIndicators = [WhoIndicator.WEIGHT_FOR_AGE, WhoIndicator.HEIGHT_FOR_AGE, WhoIndicator.HEAD_CIRCUMFERENCE_FOR_AGE, WhoIndicator.BMI_FOR_AGE, WhoIndicator.WEIGHT_FOR_LENGTH, WhoIndicator.WEIGHT_FOR_HEIGHT]
@@ -809,11 +814,12 @@ function authorName(visit: VisitSnapshot) {
             </div>
           </UCard>
         </section>
-        <section
-          v-if="patientSection === 'crecimiento'"
-          class="space-y-3"
-          aria-label="Curvas de crecimiento"
-        >
+         <section
+           v-if="patientSection === 'crecimiento'"
+           ref="chartReference"
+           class="space-y-3"
+           aria-label="Curvas de crecimiento"
+         >
           <h2 class="text-lg font-semibold">
             Curvas de crecimiento OMS
           </h2>
@@ -871,7 +877,7 @@ function authorName(visit: VisitSnapshot) {
                   :variant="showGrowthTable ? 'outline' : 'solid'"
                   class="min-h-11"
                   :aria-pressed="!showGrowthTable"
-                  @click="showGrowthTable = false"
+                   @click="showChart"
                 >
                   Gráfico
                 </UButton>
@@ -887,10 +893,9 @@ function authorName(visit: VisitSnapshot) {
               </UFieldGroup>
             </div>
           </div>
-          <div
-            v-if="!showGrowthTable"
-            class="grid overflow-hidden rounded-xl border border-default bg-default xl:grid-cols-[minmax(0,1fr)_320px]"
-          >
+           <div
+             class="grid overflow-hidden rounded-xl border border-default bg-default xl:grid-cols-[minmax(0,1fr)_320px]"
+           >
             <div class="min-w-0 p-3 sm:p-5">
               <h3 class="mb-3 text-base font-semibold">
                 {{ labels[chartIndicator] }} · {{ data.patient.sex === 'FEMALE' ? 'Niña' : 'Niño' }}

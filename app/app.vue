@@ -252,7 +252,7 @@ useSeoMeta({
           :resizable="false"
           class="staff-sidebar hidden lg:flex"
           :class="{ 'staff-sidebar--open': sidebarExpanded, 'staff-sidebar--pinned': pinnedSidebar }"
-          :ui="{ root: 'lg:w-(--width)', header: 'px-2', body: 'px-2', footer: 'border-t border-default px-2' }"
+           :ui="{ root: 'lg:w-(--width)', header: 'px-2', body: 'px-2', footer: 'flex-col items-stretch border-t border-default px-2' }"
           @mouseenter="sidebarHover = true"
           @mouseleave="sidebarHover = false; sidebarDismissed = false"
           @focusin="sidebarFocus = true"
@@ -306,6 +306,19 @@ useSeoMeta({
             </div>
           </template>
            <template #footer>
+              <UTooltip :text="sidebarExpanded ? 'Contraer menú' : sidebarHover || sidebarFocus ? 'Fijar menú abierto' : 'Expandir menú'" :disabled="sidebarExpanded">
+                <UButton
+                  :icon="pinnedSidebar ? 'i-lucide-panel-left-close' : 'i-lucide-panel-left-open'"
+                  :label="sidebarExpanded ? pinnedSidebar ? 'Contraer menú' : 'Fijar menú abierto' : undefined"
+                  variant="ghost"
+                  color="neutral"
+                  :aria-label="pinnedSidebar ? 'Contraer menú' : 'Fijar menú abierto'"
+                  :aria-pressed="pinnedSidebar"
+                  class="min-h-11 w-full"
+                  :class="sidebarExpanded ? 'justify-start px-2' : 'justify-center px-0'"
+                  @click="setSidebarPinned"
+                />
+              </UTooltip>
               <UDropdownMenu :items="[...sidebarMenu, { label: 'Cambiar tema', icon: 'i-lucide-moon', onSelect: toggleTheme }, { label: 'Cerrar sesión', icon: 'i-lucide-log-out', onSelect: logout }]">
                <UButton
                  color="neutral"
@@ -331,17 +344,7 @@ useSeoMeta({
                class="relative z-40 hidden lg:flex"
                :ui="{ root: 'bg-default' }"
             >
-              <template #leading>
-                 <UButton
-                   :icon="pinnedSidebar ? 'i-lucide-panel-left-close' : 'i-lucide-panel-left-open'"
-                   variant="ghost"
-                   color="neutral"
-                   :aria-label="pinnedSidebar ? 'Contraer menú lateral' : 'Fijar menú lateral abierto'"
-                   :aria-pressed="pinnedSidebar"
-                   class="min-h-11 min-w-11"
-                   @click="setSidebarPinned"
-                 />
-              </template>
+
               <template #right>
                  <ShellCommandSearch shortcuts />
                 <UButton

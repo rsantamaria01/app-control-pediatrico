@@ -58,9 +58,14 @@
   .staff-sidebar .sidebar-brand { position: relative; min-height: 44px; }
   .staff-sidebar .sidebar-brand-link { padding-inline-start: 8px; }
   .staff-sidebar .sidebar-brand-toggle { margin-inline-start: auto; }
+  .staff-sidebar:not(.staff-sidebar--open):not(.staff-sidebar--pinned) .sidebar-brand-link { width: 48px; flex: none; }
   .staff-sidebar .sidebar-label { overflow: hidden; text-overflow: ellipsis; }
-  .staff-sidebar:not(.staff-sidebar--open):not(.staff-sidebar--pinned) .sidebar-brand-link { flex: 0 0 48px; }
-  .staff-sidebar:not(.staff-sidebar--open):not(.staff-sidebar--pinned) .sidebar-label { display: none; }
+  .staff-sidebar:not(.staff-sidebar--open):not(.staff-sidebar--pinned) .sidebar-label {
+    flex: 0 0 0;
+    max-width: 0;
+    opacity: 0;
+    pointer-events: none;
+  }
   .staff-sidebar:not(.staff-sidebar--open):not(.staff-sidebar--pinned) .sidebar-brand-toggle {
     position: absolute;
     inset-inline-start: 0;
@@ -99,6 +104,6 @@
   @media (prefers-reduced-motion: no-preference) {
     .staff-sidebar { transition: width 200ms ease-out, min-width 200ms ease-out, flex-basis 200ms ease-out, margin-inline-end 200ms ease-out; }
     .staff-sidebar .sidebar-label { transition: opacity 120ms ease-out 80ms; }
-    .staff-sidebar:not(.staff-sidebar--open):not(.staff-sidebar--pinned) .sidebar-label { opacity: 0; transition-delay: 0ms; }
+    .staff-sidebar:not(.staff-sidebar--open):not(.staff-sidebar--pinned) .sidebar-label { transition-delay: 0ms; }
   }
 }

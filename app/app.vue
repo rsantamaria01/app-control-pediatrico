@@ -320,8 +320,8 @@ useSeoMeta({
             <UDashboardNavbar
               :title="pageTitle"
               :toggle="false"
-              class="hidden lg:flex"
-              :ui="{ root: 'bg-default' }"
+               class="relative z-40 hidden lg:flex"
+               :ui="{ root: 'bg-default' }"
             >
               <template #leading>
                  <UButton

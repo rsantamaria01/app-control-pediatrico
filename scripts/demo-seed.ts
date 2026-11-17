@@ -88,7 +88,7 @@ async function resetDemo() {
     const otherAppointments = await tx.select({ id: appointment.id }).from(appointment).where(inArray(appointment.patientId, childIds))
     if (otherAppointments.some(row => !Array.from({ length: 10 }, (_, index) => id('appointment', index)).includes(row.id))) throw new Error('Demo patient has non-demo appointments; refusing reset')
     await tx.delete(bookingRequest).where(inArray(bookingRequest.id, Array.from({ length: 3 }, (_, i) => id('booking', i))))
-    await tx.delete(appointment).where(inArray(appointment.id, Array.from({ length: 12 }, (_, i) => id('appointment', i))))
+    await tx.delete(appointment).where(inArray(appointment.id, Array.from({ length: 10 }, (_, i) => id('appointment', i))))
     await tx.delete(completedCheckup).where(inArray(completedCheckup.id, childIds.map((_, i) => id('completed', i))))
     await tx.delete(individualCheckup).where(inArray(individualCheckup.id, childIds.map((_, i) => id('checkup', i))))
     await tx.delete(milestoneAssessment).where(inArray(milestoneAssessment.id, childIds.map((_, i) => id('milestone', i))))

@@ -211,7 +211,7 @@ test('production image journeys from bootstrapped admin through two children and
     await page.getByRole('button', { name: 'Continuar' }).click()
     await page.getByRole('checkbox').check()
     await page.getByRole('button', { name: 'Verificar correo' }).click()
-    await expect(page.getByRole('heading', { name: 'Verificar correo' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Ingrese el código' })).toBeVisible()
     const code = await bookingCodeFor(bookingEmail)
     await page.getByRole('textbox', { name: 'Código de 6 dígitos' }).fill(code)
     await page.getByRole('button', { name: 'Verificar', exact: true }).click()

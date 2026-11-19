@@ -19,16 +19,29 @@ const pointLabel = (x: number) => props.view.xUnit === 'DAY' ? `${number.format(
       </caption>
       <thead>
         <tr class="border-b border-default text-muted">
-          <th scope="col" class="p-3">
+          <th
+            scope="col"
+            class="p-3"
+          >
             Fecha
           </th>
-          <th scope="col" class="p-3">
+          <th
+            scope="col"
+            class="p-3"
+          >
             {{ view.xUnit === 'DAY' ? 'Edad' : 'Longitud/talla' }}
           </th>
-          <th scope="col" class="p-3">
+          <th
+            scope="col"
+            class="p-3"
+          >
             Medición
           </th>
-          <th v-if="!family" scope="col" class="p-3">
+          <th
+            v-if="!family"
+            scope="col"
+            class="p-3"
+          >
             Resultado
           </th>
         </tr>
@@ -49,12 +62,18 @@ const pointLabel = (x: number) => props.view.xUnit === 'DAY' ? `${number.format(
           <td class="p-3">
             {{ number.format(point.y) }}
           </td>
-          <td v-if="!family" class="p-3">
+          <td
+            v-if="!family"
+            class="p-3"
+          >
             {{ 'z' in point ? formatGrowthValues(point.z, point.percentile) : '' }}
           </td>
         </tr>
         <tr v-if="!view.points.length">
-          <td :colspan="family ? 3 : 4" class="p-3 text-muted">
+          <td
+            :colspan="family ? 3 : 4"
+            class="p-3 text-muted"
+          >
             Aún no hay mediciones compartidas.
           </td>
         </tr>

@@ -74,9 +74,9 @@ function goToTable() {
           variant="outline"
           color="neutral"
           class="min-h-11"
-           @click="goToTable"
-         >
-           Ver tabla
+          @click="goToTable"
+        >
+          Ver tabla
         </UButton>
       </div>
       <div
@@ -101,13 +101,28 @@ function goToTable() {
           {{ INDICATOR_LABEL[selectedIndicator] }}
         </h2>
         <template v-if="data.charts[selectedIndicator]">
-           <GrowthChart :view="data.charts[selectedIndicator]!" family />
-           <p class="flex items-center gap-2 text-xs text-muted">
+          <GrowthChart
+            :view="data.charts[selectedIndicator]!"
+            family
+          />
+          <p class="flex items-center gap-2 text-xs text-muted">
             <span class="h-1 w-4 rounded bg-(--color-patient)" />{{ data.name }}<span class="ml-2 h-1 w-4 rounded border-t border-dashed border-muted" />Referencia OMS
-           </p>
-           <div ref="tableSection" class="min-w-0" aria-label="Mediciones compartidas"><GrowthTable :view="data.charts[selectedIndicator]!" family /></div>
-         </template>
-         <p v-else class="text-muted">
+          </p>
+          <div
+            ref="tableSection"
+            class="min-w-0"
+            aria-label="Mediciones compartidas"
+          >
+            <GrowthTable
+              :view="data.charts[selectedIndicator]!"
+              family
+            />
+          </div>
+        </template>
+        <p
+          v-else
+          class="text-muted"
+        >
           Referencia OMS no disponible.
         </p>
       </UCard>

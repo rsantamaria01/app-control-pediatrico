@@ -93,7 +93,10 @@ const groups = computed(() => [
   >
     <template #content>
       <div class="flex items-center justify-between px-4 pt-3">
-        <label for="command-search-input" class="text-sm font-medium text-default">Buscar paciente, pantalla o acción</label>
+        <label
+          for="command-search-input"
+          class="text-sm font-medium text-default"
+        >Buscar paciente, pantalla o acción</label>
         <UKbd>Esc</UKbd>
       </div>
       <UCommandPalette
@@ -101,7 +104,7 @@ const groups = computed(() => [
         :groups="groups"
         preserve-group-order
         :loading="loading"
-         placeholder="Buscar paciente, pantalla o acción"
+        placeholder="Buscar paciente, pantalla o acción"
         :input="{ id: 'command-search-input', autocomplete: 'off' }"
         close
         class="min-h-64"
@@ -123,7 +126,7 @@ const groups = computed(() => [
               Escriba al menos dos caracteres para buscar pacientes.
             </p>
             <p v-else-if="term.trim()">
-               Sin resultados
+              Sin resultados
             </p>
             <p v-else>
               Escriba para buscar pacientes o elija una pantalla o acción.
@@ -137,11 +140,11 @@ const groups = computed(() => [
             />
           </div>
         </template>
-       </UCommandPalette>
-       <div class="flex flex-wrap justify-between gap-2 border-t border-default px-4 py-3 text-xs text-muted">
-         <span>↑↓ moverse · Enter abrir · &gt; solo acciones · @ solo pacientes</span>
-         <span>Solo muestra lo que tus permisos permiten</span>
-       </div>
-     </template>
+      </UCommandPalette>
+      <div class="flex flex-wrap justify-between gap-2 border-t border-default px-4 py-3 text-xs text-muted">
+        <span>↑↓ moverse · Enter abrir · &gt; solo acciones · @ solo pacientes</span>
+        <span>Solo muestra lo que tus permisos permiten</span>
+      </div>
+    </template>
   </UModal>
 </template>

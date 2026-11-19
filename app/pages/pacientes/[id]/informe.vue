@@ -62,7 +62,10 @@ async function approve() {
           aria-hidden="true"
           class="size-4"
         />
-        <span aria-current="page" class="font-semibold text-default">
+        <span
+          aria-current="page"
+          class="font-semibold text-default"
+        >
           Informe
         </span>
       </nav>
@@ -157,10 +160,16 @@ async function approve() {
               <p class="mt-1 tabular-nums">
                 Peso {{ number.format(visit.weightKg) }} kg · {{ visit.position === 'RECUMBENT' ? 'Longitud' : 'Talla' }} {{ number.format(visit.lengthHeightCm) }} cm · Perímetro cefálico {{ number.format(visit.headCircumferenceCm) }} cm
               </p>
-              <p v-if="visit.parentAdvice" class="mt-1">
+              <p
+                v-if="visit.parentAdvice"
+                class="mt-1"
+              >
                 Indicaciones: {{ visit.parentAdvice }}
               </p>
-              <p v-if="visit.nextControlAt" class="mt-1">
+              <p
+                v-if="visit.nextControlAt"
+                class="mt-1"
+              >
                 Próximo control: {{ date.format(new Date(visit.nextControlAt)) }}
               </p>
             </div>

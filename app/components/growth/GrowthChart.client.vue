@@ -55,13 +55,25 @@ onUnmounted(() => releaseWidth?.())
       role="group"
       aria-label="Rango del gráfico"
     >
-      <UButton variant="outline" class="min-h-11" @click="setRange(6)">
+      <UButton
+        variant="outline"
+        class="min-h-11"
+        @click="setRange(6)"
+      >
         6 m
       </UButton>
-      <UButton variant="outline" class="min-h-11" @click="setRange(12)">
+      <UButton
+        variant="outline"
+        class="min-h-11"
+        @click="setRange(12)"
+      >
         1 a
       </UButton>
-      <UButton variant="outline" class="min-h-11" @click="setZoom(100)">
+      <UButton
+        variant="outline"
+        class="min-h-11"
+        @click="setZoom(100)"
+      >
         Todo
       </UButton>
     </div>

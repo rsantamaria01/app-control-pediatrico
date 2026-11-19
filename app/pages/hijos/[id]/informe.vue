@@ -28,7 +28,10 @@ const date = new Intl.DateTimeFormat('es-EC', { day: 'numeric', month: 'short', 
           aria-hidden="true"
           class="size-4"
         />
-        <span aria-current="page" class="font-semibold text-default">
+        <span
+          aria-current="page"
+          class="font-semibold text-default"
+        >
           Informes
         </span>
       </nav>
@@ -57,7 +60,11 @@ const date = new Intl.DateTimeFormat('es-EC', { day: 'numeric', month: 'short', 
         >
           <div class="flex min-w-0 items-center gap-3">
             <span class="flex size-11 shrink-0 items-center justify-center rounded-lg bg-elevated text-primary">
-              <UIcon name="i-lucide-file-text" aria-hidden="true" class="size-5" />
+              <UIcon
+                name="i-lucide-file-text"
+                aria-hidden="true"
+                class="size-5"
+              />
             </span>
             <div>
               <h2 class="font-semibold">

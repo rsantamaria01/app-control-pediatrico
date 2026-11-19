@@ -28,14 +28,18 @@ async function submit() {
         class="mt-4 space-y-4"
         @submit.prevent="submit"
       >
-        <UFormField label="Nueva contraseña" :description="`Al menos 10 caracteres; evite contraseñas comunes. Seguridad: ${strength}`" required>
+        <UFormField
+          label="Nueva contraseña"
+          :description="`Al menos 10 caracteres; evite contraseñas comunes. Seguridad: ${strength}`"
+          required
+        >
           <UInput
             v-model="password"
             type="password"
-             autocomplete="new-password"
-             minlength="10"
-             required
-             class="w-full"
+            autocomplete="new-password"
+            minlength="10"
+            required
+            class="w-full"
           />
         </UFormField>
         <UButton type="submit">

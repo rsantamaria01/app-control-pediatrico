@@ -297,7 +297,9 @@ function authorName(visit: VisitSnapshot) {
                 v-for="(guardian, index) in guardianStatus?.guardians"
                 :key="`${guardian.email}-${index}`"
               >
-                 Representante: {{ guardian.name }}<template v-if="guardian.relationship"> · {{ guardian.relationship }}</template> · {{ guardian.email }} · portal {{ guardianLabel(guardian.status).toLowerCase() }}
+                Representante: {{ guardian.name }}<template v-if="guardian.relationship">
+                  · {{ guardian.relationship }}
+                </template> · {{ guardian.email }} · portal {{ guardianLabel(guardian.status).toLowerCase() }}
               </p>
               <p
                 v-for="contact in pendingContacts"
@@ -372,18 +374,18 @@ function authorName(visit: VisitSnapshot) {
             v-if="entry.result.status === 'available'"
             class="flex flex-wrap items-center gap-1.5"
           >
-             <UBadge
-               v-if="entry.result.classification.name"
-               :color="entry.result.classification.tone === 'neutral' ? 'neutral' : 'warning'"
-               variant="soft"
-               class="max-w-full whitespace-normal"
-             >
+            <UBadge
+              v-if="entry.result.classification.name"
+              :color="entry.result.classification.tone === 'neutral' ? 'neutral' : 'warning'"
+              variant="soft"
+              class="max-w-full whitespace-normal"
+            >
               <UIcon
                 :name="entry.result.classification.tone === 'flag' ? 'i-lucide-triangle-alert' : 'i-lucide-eye'"
                 aria-hidden="true"
                 class="mr-1 size-3.5"
               />
-                 {{ entry.result.classification.name }}
+              {{ entry.result.classification.name }}
             </UBadge>
             <span class="text-sm font-semibold tabular-nums">{{ zLabel(entry.result.z) }}</span>
           </span>
@@ -391,8 +393,14 @@ function authorName(visit: VisitSnapshot) {
             v-else
             class="block text-sm text-muted"
           >No disponible</span>
-           <span v-if="latest.clinicianTrend" class="block text-xs text-muted">Tendencia indicada por el profesional: {{ latest.clinicianTrend }}</span>
-           <span v-else class="block text-xs text-muted">Sin tendencia registrada por el profesional</span>
+          <span
+            v-if="latest.clinicianTrend"
+            class="block text-xs text-muted"
+          >Tendencia indicada por el profesional: {{ latest.clinicianTrend }}</span>
+          <span
+            v-else
+            class="block text-xs text-muted"
+          >Sin tendencia registrada por el profesional</span>
         </button>
       </section>
       <p
@@ -814,16 +822,16 @@ function authorName(visit: VisitSnapshot) {
             </div>
           </UCard>
         </section>
-         <section
-           v-if="patientSection === 'crecimiento'"
-           ref="chartReference"
-           class="space-y-3"
-           aria-label="Curvas de crecimiento"
-         >
+        <section
+          v-if="patientSection === 'crecimiento'"
+          ref="chartReference"
+          class="space-y-3"
+          aria-label="Curvas de crecimiento"
+        >
           <h2 class="text-lg font-semibold">
             Curvas de crecimiento OMS
           </h2>
-           <div class="flex min-w-0 flex-wrap items-center gap-3 rounded-xl border border-default bg-default p-3 sm:p-4">
+          <div class="flex min-w-0 flex-wrap items-center gap-3 rounded-xl border border-default bg-default p-3 sm:p-4">
             <div
               class="hidden min-w-0 max-w-full gap-0.5 overflow-x-auto rounded-lg bg-elevated p-1 sm:flex"
               role="group"
@@ -838,7 +846,7 @@ function authorName(visit: VisitSnapshot) {
                 :aria-pressed="chartIndicator === indicator"
                 @click="chartIndicator = indicator"
               >
-                 {{ shortLabels[indicator] }}
+                {{ shortLabels[indicator] }}
               </UButton>
             </div>
             <USelect
@@ -877,7 +885,7 @@ function authorName(visit: VisitSnapshot) {
                   :variant="showGrowthTable ? 'outline' : 'solid'"
                   class="min-h-11"
                   :aria-pressed="!showGrowthTable"
-                   @click="showChart"
+                  @click="showChart"
                 >
                   Gráfico
                 </UButton>
@@ -886,16 +894,16 @@ function authorName(visit: VisitSnapshot) {
                   :variant="showGrowthTable ? 'solid' : 'outline'"
                   class="min-h-11"
                   :aria-pressed="showGrowthTable"
-                   @click="showTable"
+                  @click="showTable"
                 >
                   Tabla
                 </UButton>
               </UFieldGroup>
             </div>
           </div>
-           <div
-             class="grid overflow-hidden rounded-xl border border-default bg-default xl:grid-cols-[minmax(0,1fr)_320px]"
-           >
+          <div
+            class="grid overflow-hidden rounded-xl border border-default bg-default xl:grid-cols-[minmax(0,1fr)_320px]"
+          >
             <div class="min-w-0 p-3 sm:p-5">
               <h3 class="mb-3 text-base font-semibold">
                 {{ labels[chartIndicator] }} · {{ data.patient.sex === 'FEMALE' ? 'Niña' : 'Niño' }}
@@ -956,15 +964,20 @@ function authorName(visit: VisitSnapshot) {
               </UButton>
             </aside>
           </div>
-           <p v-if="showGrowthTable && !growth?.charts[chartIndicator]" class="text-sm text-muted">Referencia OMS no disponible.</p>
+          <p
+            v-if="showGrowthTable && !growth?.charts[chartIndicator]"
+            class="text-sm text-muted"
+          >
+            Referencia OMS no disponible.
+          </p>
         </section>
-         <section
-           v-if="patientSection === 'crecimiento' || patientSection === 'visitas'"
-           ref="tableReference"
-           class="space-y-3"
-         >
-           <h2 class="text-lg font-semibold">
-             Mediciones
+        <section
+          v-if="patientSection === 'crecimiento' || patientSection === 'visitas'"
+          ref="tableReference"
+          class="space-y-3"
+        >
+          <h2 class="text-lg font-semibold">
+            Mediciones
           </h2><UCard>
             <div class="overflow-x-auto">
               <table
@@ -997,8 +1010,8 @@ function authorName(visit: VisitSnapshot) {
                       scope="col"
                       class="p-3"
                     >
-                       Z
-                     </th>
+                      Z
+                    </th>
                     <th
                       scope="col"
                       class="p-3"
@@ -1029,8 +1042,8 @@ function authorName(visit: VisitSnapshot) {
                       {{ chartIndicator === WhoIndicator.WEIGHT_FOR_AGE || chartIndicator === WhoIndicator.WEIGHT_FOR_LENGTH || chartIndicator === WhoIndicator.WEIGHT_FOR_HEIGHT ? `${weightFormat.format(visit.weightKg)} kg` : chartIndicator === WhoIndicator.HEIGHT_FOR_AGE ? `${lengthFormat.format(visit.lengthHeightCm)} cm` : chartIndicator === WhoIndicator.HEAD_CIRCUMFERENCE_FOR_AGE ? `${lengthFormat.format(visit.headCircumferenceCm)} cm` : `${lengthFormat.format(visit.bmi)} kg/m²` }}
                     </td>
                     <td class="p-3 tabular-nums">
-{{ result?.status === 'available' ? zLabel(result.z) : 'No disponible' }}
-                     </td>
+                      {{ result?.status === 'available' ? zLabel(result.z) : 'No disponible' }}
+                    </td>
                     <td class="p-3">
                       <UBadge
                         v-if="result?.status === 'available' && result.classification.name"

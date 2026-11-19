@@ -30,28 +30,32 @@ async function submit() {
         class="mt-4 space-y-4"
         @submit.prevent="submit"
       >
-        <UFormField label="Usuario" description="De 3 a 32 caracteres: letras, números, punto, guion o guion bajo." required>
+        <UFormField
+          label="Usuario"
+          description="De 3 a 32 caracteres: letras, números, punto, guion o guion bajo."
+          required
+        >
           <UInput
             v-model="username"
-             autocomplete="username"
-             minlength="3"
-             maxlength="32"
-             required
-             class="w-full"
+            autocomplete="username"
+            minlength="3"
+            maxlength="32"
+            required
+            class="w-full"
           />
         </UFormField>
         <UFormField
           label="Contraseña"
           :description="`Al menos 10 caracteres; evite contraseñas comunes. Seguridad: ${strength}`"
-           required
+          required
         >
           <UInput
             v-model="password"
             type="password"
-             autocomplete="new-password"
-             minlength="10"
-             required
-             class="w-full"
+            autocomplete="new-password"
+            minlength="10"
+            required
+            class="w-full"
           />
         </UFormField>
         <UButton type="submit">

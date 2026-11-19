@@ -9,8 +9,12 @@ const { data: staffNotices, error: staffError, refresh: refreshStaff } = await u
 const readStaffIds = useState<string[]>('read-staff-notices', () => [])
 const storageKey = computed(() => `staff-notice-read:${user.value?.id ?? ''}`)
 onMounted(() => {
-  watch(storageKey, key => {
-    try { readStaffIds.value = JSON.parse(localStorage.getItem(key) ?? '[]') } catch { readStaffIds.value = [] }
+  watch(storageKey, (key) => {
+    try {
+      readStaffIds.value = JSON.parse(localStorage.getItem(key) ?? '[]')
+    } catch {
+      readStaffIds.value = []
+    }
   }, { immediate: true })
 })
 const staffUnread = computed(() => staffNotices.value.filter(notice => !readStaffIds.value.includes(notice.id)).length)
@@ -21,7 +25,11 @@ function when(date: string) {
 }
 function readStaff(id: string) {
   readStaffIds.value = [...new Set([...readStaffIds.value, id])].slice(-500)
-  try { localStorage.setItem(storageKey.value, JSON.stringify(readStaffIds.value)) } catch {}
+  try {
+    localStorage.setItem(storageKey.value, JSON.stringify(readStaffIds.value))
+  } catch {
+    // Read state stays in memory when storage is unavailable.
+  }
 }
 const accessError = navigationError.value?.statusCode ?? error.value?.statusCode
 if (import.meta.server && (accessError === 401 || accessError === 403)) throw createError({ statusCode: accessError, statusMessage: 'Acceso denegado' })
@@ -81,9 +89,9 @@ async function markRead(id: string) {
       </UButton>
     </header>
     <nav
-v-if="(isParent || isStaff) && !navigationError"
-       aria-label="Filtrar avisos"
-       class="flex rounded-lg bg-elevated p-1 text-sm"
+      v-if="(isParent || isStaff) && !navigationError"
+      aria-label="Filtrar avisos"
+      class="flex rounded-lg bg-elevated p-1 text-sm"
     >
       <button
         type="button"
@@ -105,23 +113,26 @@ v-if="(isParent || isStaff) && !navigationError"
       </button>
     </nav>
     <div class="rounded-xl border border-default bg-default p-4">
-       <UAlert
-         v-if="navigationError"
+      <UAlert
+        v-if="navigationError"
         color="error"
         variant="soft"
         title="No se pudo verificar el acceso"
         :actions="[{ label: 'Reintentar', onClick: () => refreshNavigation() }]"
       />
-       <UAlert
-         v-else-if="isStaff && staffError"
-         color="error"
-         variant="soft"
-         title="No se pudieron cargar los avisos"
-         :actions="[{ label: 'Reintentar', onClick: () => refreshStaff() }]"
-       />
-       <UEmpty v-else-if="isStaff && !staffVisible.length" title="Sin avisos nuevos" />
-       <UAlert
-         v-else-if="isParent && error"
+      <UAlert
+        v-else-if="isStaff && staffError"
+        color="error"
+        variant="soft"
+        title="No se pudieron cargar los avisos"
+        :actions="[{ label: 'Reintentar', onClick: () => refreshStaff() }]"
+      />
+      <UEmpty
+        v-else-if="isStaff && !staffVisible.length"
+        title="Sin avisos nuevos"
+      />
+      <UAlert
+        v-else-if="isParent && error"
         color="error"
         variant="soft"
         title="No se pudieron cargar los avisos"
@@ -137,15 +148,39 @@ v-if="(isParent || isStaff) && !navigationError"
         description="Inicie sesión para consultar sus avisos."
       />
     </div>
-    <section v-if="isStaff && !staffError && !navigationError && staffVisible.length" aria-label="Avisos del personal" class="overflow-hidden rounded-xl border border-default bg-default">
+    <section
+      v-if="isStaff && !staffError && !navigationError && staffVisible.length"
+      aria-label="Avisos del personal"
+      class="overflow-hidden rounded-xl border border-default bg-default"
+    >
       <ul class="divide-y divide-default">
-        <li v-for="notice in staffVisible" :key="notice.id" class="flex items-center gap-3 px-4 py-3" :class="!readStaffIds.includes(notice.id) ? 'bg-primary/5' : ''">
-          <span class="flex size-9 shrink-0 items-center justify-center rounded-full bg-elevated"><UIcon :name="notice.icon" class="size-5" aria-hidden="true" /></span>
-          <NuxtLink :to="notice.to" class="min-w-0 flex-1 py-2 hover:text-primary">
+        <li
+          v-for="notice in staffVisible"
+          :key="notice.id"
+          class="flex items-center gap-3 px-4 py-3"
+          :class="!readStaffIds.includes(notice.id) ? 'bg-primary/5' : ''"
+        >
+          <span class="flex size-9 shrink-0 items-center justify-center rounded-full bg-elevated"><UIcon
+            :name="notice.icon"
+            class="size-5"
+            aria-hidden="true"
+          /></span>
+          <NuxtLink
+            :to="notice.to"
+            class="min-w-0 flex-1 py-2 hover:text-primary"
+          >
             <span class="block font-semibold">{{ notice.title }}</span>
             <span class="block truncate text-sm text-muted">{{ notice.context }} · {{ when(notice.createdAt) }}</span>
           </NuxtLink>
-          <UButton v-if="!readStaffIds.includes(notice.id)" variant="ghost" color="neutral" icon="i-lucide-check" :aria-label="`Marcar como leído: ${notice.title}, ${notice.context}`" class="min-h-11 min-w-11" @click="readStaff(notice.id)" />
+          <UButton
+            v-if="!readStaffIds.includes(notice.id)"
+            variant="ghost"
+            color="neutral"
+            icon="i-lucide-check"
+            :aria-label="`Marcar como leído: ${notice.title}, ${notice.context}`"
+            class="min-h-11 min-w-11"
+            @click="readStaff(notice.id)"
+          />
         </li>
       </ul>
     </section>

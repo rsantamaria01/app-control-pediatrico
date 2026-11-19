@@ -78,6 +78,9 @@ it('upgrades a populated immutable visit without guessing the original birth dat
   await prepareMigrations(20)
   await writeFile(join(migrationDirectory, '0016_giant_guardian.sql'), 'ALTER TABLE "guardian_grant" ADD COLUMN "last_send_error" text;--> statement-breakpoint\nALTER TABLE "clinical_visit" ADD COLUMN "share_with_family" boolean DEFAULT true NOT NULL;--> statement-breakpoint\nALTER TABLE "clinical_visit" ADD COLUMN "next_control_at" timestamp with time zone;')
   await migrate(drizzle(pool), { migrationsFolder: migrationDirectory })
+  await prepareMigrations(48)
+  await writeFile(join(migrationDirectory, '0016_giant_guardian.sql'), 'ALTER TABLE "guardian_grant" ADD COLUMN "last_send_error" text;--> statement-breakpoint\nALTER TABLE "clinical_visit" ADD COLUMN "share_with_family" boolean DEFAULT true NOT NULL;--> statement-breakpoint\nALTER TABLE "clinical_visit" ADD COLUMN "next_control_at" timestamp with time zone;')
+  await migrate(drizzle(pool), { migrationsFolder: migrationDirectory })
   const { getShareableChild, listShareableChildren, setVisitSharing } = await import('../../server/services/invitations')
   expect((await getShareableChild({ id: guardianId, roles: ['PATIENT'] }, patientId)).visits).toEqual([{ measuredAt: '2025-02-01T12:00:00.000Z', weightKg: 10, lengthHeightCm: 78, position: 'RECUMBENT', headCircumferenceCm: 46, nextControlAt: null }])
   expect((await listShareableChildren({ id: guardianId, roles: ['PATIENT'] })).find(child => child.id === patientId)?.lastControl?.weightKg).toBe(10)
@@ -88,7 +91,7 @@ it('upgrades a populated immutable visit without guessing the original birth dat
   await pool.query('INSERT INTO clinical_visit (id, patient_id, request_id, request_digest, measured_at, weight_kg, length_height_cm, position, head_circumference_cm, bmi, correction_until_months, author_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)', [afterId, patientId, randomUUID(), 'new', '2025-04-01T12:00:00.000Z', 12, 82, 'RECUMBENT', 48, 18, 24, 'doctor'])
   expect((await pool.query('SELECT share_with_family FROM clinical_visit WHERE id = $1', [afterId])).rows[0].share_with_family).toBe(true)
   await setVisitSharing({ id: 'doctor', roles: ['DOCTOR'] }, patientId, visitId, true)
-  expect((await getShareableChild({ id: guardianId, roles: ['PATIENT'] }, patientId)).visits).toHaveLength(3)
+  expect((await getShareableChild({ id: guardianId, roles: ['PATIENT'] }, patientId, true)).visits).toHaveLength(3)
   const [row] = (await pool.query('SELECT birth_date_at_visit, sex_at_visit, weight_kg FROM clinical_visit WHERE id = $1', [visitId])).rows
   expect(row).toMatchObject({ birth_date_at_visit: null, sex_at_visit: null, weight_kg: '9' })
   expect((await pool.query('SELECT snapshot FROM visit_result WHERE id = $1', [resultId])).rows[0].snapshot).toEqual({ status: 'unavailable', reason: 'WHO reference unavailable' })

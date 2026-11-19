@@ -5,10 +5,12 @@ WHO growth standards. Guardians see only their own children's approved shareable
 
 ## Current mode (change only this block when Raul changes the mode)
 - **Parity in progress** (Raul 2026-11-18): design parity is NOT approved yet. CI is back on.
+- Up to two jobs run in parallel on CT 157, each in its own Paseo workspace (worktree + branch).
+  Stay inside your job's scope; the other job owns its files.
 - Commit locally as often as you like. **Never `git push` until Raul says OK in the chat**
-  after he reviews your work in the Paseo shared browser (see Workflow). CI runs on every push.
-- `docs/design/DESIGN.md` is the spec. The design-fidelity skill stays suspended: no screenshot
-  loops and no artboard comparisons; Raul reviews by eye.
+  after he reviews your work. CI runs on every push.
+- `docs/design/DESIGN.md` is the spec. The design-fidelity skill stays suspended: no artboard
+  comparisons; Raul reviews by eye in the Paseo shared browser.
 - Pending parity items: DESIGN.md «Pendiente de aprobación».
 
 ## Stack
@@ -22,46 +24,44 @@ WHO growth standards. Guardians see only their own children's approved shareable
 - Tests: Vitest (`test/unit`, `test/integration`), Playwright (`test/e2e`).
 
 ## Where you run
-- Agents started from Paseo run on the host of CT 157 (`rs-lxc-35`, 8 GB RAM), repo at
-  `/root/projects/app-control-pediatrico`. The devcontainer `app-control-pediatrico-workspace-1`
-  mounts the same repo at `/workspaces/app-control-pediatrico`.
+- Agents started from Paseo run on the host of CT 157 (`rs-lxc-35`, 12 GB RAM), inside a Paseo
+  workspace: a git worktree of `/root/projects/app-control-pediatrico` on its own branch.
+  Run `pnpm install` once in the workspace before anything else.
 - Dev services are published on loopback for host-side agents. Load them before tests or scripts:
   `set -a; . /root/.config/app-monitoreo-pediatrico/host-dev.env; set +a`
   (Postgres `127.0.0.1:5433`, Valkey `127.0.0.1:6380`, RustFS `127.0.0.1:9010`). Test data only.
 - Never bind dev services to `0.0.0.0`.
 
-## Workflow (one job = one worktree = one branch)
-1. Create your worktree inside the repo so the devcontainer can see it:
-   `git worktree add .worktrees/<job> -b <branch> origin/feat/alpha`, then `pnpm install` in it.
-2. Point the live server at it:
-   `docker exec app-control-pediatrico-workspace-1 sh -c 'echo /workspaces/app-control-pediatrico/.worktrees/<job> > /tmp/relay/live/src'`.
-   It mirrors your files every 2 s and restarts itself when deps or migrations change.
-3. Raul reviews in the Paseo shared browser at `http://localhost:3200` (live dev, hot reload).
-   The stable preview is `http://localhost:3100`. Keep the worktree buildable: a broken file shows
-   Raul an error overlay.
-4. Before asking Raul to review: `pnpm lint && pnpm typecheck && pnpm test`, plus the integration
+## Workflow (one job = one Paseo workspace = one branch)
+1. Work only in your Paseo workspace; its branch starts from `feat/alpha`.
+2. UI jobs only: run the single dev server for review. Load `host-dev.env`, then
+   `/root/.config/app-monitoreo-pediatrico/ui-dev.env`, then `pnpm dev`. It serves the demo DB
+   with role emulation on `http://localhost:3400`. Raul reviews in the workspace's Shared Browser.
+   Keep it buildable: a broken file shows Raul an error overlay. Non-UI jobs never start a dev server.
+3. Before asking Raul to review: `pnpm lint && pnpm typecheck && pnpm test`, plus the integration
    tests for what you touched (`pnpm exec vitest run -c vitest.integration.config.ts <files>`).
-5. Commit locally. Tell Raul what to look at (URL path and role). Wait for his OK, then push and
-   open the PR into `feat/alpha`. Never merge into `main`; merging is Raul's decision.
-6. When the job ends, point the live server back to the previous source if Raul asks, and remove
-   your worktree with `git worktree remove .worktrees/<job>`.
+4. Commit locally. Tell Raul what to look at (path and role). Wait for his OK, then push and open
+   the PR into `feat/alpha`. Never merge into `main`; merging is Raul's decision.
+5. Before pushing, rebase on the latest `origin/feat/alpha` and rerun the checks.
 
 ## Commands
-- `pnpm test` — unit tests · `pnpm test:e2e` — Playwright
+- `pnpm test` — unit tests · `pnpm test:integration` · `pnpm test:e2e` — Playwright
 - `pnpm lint` · `pnpm typecheck` · `pnpm build`
 - `pnpm db:generate` / `pnpm db:migrate` — Drizzle migrations
-- Do not run `pnpm dev`/`nuxt dev`: the live server already serves your worktree.
+- `pnpm dev` only as described in Workflow step 2.
 
-## Resource and safety rules (CT 157 has 8 GB; it ran out of RAM twice)
-- No dev servers of your own, no watch modes, no parallel test suites or builds.
-  Vitest at most 2 threads; Playwright at most 2 workers; one `pnpm build` at the end of a job.
+## Resource and safety rules (CT 157 ran out of RAM twice)
+- At most one dev server on the host (the UI job's, port 3400). No watch modes.
+- One heavy run at a time on the host: before `pnpm build`, Playwright or a Compose checkpoint, check
+  `pgrep -fa "nuxt build|playwright|vitest"`; wait if the other job is running one.
+  Vitest at most 2 threads; Playwright at most 2 workers.
 - Stop every server, browser and background process you start when its step ends (check with `ps`).
 - Never put large files in `/tmp` on the CT host: it is tmpfs and lives in RAM. Use `/root/scratch/`.
-- Never stop, restart or edit anything under `/tmp/relay/live` except the `src` file, never use
-  port 3300, and never touch `pediatria-live`, `pediatria-live-proxy` or the `pediatria-preview` stack.
-- Databases: never drop, recreate or reset `pediatrico`, the live DB
-  `pediatrico_design_000000000000_test` (name in `/tmp/relay/live/live-db.txt` in the devcontainer),
-  or any database you did not create in the current job.
+- Never touch the `pediatria-preview` stack, `pediatria-live`/`pediatria-live-proxy` (retired), or
+  the devcontainer's `/tmp/relay`.
+- Databases: never drop, recreate or reset `pediatrico`, the demo DB
+  `pediatrico_design_000000000000_test` (used by the UI dev server), or any database you did not
+  create in the current job.
 - Never run `git worktree prune`: other worktrees are registered with devcontainer paths.
 - Never commit `.nuxtrc`, `.env` or anything under `.worktrees/`.
 
@@ -129,5 +129,5 @@ modern HTML/CSS/client JS (modern-web-guidance), this app's screens, charts, Z l
 
 ## Reporting
 - Keep replies short. End each turn with what changed, what Raul should look at
-  (`localhost:3200` path and role), what is pending, and one line:
+  (`localhost:3400` path and role, for UI jobs), what is pending, and one line:
   `STATUS: OK`, `STATUS: NEEDS_REVIEW` or `STATUS: BLOCKED <reason>`.

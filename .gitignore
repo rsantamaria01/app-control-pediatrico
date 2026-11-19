@@ -26,3 +26,6 @@ logs
 # Test output
 test-results
 playwright-report
+
+# Agent worktrees (host-side, visible to the devcontainer)
+.worktrees/

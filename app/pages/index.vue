@@ -121,15 +121,17 @@ function age(birthDate: string) {
                 </dd>
               </div>
             </dl>
-             <div class="mt-4 flex items-center justify-between gap-2">
-               <h3 class="text-sm font-semibold">Citas programadas</h3>
-               <span class="text-xs text-muted tabular-nums">{{ active.length }}</span>
-             </div>
+            <div class="mt-4 flex items-center justify-between gap-2">
+              <h3 class="text-sm font-semibold">
+                Citas programadas
+              </h3>
+              <span class="text-xs text-muted tabular-nums">{{ active.length }}</span>
+            </div>
             <p
-               v-if="!active.length"
-               class="mt-2 rounded-lg border border-dashed border-default p-4 text-sm text-muted"
-             >
-               No hay citas programadas para hoy.
+              v-if="!active.length"
+              class="mt-2 rounded-lg border border-dashed border-default p-4 text-sm text-muted"
+            >
+              No hay citas programadas para hoy.
             </p>
             <ul
               v-else
@@ -171,42 +173,123 @@ function age(birthDate: string) {
         </UCard>
         <UCard>
           <div class="flex items-center gap-2">
-            <UIcon name="i-lucide-inbox" class="size-5 text-primary" aria-hidden="true" />
-            <h2 class="text-lg font-semibold">Solicitudes de reserva</h2>
+            <UIcon
+              name="i-lucide-inbox"
+              class="size-5 text-primary"
+              aria-hidden="true"
+            />
+            <h2 class="text-lg font-semibold">
+              Solicitudes de reserva
+            </h2>
           </div>
-          <UAlert v-if="requestsError" color="error" variant="soft" title="No se pudieron cargar las solicitudes" :actions="[{ label: 'Reintentar', onClick: () => refreshRequests() }]" class="mt-4" />
+          <UAlert
+            v-if="requestsError"
+            color="error"
+            variant="soft"
+            title="No se pudieron cargar las solicitudes"
+            :actions="[{ label: 'Reintentar', onClick: () => refreshRequests() }]"
+            class="mt-4"
+          />
           <template v-else>
-            <p class="mt-5 text-4xl font-semibold tabular-nums">{{ requestsCount?.count ?? 0 }}</p>
-            <p class="mt-2 text-sm text-muted">Solicitudes pendientes de revisión; una reserva aún no es una cita confirmada.</p>
+            <p class="mt-5 text-4xl font-semibold tabular-nums">
+              {{ requestsCount?.count ?? 0 }}
+            </p>
+            <p class="mt-2 text-sm text-muted">
+              Solicitudes pendientes de revisión; una reserva aún no es una cita confirmada.
+            </p>
           </template>
-          <UButton to="/agenda/solicitudes" variant="outline" color="neutral" class="mt-5 min-h-11">Revisar solicitudes</UButton>
+          <UButton
+            to="/agenda/solicitudes"
+            variant="outline"
+            color="neutral"
+            class="mt-5 min-h-11"
+          >
+            Revisar solicitudes
+          </UButton>
         </UCard>
       </div>
-      <section aria-labelledby="mis-pacientes" class="space-y-3">
-        <h2 id="mis-pacientes" class="text-lg font-semibold">Mis pacientes</h2>
+      <section
+        aria-labelledby="mis-pacientes"
+        class="space-y-3"
+      >
+        <h2
+          id="mis-pacientes"
+          class="text-lg font-semibold"
+        >
+          Mis pacientes
+        </h2>
         <div class="grid gap-4 xl:grid-cols-3">
-          <UCard v-for="queue in reviewQueues" :key="queue.to" :ui="{ body: 'p-0 sm:p-0' }">
+          <UCard
+            v-for="queue in reviewQueues"
+            :key="queue.to"
+            :ui="{ body: 'p-0 sm:p-0' }"
+          >
             <div class="flex items-center gap-2 border-b border-default p-4">
-              <UIcon :name="queue.icon" class="size-5 shrink-0 text-primary" aria-hidden="true" />
-              <h3 class="min-w-0 flex-1 font-semibold">{{ queue.title }}</h3>
-              <UBadge v-if="!queue.error" color="neutral" variant="soft">{{ queue.rows.length }}</UBadge>
+              <UIcon
+                :name="queue.icon"
+                class="size-5 shrink-0 text-primary"
+                aria-hidden="true"
+              />
+              <h3 class="min-w-0 flex-1 font-semibold">
+                {{ queue.title }}
+              </h3>
+              <UBadge
+                v-if="!queue.error"
+                color="neutral"
+                variant="soft"
+              >
+                {{ queue.rows.length }}
+              </UBadge>
             </div>
-            <UAlert v-if="queue.error" color="error" variant="soft" title="No se pudo cargar la revisión" :actions="[{ label: 'Reintentar', onClick: () => queue.retry() }]" class="m-4" />
-            <p v-else-if="!queue.rows.length" class="p-4 text-sm text-muted">Sin pacientes por revisar.</p>
-            <ul v-else class="divide-y divide-default">
-              <li v-for="person in queue.rows.slice(0, 3)" :key="person.id">
-                <NuxtLink :to="`/pacientes/${person.id}`" class="flex min-h-16 items-center gap-2 px-4 py-2 hover:bg-elevated">
-                  <UAvatar :text="person.name.split(' ').map(part => part[0]).slice(0, 2).join('').toUpperCase()" size="sm" />
+            <UAlert
+              v-if="queue.error"
+              color="error"
+              variant="soft"
+              title="No se pudo cargar la revisión"
+              :actions="[{ label: 'Reintentar', onClick: () => queue.retry() }]"
+              class="m-4"
+            />
+            <p
+              v-else-if="!queue.rows.length"
+              class="p-4 text-sm text-muted"
+            >
+              Sin pacientes por revisar.
+            </p>
+            <ul
+              v-else
+              class="divide-y divide-default"
+            >
+              <li
+                v-for="person in queue.rows.slice(0, 3)"
+                :key="person.id"
+              >
+                <NuxtLink
+                  :to="`/pacientes/${person.id}`"
+                  class="flex min-h-16 items-center gap-2 px-4 py-2 hover:bg-elevated"
+                >
+                  <UAvatar
+                    :text="person.name.split(' ').map(part => part[0]).slice(0, 2).join('').toUpperCase()"
+                    size="sm"
+                  />
                   <span class="min-w-0 flex-1"><span class="block truncate text-sm font-semibold">{{ person.name }}</span><span class="block truncate text-xs text-muted">{{ person.detail }}</span></span>
-                  <UBadge color="neutral" variant="soft" size="sm">{{ person.status }}</UBadge>
+                  <UBadge
+                    color="neutral"
+                    variant="soft"
+                    size="sm"
+                  >{{ person.status }}</UBadge>
                 </NuxtLink>
               </li>
             </ul>
-            <UButton :to="queue.to" variant="link" class="m-2 min-h-11">Ver todos</UButton>
+            <UButton
+              :to="queue.to"
+              variant="link"
+              class="m-2 min-h-11"
+            >
+              Ver todos
+            </UButton>
           </UCard>
         </div>
       </section>
-
     </template>
     <template v-else-if="isParent">
       <h1 class="text-2xl font-semibold">
@@ -235,17 +318,33 @@ function age(birthDate: string) {
           class="block rounded-xl border border-default bg-default p-4 transition hover:border-primary focus-visible:outline-2 focus-visible:outline-primary"
         >
           <span class="flex items-center gap-3">
-            <UAvatar :text="child.name.slice(0, 1).toUpperCase()" size="lg" />
+            <UAvatar
+              :text="child.name.slice(0, 1).toUpperCase()"
+              size="lg"
+            />
             <span class="min-w-0 flex-1"><span class="block text-lg font-semibold">{{ child.name }}</span><span class="text-sm text-muted">{{ age(child.birthDate) }}</span></span>
-            <UIcon name="i-lucide-chevron-right" class="size-5 text-muted" aria-hidden="true" />
+            <UIcon
+              name="i-lucide-chevron-right"
+              class="size-5 text-muted"
+              aria-hidden="true"
+            />
           </span>
           <template v-if="child.lastControl">
             <span class="mt-3 block font-medium">Último control · {{ dateFormat.format(new Date(child.lastControl.measuredAt)) }}</span>
             <span class="mt-2 grid grid-cols-3 gap-2 text-sm tabular-nums"><span>Peso<br><strong>{{ weightFormat.format(child.lastControl.weightKg) }} kg</strong></span><span>{{ child.lastControl.position === 'RECUMBENT' ? 'Longitud' : 'Talla' }}<br><strong>{{ sizeFormat.format(child.lastControl.lengthHeightCm) }} cm</strong></span><span>Cabeza<br><strong>{{ sizeFormat.format(child.lastControl.headCircumferenceCm) }} cm</strong></span></span>
-            <span v-if="child.lastControl.parentAdvice" class="mt-3 block rounded-lg bg-primary/10 p-3"><span class="block font-medium text-primary">Indicaciones de tu pediatra</span><span class="line-clamp-2 text-sm">{{ child.lastControl.parentAdvice }}</span></span>
-            <span v-if="child.lastControl.nextControlAt" class="mt-3 block text-sm">Próximo control · {{ dateTimeFormat.format(new Date(child.lastControl.nextControlAt)) }}</span>
+            <span
+              v-if="child.lastControl.parentAdvice"
+              class="mt-3 block rounded-lg bg-primary/10 p-3"
+            ><span class="block font-medium text-primary">Indicaciones de tu pediatra</span><span class="line-clamp-2 text-sm">{{ child.lastControl.parentAdvice }}</span></span>
+            <span
+              v-if="child.lastControl.nextControlAt"
+              class="mt-3 block text-sm"
+            >Próximo control · {{ dateTimeFormat.format(new Date(child.lastControl.nextControlAt)) }}</span>
           </template>
-          <span v-else class="mt-3 block text-sm text-muted">Aún no hay controles compartidos.</span>
+          <span
+            v-else
+            class="mt-3 block text-sm text-muted"
+          >Aún no hay controles compartidos.</span>
         </NuxtLink>
       </div>
     </template>

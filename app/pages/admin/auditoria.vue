@@ -3,13 +3,13 @@ import type { AuditPage, DataRequest, DataRequestPage } from '#shared/types/admi
 
 const route = useRoute()
 const tab = computed(() => route.query.tab === 'solicitudes' ? 'solicitudes' : 'registro')
-const filters = reactive({ action: '', actorId: '', outcome: '', from: '', to: '' })
+const filters = reactive({ action: '', actorId: '', outcome: 'ALL', from: '', to: '' })
 const applied = ref({ ...filters })
 const page = ref(1)
 const query = computed(() => ({
   page: page.value,
   pageSize: 25,
-  ...Object.fromEntries(Object.entries(applied.value).filter(([key, value]) => value && key !== 'from' && key !== 'to')),
+  ...Object.fromEntries(Object.entries(applied.value).filter(([key, value]) => value && !(key === 'outcome' && value === 'ALL') && key !== 'from' && key !== 'to')),
   ...(applied.value.from ? { from: `${applied.value.from}T00:00:00.000-05:00` } : {}),
   ...(applied.value.to ? { to: `${applied.value.to}T23:59:59.999-05:00` } : {})
 }))
@@ -143,7 +143,7 @@ async function advance(item: DataRequest) {
           <USelect
             v-model="filters.outcome"
             name="outcome"
-            :items="[{ label: 'Todos', value: '' }, { label: 'Permitido', value: 'ALLOWED' }, { label: 'Denegado', value: 'DENIED' }]"
+            :items="[{ label: 'Todos', value: 'ALL' }, { label: 'Permitido', value: 'ALLOWED' }, { label: 'Denegado', value: 'DENIED' }]"
             class="w-full"
           />
         </UFormField>

@@ -80,28 +80,120 @@ async function updatePreference(channel: 'email' | 'whatsapp', event: Event) {
       </h1>
     </header>
     <div class="space-y-4">
-      <section v-if="isStaff && !navigationError" class="rounded-xl border border-default bg-default p-4">
+      <section
+        v-if="isStaff && !navigationError"
+        class="rounded-xl border border-default bg-default p-4"
+      >
         <div class="flex items-center gap-4">
-          <UAvatar :text="user?.name?.split(' ').map(part => part[0]).slice(0, 2).join('').toUpperCase() || 'CP'" size="xl" />
-          <div class="min-w-0"><h2 class="text-lg font-semibold">{{ user?.name }}</h2><p class="text-sm text-muted">{{ roles }}</p></div>
+          <UAvatar
+            :text="user?.name?.split(' ').map(part => part[0]).slice(0, 2).join('').toUpperCase() || 'CP'"
+            size="xl"
+          />
+          <div class="min-w-0">
+            <h2 class="text-lg font-semibold">
+              {{ user?.name }}
+            </h2><p class="text-sm text-muted">
+              {{ roles }}
+            </p>
+          </div>
         </div>
         <dl class="mt-4 grid gap-3 border-t border-default pt-4 text-sm sm:grid-cols-2">
-          <div><dt class="text-muted">Usuario</dt><dd class="font-medium">{{ identity?.username || '—' }}</dd></div>
-          <div><dt class="text-muted">Correo electrónico</dt><dd class="break-all font-medium">{{ user?.email || '—' }}</dd></div>
+          <div>
+            <dt class="text-muted">
+              Usuario
+            </dt><dd class="font-medium">
+              {{ identity?.username || '—' }}
+            </dd>
+          </div>
+          <div>
+            <dt class="text-muted">
+              Correo electrónico
+            </dt><dd class="break-all font-medium">
+              {{ user?.email || '—' }}
+            </dd>
+          </div>
         </dl>
       </section>
-      <section v-if="isStaff && !navigationError" class="rounded-xl border border-default bg-default p-4">
-        <h2 class="font-semibold">Seguridad</h2>
-        <UAlert v-if="passwordError" color="error" variant="soft" :title="passwordError" class="my-3" />
-        <UAlert v-if="passwordSaved" color="success" variant="soft" title="Contraseña actualizada" class="my-3" />
-        <UButton v-if="!passwordOpen" variant="outline" color="neutral" class="mt-3 min-h-11" @click="passwordOpen = true">Cambiar contraseña</UButton>
-        <form v-else class="mt-3 space-y-3" @submit.prevent="changePassword">
-          <UFormField label="Contraseña actual" required><UInput v-model="currentPassword" type="password" autocomplete="current-password" required class="w-full" /></UFormField>
-          <UFormField label="Nueva contraseña" description="Use al menos 10 caracteres y evite contraseñas comunes." required><UInput v-model="newPassword" type="password" autocomplete="new-password" required minlength="10" class="w-full" /></UFormField>
-          <div class="flex gap-2"><UButton type="submit" :loading="changingPassword" class="min-h-11">Guardar contraseña</UButton><UButton variant="ghost" color="neutral" class="min-h-11" @click="passwordOpen = false">Cancelar</UButton></div>
+      <section
+        v-if="isStaff && !navigationError"
+        class="rounded-xl border border-default bg-default p-4"
+      >
+        <h2 class="font-semibold">
+          Seguridad
+        </h2>
+        <UAlert
+          v-if="passwordError"
+          color="error"
+          variant="soft"
+          :title="passwordError"
+          class="my-3"
+        />
+        <UAlert
+          v-if="passwordSaved"
+          color="success"
+          variant="soft"
+          title="Contraseña actualizada"
+          class="my-3"
+        />
+        <UButton
+          v-if="!passwordOpen"
+          variant="outline"
+          color="neutral"
+          class="mt-3 min-h-11"
+          @click="passwordOpen = true"
+        >
+          Cambiar contraseña
+        </UButton>
+        <form
+          v-else
+          class="mt-3 space-y-3"
+          @submit.prevent="changePassword"
+        >
+          <UFormField
+            label="Contraseña actual"
+            required
+          >
+            <UInput
+              v-model="currentPassword"
+              type="password"
+              autocomplete="current-password"
+              required
+              class="w-full"
+            />
+          </UFormField>
+          <UFormField
+            label="Nueva contraseña"
+            description="Use al menos 10 caracteres y evite contraseñas comunes."
+            required
+          >
+            <UInput
+              v-model="newPassword"
+              type="password"
+              autocomplete="new-password"
+              required
+              minlength="10"
+              class="w-full"
+            />
+          </UFormField>
+          <div class="flex gap-2">
+            <UButton
+              type="submit"
+              :loading="changingPassword"
+              class="min-h-11"
+            >
+              Guardar contraseña
+            </UButton><UButton
+              variant="ghost"
+              color="neutral"
+              class="min-h-11"
+              @click="passwordOpen = false"
+            >
+              Cancelar
+            </UButton>
+          </div>
         </form>
       </section>
-       <UAlert
+      <UAlert
         v-if="navigationError"
         color="error"
         variant="soft"
@@ -221,12 +313,12 @@ async function updatePreference(channel: 'email' | 'whatsapp', event: Event) {
       </div>
       <UButton
         v-if="isStaff && !navigationError"
-         variant="outline"
-         color="error"
-         icon="i-lucide-log-out"
-         :loading="loggingOut"
-         class="min-h-11"
-         @click="logout"
+        variant="outline"
+        color="error"
+        icon="i-lucide-log-out"
+        :loading="loggingOut"
+        class="min-h-11"
+        @click="logout"
       >
         Cerrar sesión
       </UButton>

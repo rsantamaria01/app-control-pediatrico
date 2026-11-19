@@ -108,11 +108,15 @@ async function save() {
               required
             />
           </UFormField>
-          <UFormField label="Posición de la medición" description="Seleccione cómo se midió al paciente; el cálculo OMS utiliza esta posición." required>
+          <UFormField
+            label="Posición de la medición"
+            description="Seleccione cómo se midió al paciente; el cálculo OMS utiliza esta posición."
+            required
+          >
             <USelect
               v-model="state.position"
               :items="[{ label: 'Acostado', value: 'RECUMBENT' }, { label: 'De pie', value: 'STANDING' }]"
-               placeholder="Seleccione la posición"
+              placeholder="Seleccione la posición"
               class="w-full"
             />
           </UFormField>

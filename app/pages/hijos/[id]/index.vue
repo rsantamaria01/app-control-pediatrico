@@ -148,7 +148,6 @@ const advice = computed(() => child.value?.visits.filter(visit => visit.parentAd
               Consulte las mediciones compartidas por la clínica y sus gráficos de crecimiento con su pediatra.
             </p>
           </UCard>
-
         </div>
         <div class="space-y-5">
           <UCard

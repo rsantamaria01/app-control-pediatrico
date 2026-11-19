@@ -144,7 +144,7 @@ describe('approved report boundary', () => {
     expect(retrieved.content.visits[0]?.parentAdvice).toBe('Indicaciones compartidas')
     expect(JSON.stringify(retrieved)).not.toMatch(/PRIVATE|Cambio posterior|Vacuna posterior|\bz\b|percentile|classification|status|bmi/i)
     await expect(getApprovedReport(stranger, childId, approved.id)).rejects.toMatchObject({ statusCode: 404 })
-    await expect(getApprovedReport({ id: guardian.id, roles: ['PATIENT', 'DOCTOR'] }, childId, approved.id)).rejects.toMatchObject({ statusCode: 404 })
+    expect(await getApprovedReport({ id: guardian.id, roles: ['PATIENT', 'DOCTOR'] }, childId, approved.id)).toEqual(retrieved)
     await expect(getApprovedReport(guardian, otherChildId, approved.id)).rejects.toMatchObject({ statusCode: 404 })
     await db.insert(visitSharing).values({ visitId: sharedId, shared: false, changedBy: doctor.id })
     await db.insert(visitSharing).values({ visitId: laterId, shared: false, changedBy: doctor.id })

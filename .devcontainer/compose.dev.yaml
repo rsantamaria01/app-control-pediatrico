@@ -35,6 +35,18 @@ services:
       S3_SECRET_KEY: ${S3_SECRET_KEY:-pediatrico-dev-secret}
       NUXT_HOST: 0.0.0.0
 
+  # Loopback-only ports so agents running on the CT host (Paseo/OpenCode) can reach dev services.
+  # Raul 2026-11-18. Never bind these to 0.0.0.0.
+  db:
+    ports:
+      - '127.0.0.1:5433:5432'
+  cache:
+    ports:
+      - '127.0.0.1:6380:6379'
+  storage:
+    ports:
+      - '127.0.0.1:9010:9000'
+
 volumes:
   pnpm-store: {}
   opencode-data: {}

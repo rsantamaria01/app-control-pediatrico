@@ -10,7 +10,7 @@ WHO growth standards. Guardians see only their own children's approved shareable
 - Commit locally as often as you like. **Never `git push` until Raul says OK in the chat**
   after he reviews your work. CI runs on every push.
 - `docs/design/DESIGN.md` is the spec. The design-fidelity skill stays suspended: no artboard
-  comparisons; Raul reviews by eye in the Paseo shared browser.
+  comparisons; Raul reviews by eye in the workspace's Paseo Server Browser.
 - Pending parity items: DESIGN.md «Pendiente de aprobación».
 
 ## Stack
@@ -34,10 +34,12 @@ WHO growth standards. Guardians see only their own children's approved shareable
 
 ## Workflow (one job = one Paseo workspace = one branch)
 1. Work only in your Paseo workspace; its branch starts from `feat/alpha`.
-2. UI jobs only: run the single dev server for review. Load `host-dev.env`, then
-   `/root/.config/app-monitoreo-pediatrico/ui-dev.env`, then `pnpm dev`. It serves the demo DB
-   with role emulation on `http://localhost:3400`. Raul reviews in the workspace's Shared Browser.
-   Keep it buildable: a broken file shows Raul an error overlay. Non-UI jobs never start a dev server.
+2. UI jobs only: the single dev server for review is the `web` service in `paseo.json`
+   (`nuxt dev` with hot reload; it loads `host-dev.env` and
+   `/root/.config/app-monitoreo-pediatrico/ui-dev.env`). Start it from Paseo, not by hand. It serves
+   the demo DB with role emulation on `http://localhost:3400`. Raul reviews in the workspace's
+   Server Browser. You cannot drive that browser: verify with tests or `curl`. Keep the worktree
+   buildable: a broken file shows Raul an error overlay. Non-UI jobs never start a dev server.
 3. Before asking Raul to review: `pnpm lint && pnpm typecheck && pnpm test`, plus the integration
    tests for what you touched (`pnpm exec vitest run -c vitest.integration.config.ts <files>`).
 4. Commit locally. Tell Raul what to look at (path and role). Wait for his OK, then push and open
@@ -48,7 +50,7 @@ WHO growth standards. Guardians see only their own children's approved shareable
 - `pnpm test` — unit tests · `pnpm test:integration` · `pnpm test:e2e` — Playwright
 - `pnpm lint` · `pnpm typecheck` · `pnpm build`
 - `pnpm db:generate` / `pnpm db:migrate` — Drizzle migrations
-- `pnpm dev` only as described in Workflow step 2.
+- `pnpm dev` only through the `paseo.json` `web` service (Workflow step 2).
 
 ## Resource and safety rules (CT 157 ran out of RAM twice)
 - At most one dev server on the host (the UI job's, port 3400). No watch modes.
